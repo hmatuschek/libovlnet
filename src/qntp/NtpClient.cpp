@@ -20,6 +20,7 @@
 #include "NtpPacket.h"
 #include "NtpReply.h"
 #include "NtpReply_p.h"
+#include <cstring>
 
 NtpClient::NtpClient(QObject *parent): QObject(parent) {
   init(QHostAddress::Any, 0);
@@ -66,7 +67,7 @@ void NtpClient::readPendingDatagrams() {
     QHostAddress address;
     quint16 port;
 
-    if(mSocket->readDatagram(reinterpret_cast<char *>(&packet), sizeof(packet), &address, &port) < sizeof(NtpPacket))
+    if(mSocket->readDatagram(reinterpret_cast<char *>(&packet), sizeof(packet), &address, &port) < qint64(sizeof(NtpPacket)))
       continue;
 
     QDateTime now = QDateTime::currentDateTime();

@@ -1,8 +1,8 @@
 # chord sources
 set(vlf_chord_SOURCES
-   chord/chord.cpp chord/transport.cpp)
+    chord/chord.cpp chord/transport.cpp)
 set(vlf_chord_MOC_HEADERS
-   chord/chord.h   chord/transport.h)
+    chord/chord.h chord/transport.h)
 set(vlf_chord_HEADERS ${vlf_chord_MOC_HEADERS})
 
 # libqntp sources
@@ -15,14 +15,13 @@ set(vlf_ntp_HEADERS
     ${vlf_ntp_MOC_HEADERS})
 
 # client sources
-set(vlf_SOURCES ${vlf_ntp_SOURCES} ${vlf_chord_SOURCES}}
+set(vlf_SOURCES ${vlf_ntp_SOURCES} ${vlf_chord_SOURCES}
     main.cpp application.cpp )
 set(vlf_MOC_HEADERS ${vlf_ntp_MOC_HEADERS} ${vlf_chord_MOC_HEADERS}
     application.h )
 set(vlf_HEADERS ${vlf_ntp_HEADERS} ${vlf_chord_HEADERS} ${vlf_MOC_HEADERS})
 
 qt5_wrap_cpp(vlf_MOC_SOURCES ${vlf_MOC_HEADERS})
-set(vlf_HEADERS logger.hh ${vlf_MOC_HEADERS} )
 
 add_executable(vlfclient ${vlf_SOURCES} ${vlf_MOC_SOURCES} ${vlf_RCC_SOURCES})
 target_link_libraries(vlfclient ${LIBS})

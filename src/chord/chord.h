@@ -2,8 +2,7 @@
 #define CHORD_H
 
 #include <QObject>
-#include "libutp/utp.h"
-
+#include "transport.h"
 
 class Chord : public QObject
 {
@@ -11,8 +10,7 @@ class Chord : public QObject
 
 public:
   explicit Chord(QObject *parent = 0);
-
-
+  virtual ~Chord();
 };
 
 #endif // CHORD_H
