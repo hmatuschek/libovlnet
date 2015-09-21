@@ -15,8 +15,8 @@ set(vlf_ntp_HEADERS
     ${vlf_ntp_MOC_HEADERS})
 
 # client sources
-set(vlf_SOURCES main.cpp ${vlf_ntp_SOURCES} ${vlf_chord_SOURCES}}
-    application.cpp )
+set(vlf_SOURCES ${vlf_ntp_SOURCES} ${vlf_chord_SOURCES}}
+    main.cpp application.cpp )
 set(vlf_MOC_HEADERS ${vlf_ntp_MOC_HEADERS} ${vlf_chord_MOC_HEADERS}
     application.h )
 set(vlf_HEADERS ${vlf_ntp_HEADERS} ${vlf_chord_HEADERS} ${vlf_MOC_HEADERS})

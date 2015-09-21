@@ -1,3 +1,0 @@
-[submodule "src/libutp"]
-	path = src/libutp
-	url = https://github.com/bittorrent/libutp.git
