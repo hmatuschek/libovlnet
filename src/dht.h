@@ -37,7 +37,8 @@
 
 // Forward declarations
 class Identifier;
-
+class FindNodeQuery;
+class Node;
 
 
 /** The distance between two identifiers. */
@@ -59,7 +60,7 @@ public:
 class Identifier : public QByteArray
 {
 public:
-  /** Empty constructor. */
+  /** Creates a new random identifier. */
   Identifier();
   /** Constructor. */
   Identifier(const char *id);
@@ -134,6 +135,7 @@ public:
   void add(const Item &item);
   /** The minimum prefix of the bucket. */
   size_t prefix() const;
+
   /** Splits the bucket at its prefix. Means all item with a higher prefix (smaller distance)
    * than the prefix of this bucket are moved to the new one. */
   void split(Bucket &newBucket);
@@ -163,23 +165,13 @@ public:
 
 protected:
   /** Returns the bucket index, an item should be searched for. */
-  size_t index(const Bucket::Item &item) const;
+  QList<Bucket>::iterator index(const Bucket::Item &item);
 
 protected:
   /** The bucket list. */
-  QVector<Bucket> _buckets;
+  QList<Bucket> _buckets;
 };
 
-
-/** Represents a triple of ID, IP address and port as transferred via UDP. */
-typedef struct {
-  /** The ID of a node. */
-  char     id[DHT_HASH_SIZE];
-  /** The IP of the node. */
-  uint8_t  ip[4];
-  /** The port of the node. */
-  uint16_t port;
-} DHTTriple;
 
 
 /** The structure of the UDP datagrams transferred. */
@@ -192,6 +184,16 @@ typedef struct {
     FIND_VALUE,
     GET_DATA,
   } Type;
+
+  /** Represents a triple of ID, IP address and port as transferred via UDP. */
+  typedef struct {
+    /** The ID of a node. */
+    char     id[DHT_HASH_SIZE];
+    /** The IP of the node. */
+    uint32_t  ip;
+    /** The port of the node. */
+    uint16_t port;
+  } DHTTriple;
 
   /** The magic cookie to match a response to a request. */
   char    cookie[DHT_HASH_SIZE];
@@ -238,35 +240,49 @@ typedef struct {
     struct {
       uint64_t offset;
     } ack_data;
-  };
+  } payload;
 } Message;
 
 
-class RequestItem
+class QueryItem: public QObject
 {
+  Q_OBJECT
+
 protected:
-  RequestItem(Message::Type type);
+  QueryItem(Message::Type type, const Identifier &destination);
 
 public:
   inline Message::Type type() const { return _type; }
+  inline const Identifier &destination() const { return _destination; }
+  inline const Identifier &identifier() const { return _queryId; }
   inline const QDateTime &timestamp() const { return _timeStamp; }
 
 protected:
   Message::Type _type;
+  Identifier    _queryId;
+  Identifier    _destination;
   QDateTime     _timeStamp;
 };
 
 
-class PingRequestItem: public RequestItem
+class PingQueryItem: public QueryItem
+{
+  Q_OBJECT
+
+public:
+  PingQueryItem(const Identifier &destination);
+};
+
+
+class FindNodeQuery: public QueryItem
 {
 public:
-  PingRequestItem(const Identifier &id);
-
-  inline const Identifier &identifier() const { return _id; }
+  FindNodeQuery(const Identifier &destination, const Identifier &id);
+  ~FindNodeQuery();
 
 protected:
-  Identifier _id;
 };
+
 
 
 
@@ -288,6 +304,11 @@ public:
 
 signals:
 
+protected:
+  /** Sends a FindNode message to the node @c to to search for the node specified by @c id.
+   * Any response to that request will be forwarded to the specified @c query. */
+  void sendFindNode(const Identifier &id, const Identifier &to, FindNodeQuery *query);
+
 protected slots:
   /** Gets called on the reception of a UDP package. */
   void _onReadyRead();
@@ -302,7 +323,7 @@ protected:
   /** The kex->value map. */
   QHash<Identifier, QVector<Bucket::Item> > _table;
   /** The list of pending requests. */
-  QHash<Identifier, RequestItem *> _pendingRequests;
+  QHash<Identifier, QueryItem *> _pendingRequests;
 };
 
 

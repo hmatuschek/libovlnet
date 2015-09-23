@@ -1,12 +1,16 @@
 #include "dht.h"
+#include <netinet/in.h>
+
 
 /* ******************************************************************************************** *
  * Implementation of Identifier
  * ******************************************************************************************** */
 Identifier::Identifier()
-  : QByteArray()
+  : QByteArray(DHT_HASH_SIZE, 0)
 {
-  // pass...
+  for (int i=0; i<DHT_HASH_SIZE; i++) {
+    (*this)[i] = qrand() % 0xff;
+  }
 }
 
 Identifier::Identifier(const char *id)
@@ -154,7 +158,7 @@ Bucket::Bucket(const Bucket &other)
 
 bool
 Bucket::full() const {
-  return _maxSize==_triples.size();
+  return int(_maxSize)==_triples.size();
 }
 
 bool
@@ -211,53 +215,66 @@ Buckets::add(const Bucket::Item &item) {
   // If there are no buckets -> create one.
   if (0 == _buckets.size()) {
     _buckets.append(Bucket());
-    _buckets[0].add(item);
+    _buckets.back().add(item);
     return;
   }
-  // Find the bucket, the item belongs to
-  size_t idx = index(item);
-  Bucket &bucket = _buckets[idx];
 
-  if (bucket.contains(item.id())) {
+  // Find the bucket, the item belongs to
+  QList<Bucket>::iterator bucket = index(item);
+
+  if (bucket->contains(item.id()) || (! bucket->full())) {
     // If the bucket contains the item already -> update
-    bucket.add(item);
-  } else if (bucket.full() && ((_buckets.size()-1)  == idx)) {
-    // If the bucket is full and I could create one -> do it
-    Bucket newBucket;
-    bucket.split(newBucket);
-    _buckets.append(newBucket);
-    // Repeat step if needed
-    this->add(item);
+    bucket->add(item);
   } else {
-    // If I cannot create a new Bucket or if the bucket is not full
-    bucket.add(item);
+    // If the item is new to the bucket and if the bucket is full
+    //  -> check if it can be splitted
+    QList<Bucket>::iterator next = bucket; next++;
+    if (next==_buckets.end()) {
+      Bucket newBucket;
+      bucket->split(newBucket);
+      _buckets.insert(next, newBucket);
+    } else {
+      // If I cannot split the bucket -> override one
+      bucket->add(item);
+    }
   }
 }
 
-size_t
-Buckets::index(const Bucket::Item &item) const {
-  if (2 > _buckets.size()) { return 0; }
-  for (size_t i=0; i<(_buckets.size()-1); i++) {
-    if (_buckets[i].prefix() == item.prefix()) { return i; }
-    if (_buckets[i+1].prefix() > item.prefix()) { return i; }
+QList<Bucket>::iterator
+Buckets::index(const Bucket::Item &item) {
+  if (2 > _buckets.size()) { return _buckets.begin(); }
+  QList<Bucket>::iterator current = _buckets.begin();
+  QList<Bucket>::iterator next = _buckets.begin(); next++;
+  for (; next < _buckets.end(); current++, next++) {
+    if (current->prefix() == item.prefix()) { return current; }
+    if (next->prefix() > item.prefix()) { return current; }
   }
-  return _buckets.size()-1;
+  return _buckets.end()--;
 }
 
 
 /* ******************************************************************************************** *
  * Implementation of RequestItem etc.
  * ******************************************************************************************** */
-RequestItem::RequestItem(Message::Type type)
-  : _type(type), _timeStamp(QDateTime::currentDateTime())
+QueryItem::QueryItem(Message::Type type, const Identifier &destination)
+  : _type(type), _destination(destination), _timeStamp(QDateTime::currentDateTime())
 {
   // pass...
 }
 
-PingRequestItem::PingRequestItem(const Identifier &id)
-  : RequestItem(Message::PING), _id(id)
+PingQueryItem::PingQueryItem(const Identifier &destination)
+  : QueryItem(Message::PING, destination)
 {
   // pass...
+}
+
+FindNodeQuery::FindNodeQuery(const Identifier &destination, const Identifier &id)
+  : QueryItem(Message::FIND_NODE, id)
+{
+  // pass...
+}
+
+FindNodeQuery::~FindNodeQuery() {
 }
 
 
@@ -298,15 +315,41 @@ Node::_onReadyRead() {
 
     if (_pendingRequests.contains(cookie)) {
       // Message is a response -> dispatch by type from table
-      RequestItem *item = _pendingRequests[cookie];
+      QueryItem *item = _pendingRequests[cookie];
       if (Message::PING == item->type()) {
         // Response to a ping request -> update buckets.
-        PingRequestItem *pitem = reinterpret_cast<PingRequestItem *>(item);
-        _buckets.add(Bucket::Item(pitem->identifier(), addr, port,
-                                  (pitem->identifier()-_id).leadingBit()));
+        PingQueryItem *pitem = reinterpret_cast<PingQueryItem *>(item);
+        _buckets.add(Bucket::Item(pitem->destination(), addr, port,
+                                  (pitem->destination()-_id).leadingBit()));
+        // Request finished -> remove from table
+        _pendingRequests.remove(cookie);
+        delete pitem;
       } else if (Message::FIND_NODE == item->type()) {
-        // Response to a find node request
-
+        // Response to a find node request -> unpack result
+        FindNodeQuery *ritem = reinterpret_cast<FindNodeQuery *>(item);
+        // payload length must be a multiple of triple length
+        if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
+          qDebug() << "Received a malformed FIND_NODE response from"
+                   << addr << ":" << port;
+          _pendingRequests.remove(ritem->destination());
+          delete ritem;
+          continue;
+        }
+        // unpack
+        size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
+        QList<Bucket::Item> items; items.reserve(Ntriple);
+        for (size_t i=0; i<Ntriple; i++) {
+          Identifier id(msg.payload.result.triples[i].id);
+          items.push_back(Bucket::Item(
+                            id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
+                            ntohs(msg.payload.result.triples[i].port),
+                            (id-_id).leadingBit()));
+        }
+        // signal results to query
+        ritem->query()->update(items);
+        // remove request from list
+        _pendingRequests.remove(ritem->destination());
+        delete ritem;
       }
     } else {
       // Message is likely a request
