@@ -1,10 +1,3 @@
-# chord sources
-set(vlf_chord_SOURCES
-    chord/chord.cpp chord/transport.cpp)
-set(vlf_chord_MOC_HEADERS
-    chord/chord.h chord/transport.h)
-set(vlf_chord_HEADERS ${vlf_chord_MOC_HEADERS})
-
 # libqntp sources
 set(vlf_ntp_SOURCES
     qntp/NtpClient.cpp qntp/NtpReply.cpp)
@@ -16,9 +9,9 @@ set(vlf_ntp_HEADERS
 
 # client sources
 set(vlf_SOURCES ${vlf_ntp_SOURCES} ${vlf_chord_SOURCES}
-    main.cpp application.cpp )
+    main.cpp dht.cpp application.cpp )
 set(vlf_MOC_HEADERS ${vlf_ntp_MOC_HEADERS} ${vlf_chord_MOC_HEADERS}
-    application.h )
+    application.h dht.h)
 set(vlf_HEADERS ${vlf_ntp_HEADERS} ${vlf_chord_HEADERS} ${vlf_MOC_HEADERS})
 
 qt5_wrap_cpp(vlf_MOC_SOURCES ${vlf_MOC_HEADERS})
