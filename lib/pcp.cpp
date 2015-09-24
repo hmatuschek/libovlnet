@@ -80,7 +80,7 @@ PCPClient::requestMap(uint16_t iport, const QHostAddress &addr, uint16_t port)
   request.version  = 2;
   request.response = 0;
   request.opcode   = 1;
-  request.lifetime = 60*60; // request 1h
+  request.lifetime = htonl(60*60); // request 1h
   memcpy(request.ipv6, local.toIPv6Address().c, 16);
   memcpy(request.mapRequest.nonce, _nonce, 12);
   request.mapRequest.protocol = 17;
@@ -110,7 +110,11 @@ PCPClient::_onDatagramReceived() {
       qDebug() << "Invalid response nonce received from" << addr << ":" << port;
       return;
     }
-
+    if (SUCCESS == response.result) {
+      emit mapping(ntohs(response.mapResponse.iport),
+                   QHostAddress(response.mapResponse.eipv6),
+                   ntohs(response.mapResponse.eport));
+    }
   }
 }
 

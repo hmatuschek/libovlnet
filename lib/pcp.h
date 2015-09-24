@@ -16,6 +16,9 @@ public:
 public slots:
   void requestMap(uint16_t iport, const QHostAddress &addr, uint16_t port=5351);
 
+signals:
+  void mapping(uint16_t iport, const QHostAddress &eaddr, uint16_t eport);
+
 protected slots:
   void _onDatagramReceived();
 
