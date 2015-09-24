@@ -144,7 +144,7 @@ public:
   inline const Identifier &cookie() const { return _cookie; }
   inline const QDateTime &timestamp() const { return _timestamp; }
   inline size_t olderThan(size_t seconds) const {
-    return (_timestamp.addSecs(seconds) < QDateTime::currentDateTime());
+    return (_timestamp.addMSecs(seconds) < QDateTime::currentDateTime());
   }
 
 protected:
@@ -731,8 +731,6 @@ DHT::DHT(const Identifier &id, const QHostAddress &addr, quint16 port, QObject *
     _announcementTimer()
 {
   qDebug() << "Start node #" << id << "at" << addr << ":" << port;
-  qDebug() << " sizeof(Message)=" << sizeof(Message);
-  qDebug() << " sizeof(DHTTriple)=" << sizeof(DHTTriple);
 
   if (!_socket.bind(addr, port)) {
     qDebug() << "Cannot bind to port" << addr << ":" << port;
@@ -1200,7 +1198,9 @@ DHT::_onCheckRequestTimeout() {
   QList<Request *> deadRequests;
   QHash<Identifier, Request *>::iterator item = _pendingRequests.begin();
   for (; item != _pendingRequests.end(); item++) {
-    if ((*item)->olderThan(2)) { deadRequests.append(*item); }
+    if ((*item)->olderThan(2000)) {
+      deadRequests.append(*item);
+    }
   }
 
   // Process dead requests, dispatch by type
@@ -1208,9 +1208,11 @@ DHT::_onCheckRequestTimeout() {
   for (; req != deadRequests.end(); req++) {
     _pendingRequests.remove((*req)->cookie());
     if (MSG_PING == (*req)->type()) {
+      qDebug() << "Ping request timeout...";
       // Just ignore
       delete *req;
     } else if (MSG_FIND_NODE == (*req)->type()) {
+      qDebug() << "FindNode request timeout...";
       FindNodeQuery *query = static_cast<FindNodeRequest *>(*req)->query();
       // Get next node to query
       NodeItem next;
@@ -1233,6 +1235,7 @@ DHT::_onCheckRequestTimeout() {
       // Send next request
       sendFindNode(next, query);
     } else if (MSG_FIND_VALUE == (*req)->type()) {
+      qDebug() << "FindValue request timeout...";
       FindValueQuery *query = static_cast<FindValueRequest *>(*req)->query();
       // Get next node to query
       NodeItem next;
