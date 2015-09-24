@@ -516,6 +516,8 @@ Bucket::removeOlderThan(size_t age) {
   QHash<Identifier, Item>::iterator item = _triples.begin();
   while (item != _triples.end()) {
     if (item->olderThan(age)) {
+      qDebug() << "Lost contact to" << item.key()
+               << "@" << item->addr() << ":" << item->port();
       item = _triples.erase(item);
     } else {
       item++;
