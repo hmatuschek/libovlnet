@@ -545,14 +545,33 @@ FindValueRequest::FindValueRequest(FindValueQuery *query)
  * Implementation of Node
  * ******************************************************************************************** */
 Node::Node(const Identifier &id, const QHostAddress &addr, quint16 port, QObject *parent)
-  : QObject(parent), _self(id), _socket(), _buckets(_self)
+  : QObject(parent), _self(id), _socket(), _buckets(_self), _requestTimer(), _nodeTimer(),
+    _announcementTimer()
 {
+  qDebug() << "Start node #" << id << "at" << addr << ":" << port;
   if (!_socket.bind(addr, port)) {
     qDebug() << "Cannot bind to port" << addr << ":" << port;
     return;
   }
 
+  // check request timeouts every 500ms
+  _requestTimer.setInterval(500);
+  _requestTimer.setSingleShot(false);
+  // check for dead nodes every minute
+  _nodeTimer.setInterval(1000*60);
+  _nodeTimer.setSingleShot(false);
+  // check announcements every 5 minutes
+  _announcementTimer.setInterval(1000*60*5);
+  _announcementTimer.setSingleShot(false);
+
   QObject::connect(&_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+  QObject::connect(&_requestTimer, SIGNAL(timeout()), this, SLOT(_onCheckRequestTimeout()));
+  QObject::connect(&_nodeTimer, SIGNAL(timeout()), this, SLOT(_onCheckNodeTimeout()));
+  QObject::connect(&_announcementTimer, SIGNAL(timeout()), this, SLOT(_onCheckAnnouncementTimeout()));
+
+  _requestTimer.start();
+  _nodeTimer.start();
+  _announcementTimer.start();
 }
 
 Node::~Node() {
@@ -568,17 +587,23 @@ void
 Node::ping(const QHostAddress &addr, uint16_t port) {
   // Create ping request
   PingRequest *req = new PingRequest();
+  _pendingRequests.insert(req->cookie(), req);
+
   // Assemble message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   memcpy(msg.payload.ping.id, _self.data(), DHT_HASH_SIZE);
   msg.payload.ping.type = Message::PING;
+  qDebug() << "Send ping to" << addr << ":" << port;
   // send it
-  _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port);
+  if(0 > _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port)) {
+    qDebug() << "Failed to send ping to" << addr << ":" << port;
+  }
 }
 
 void
 Node::findNode(const Identifier &id) {
+  qDebug() << "Search for node" << id;
   // Create a query instance
   FindNodeQuery *query = new FindNodeQuery(id);
   // Collect DHT_K nearest nodes
@@ -586,6 +611,7 @@ Node::findNode(const Identifier &id) {
   // Send request to the first element in the list
   NodeItem next;
   if (! query->next(next)) {
+    qDebug() << "Can not find node" << id << ". Buckets empty.";
     delete query; emit nodeNotFound(id);
   } else {
     sendFindNode(next, query);
@@ -594,6 +620,7 @@ Node::findNode(const Identifier &id) {
 
 void
 Node::findValue(const Identifier &id) {
+  qDebug() << "Search for value" << id;
   // Create a query instance
   FindValueQuery *query = new FindValueQuery(id);
   // Collect DHT_K nearest nodes
@@ -601,6 +628,7 @@ Node::findValue(const Identifier &id) {
   // Send request to the first element in the list
   NodeItem next;
   if (! query->next(next)) {
+    qDebug() << "Can not find value" << id << ". Buckets empty.";
     delete query; emit valueNotFound(id);
   } else {
     sendFindValue(next, query);
@@ -609,6 +637,8 @@ Node::findValue(const Identifier &id) {
 
 void
 Node::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
+  qDebug() << "Send FindNode request to" << to.id()
+           << "@" << to.addr() << ":" << to.port();
   // Construct request item
   FindNodeRequest *req = new FindNodeRequest(query);
   // Queue request
@@ -618,11 +648,16 @@ Node::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   msg.payload.find_node.type = Message::FIND_NODE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
-  _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port());
+  if(0 > _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port())) {
+    qDebug() << "Failed to send FindNode request to" << to.id()
+             << "@" << to.addr() << ":" << to.port();
+  }
 }
 
 void
 Node::sendFindValue(const NodeItem &to, FindValueQuery *query) {
+  qDebug() << "Send FindValue request to" << to.id()
+           << "@" << to.addr() << ":" << to.port();
   // Construct request item
   FindValueRequest *req = new FindValueRequest(query);
   // Queue request
@@ -632,52 +667,59 @@ Node::sendFindValue(const NodeItem &to, FindValueQuery *query) {
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   msg.payload.find_node.type = Message::FIND_VALUE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
-  _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port());
+  if (0 > _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port())) {
+    qDebug() << "Failed to send FindNode request to" << to.id()
+             << "@" << to.addr() << ":" << to.port();
+  }
 }
 
 void
 Node::_onReadyRead() {
   while (_socket.hasPendingDatagrams()) {
+    qDebug() << "Received UDP packet of " << _socket.pendingDatagramSize() << "bytes.";
+
     // check datagram size
     if ( (_socket.pendingDatagramSize() > DHT_MAX_MESSAGE_SIZE) ||
          (_socket.pendingDatagramSize() < DHT_MIN_MESSAGE_SIZE)) {
-      // Cannot be a vaild message -> drop silently
-      _socket.readDatagram(0,0);
-    }
-
-    // Read message
-    Message msg; QHostAddress addr; uint16_t port;
-    int64_t size = _socket.readDatagram((char *) &msg, DHT_MAX_MESSAGE_SIZE, &addr, &port);
-    if (0 > size) { continue; }
-
-    Identifier cookie(msg.cookie);
-
-    if (_pendingRequests.contains(cookie)) {
-      // Message is a response -> dispatch by type from table
-      Request *item = _pendingRequests[cookie];
-      _pendingRequests.remove(cookie);
-      if (Message::PING == item->type()) {
-        _processPingResponse(msg, size, static_cast<PingRequest *>(item), addr, port);
-      } else if (Message::FIND_NODE == item->type()) {
-        _processFindNodeResponse(msg, size, static_cast<FindNodeRequest *>(item), addr, port);
-      } else if (Message::FIND_VALUE == item->type()) {
-        _processFindValueResponse(msg, size, static_cast<FindValueRequest *>(item), addr, port);
-      } else {
-        qDebug() << "Unknown response from " << addr << ":" << port;
-      }
-      delete item;
+      QHostAddress addr; uint16_t port;
+      // Cannot be a vaild message -> drop it
+      _socket.readDatagram(0, 0, &addr, &port);
+      qDebug() << "Invalid UDP packet received from" << addr << ":" << port;
     } else {
-      // Message is likely a request
-      if ((size == (2*DHT_HASH_SIZE+1)) && (Message::PING == msg.payload.ping.type)){
-        _processPingRequest(msg, size, addr, port);
-      } else if ((size == (2*DHT_HASH_SIZE+1)) && (Message::FIND_NODE == msg.payload.find_node.type)) {
-        _processFindNodeRequest(msg, size, addr, port);
-      } else if ((size == (2*DHT_HASH_SIZE+1)) && (Message::FIND_VALUE == msg.payload.find_value.type)) {
-        _processFindValueRequest(msg, size, addr, port);
-      } else if ((size >= (2*DHT_HASH_SIZE+1)) && (Message::ANNOUNCE == msg.payload.announce.type)) {
-        _processFindValueRequest(msg, size, addr, port);
+      // Read message
+      Message msg; QHostAddress addr; uint16_t port;
+      int64_t size = _socket.readDatagram((char *) &msg, DHT_MAX_MESSAGE_SIZE, &addr, &port);
+
+      Identifier cookie(msg.cookie);
+      qDebug() << "Received message" << cookie << "from" << addr << ":" << port;
+
+      if (_pendingRequests.contains(cookie)) {
+        // Message is a response -> dispatch by type from table
+        Request *item = _pendingRequests[cookie];
+        _pendingRequests.remove(cookie);
+        if (Message::PING == item->type()) {
+          _processPingResponse(msg, size, static_cast<PingRequest *>(item), addr, port);
+        } else if (Message::FIND_NODE == item->type()) {
+          _processFindNodeResponse(msg, size, static_cast<FindNodeRequest *>(item), addr, port);
+        } else if (Message::FIND_VALUE == item->type()) {
+          _processFindValueResponse(msg, size, static_cast<FindValueRequest *>(item), addr, port);
+        } else {
+          qDebug() << "Unknown response from " << addr << ":" << port;
+        }
+        delete item;
       } else {
-        qDebug() << "Unknown request from " << addr << ":" << port;
+        // Message is likely a request
+        if ((size == (2*DHT_HASH_SIZE+1)) && (Message::PING == msg.payload.ping.type)){
+          _processPingRequest(msg, size, addr, port);
+        } else if ((size == (2*DHT_HASH_SIZE+1)) && (Message::FIND_NODE == msg.payload.find_node.type)) {
+          _processFindNodeRequest(msg, size, addr, port);
+        } else if ((size == (2*DHT_HASH_SIZE+1)) && (Message::FIND_VALUE == msg.payload.find_value.type)) {
+          _processFindValueRequest(msg, size, addr, port);
+        } else if ((size >= (2*DHT_HASH_SIZE+1)) && (Message::ANNOUNCE == msg.payload.announce.type)) {
+          _processFindValueRequest(msg, size, addr, port);
+        } else {
+          qDebug() << "Unknown request from " << addr << ":" << port;
+        }
       }
     }
   }
@@ -687,6 +729,7 @@ void
 Node::_processPingResponse(
     const Message &msg, size_t size, PingRequest *req, const QHostAddress &addr, uint16_t port)
 {
+  qDebug() << "Received Ping response from " << addr << ":" << port;
   // sinal success
   emit nodeReachable(NodeItem(msg.payload.ping.id, addr, port));
   // If the buckets are empty -> we are likely bootstrapping
@@ -701,6 +744,7 @@ void
 Node::_processFindNodeResponse(
     const Message &msg, size_t size, FindNodeRequest *req, const QHostAddress &addr, uint16_t port)
 {
+  qDebug() << "Received FindNode response from " << addr << ":" << port;
   // payload length must be a multiple of triple length
   if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
     qDebug() << "Received a malformed FIND_NODE response from"
@@ -737,9 +781,149 @@ Node::_processFindNodeResponse(
     emit nodeNotFound(req->query()->id());
     // delete query
     delete req->query();
+    // done.
+    return;
   }
+
   // Send next request
   sendFindNode(next, req->query());
+}
+
+void
+Node::_processFindValueResponse(
+    const Message &msg, size_t size, FindValueRequest *req, const QHostAddress &addr, uint16_t port)
+{
+  // payload length must be a multiple of triple length
+  if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
+    qDebug() << "Received a malformed FIND_NODE response from"
+             << addr << ":" << port;
+  } else {
+    // unpack and update query
+    size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
+
+    // If queried node has value
+    if (msg.payload.result.success) {
+      // Get list of nodes providing the data
+      QList<NodeItem> nodes; nodes.reserve(Ntriple);
+      for (size_t i=0; i<Ntriple; i++) {
+        nodes.push_back(NodeItem(msg.payload.result.triples[i].id,
+                                 QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
+                                 ntohs(msg.payload.result.triples[i].port)));
+      }
+      // signal success
+      emit valueFound(req->query()->id(), nodes);
+      // query done
+      delete req->query();
+      return;
+    }
+
+    // If value was not found -> proceed with returned nodes
+    for (size_t i=0; i<Ntriple; i++) {
+      Identifier id(msg.payload.result.triples[i].id);
+      NodeItem item(id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
+                    ntohs(msg.payload.result.triples[i].port));
+      // Add discovered node to buckets
+      _buckets.add(id, item.addr(), item.port());
+      // Update node list of query
+      req->query()->update(item);
+    }
+  }
+
+  NodeItem next;
+  // get next node to query, if there is no next node -> search failed
+  if (! req->query()->next(next)) {
+    // signal error
+    emit valueNotFound(req->query()->id());
+    // delete query
+    delete req->query();
+    // done.
+    return;
+  }
+  // Send next request
+  sendFindValue(next, req->query());
+}
+
+void
+Node::_processPingRequest(
+    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+{
+  qDebug() << "Received Ping request from" << addr << ":" << port;
+  // simply assemble a pong response including my own ID
+  Message resp;
+  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+  memcpy(resp.payload.ping.id, _self.data(), DHT_HASH_SIZE);
+  resp.payload.ping.type = Message::PING;
+  // send
+  qDebug() << "Send Ping response to" << addr << ":" << port;
+  if(0 > _socket.writeDatagram((char *) &resp, 2*DHT_HASH_SIZE+1, addr, port)) {
+    qDebug() << "Failed to send Ping response to" << addr << ":" << port;
+  }
+  // Add node to candidate nodes for the bucket table if not known already
+  if ((! _buckets.contains(msg.payload.ping.id)) && (10 > _candidates.size())) {
+    _candidates.push_back(PeerItem(addr, port));
+  }
+}
+
+void
+Node::_processFindNodeRequest(
+    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+{
+  QList<NodeItem> best;
+  _buckets.getNearest(msg.payload.find_node.id, best);
+
+  Message resp;
+  // Assemble response
+  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+  resp.payload.result.success = 0;
+  QList<NodeItem>::iterator item = best.begin();
+  for (int i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
+    memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
+    resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
+    resp.payload.result.triples[i].port = htons(item->port());
+  }
+
+  // Compute size and send reponse
+  size_t resp_size = 1+(1+std::min(best.size(), DHT_K))*DHT_HASH_SIZE;
+  _socket.writeDatagram((char *) &resp, resp_size, addr, port);
+}
+
+void
+Node::_processFindValueRequest(
+    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+{
+  Message resp;
+
+  if (_announcements.contains(msg.payload.find_value.id)) {
+    QList<AnnouncementItem> &owners = _announcements[msg.payload.find_value.id];
+    // Assemble response
+    memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+    resp.payload.result.success = 1;
+    QList<AnnouncementItem>::iterator item = owners.begin();
+    for (int i = 0; (item!=owners.end()) && (i<DHT_K); item++, i++) {
+      memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
+      resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
+      resp.payload.result.triples[i].port = htons(item->port());
+    }
+    // Compute size and send reponse
+    size_t resp_size = 1+(1+std::min(owners.size(), DHT_K))*DHT_HASH_SIZE;
+    _socket.writeDatagram((char *) &resp, resp_size, addr, port);
+  } else {
+    // Get best matching nodes from the buckets
+    QList<NodeItem> best;
+    _buckets.getNearest(msg.payload.find_node.id, best);
+    // Assemble response
+    memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+    resp.payload.result.success = 0;
+    QList<NodeItem>::iterator item = best.begin();
+    for (int i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
+      memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
+      resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
+      resp.payload.result.triples[i].port = htons(item->port());
+    }
+    // Compute size and send reponse
+    size_t resp_size = 1+(1+std::min(best.size(), DHT_K))*DHT_HASH_SIZE;
+    _socket.writeDatagram((char *) &resp, resp_size, addr, port);
+  }
 }
 
 void
@@ -807,136 +991,21 @@ Node::_onCheckNodeTimeout() {
 
 void
 Node::_onCheckAnnouncementTimeout() {
-  /// @todo Implement
-}
-
-void
-Node::_processFindValueResponse(
-    const Message &msg, size_t size, FindValueRequest *req, const QHostAddress &addr, uint16_t port)
-{
-  // payload length must be a multiple of triple length
-  if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
-    qDebug() << "Received a malformed FIND_NODE response from"
-             << addr << ":" << port;
-  } else {
-    // unpack and update query
-    size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
-
-    // If queried node has value
-    if (msg.payload.result.success) {
-      // Get list of nodes providing the data
-      QList<NodeItem> nodes; nodes.reserve(Ntriple);
-      for (size_t i=0; i<Ntriple; i++) {
-        nodes.push_back(NodeItem(msg.payload.result.triples[i].id,
-                                 QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
-                                 ntohs(msg.payload.result.triples[i].port)));
+  QHash<Identifier, QList<AnnouncementItem> >::iterator entry = _announcements.begin();
+  while (entry != _announcements.end()) {
+    QList<AnnouncementItem>::iterator ann = entry->begin();
+    while (ann != entry->end()) {
+      if (ann->olderThan(30*60)) {
+        ann = entry->erase(ann);
+      } else {
+        ann++;
       }
-      // signal success
-      emit valueFound(req->query()->id(), nodes);
-      // query done
-      delete req->query();
     }
-
-    // If value was not found -> proceed with returned nodes
-    for (size_t i=0; i<Ntriple; i++) {
-      Identifier id(msg.payload.result.triples[i].id);
-      NodeItem item(id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
-                    ntohs(msg.payload.result.triples[i].port));
-      // Add discovered node to buckets
-      _buckets.add(id, item.addr(), item.port());
-      // Update node list of query
-      req->query()->update(item);
+    if (entry->empty()) {
+      entry = _announcements.erase(entry);
+    } else {
+      entry++;
     }
   }
-
-  NodeItem next;
-  // get next node to query, if there is no next node -> search failed
-  if (! req->query()->next(next)) {
-    // signal error
-    emit valueNotFound(req->query()->id());
-    // delete query
-    delete req->query();
-  }
-  // Send next request
-  sendFindValue(next, req->query());
-}
-
-void
-Node::_processPingRequest(
-    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
-{
-  // simply assemble a pong response including my own ID
-  Message resp;
-  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
-  memcpy(resp.payload.ping.id, _self.data(), DHT_HASH_SIZE);
-  resp.payload.ping.type = Message::PING;
-  // send
-  _socket.writeDatagram((char *) &resp, 2*DHT_HASH_SIZE+1, addr, port);
-
-  // Add node to candidate nodes for the bucket table if not known already
-  if ((! _buckets.contains(msg.payload.ping.id)) && (10 > _candidates.size())) {
-    _candidates.push_back(PeerItem(addr, port));
-  }
-}
-
-void
-Node::_processFindNodeRequest(
-    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
-{
-  QList<NodeItem> best;
-  _buckets.getNearest(msg.payload.find_node.id, best);
-
-  Message resp;
-  // Assemble response
-  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
-  resp.payload.result.success = 0;
-  QList<NodeItem>::iterator item = best.begin();
-  for (size_t i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
-    memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
-    resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
-    resp.payload.result.triples[i].port = htons(item->port());
-  }
-
-  // Compute size and send reponse
-  size_t resp_size = 1+(1+std::min(best.size(), DHT_K))*DHT_HASH_SIZE;
-  _socket.writeDatagram((char *) &resp, resp_size, addr, port);
-}
-
-void
-Node::_processFindValueRequest(
-    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
-{
-  Message resp;
-
-  if (_table.contains(msg.payload.find_value.id)) {
-    QList<NodeItem> &owners = _table[msg.payload.find_value.id];
-    // Assemble response
-    memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
-    resp.payload.result.success = 1;
-    QList<NodeItem>::iterator item = owners.begin();
-    for (size_t i = 0; (item!=owners.end()) && (i<DHT_K); item++, i++) {
-      memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
-      resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
-      resp.payload.result.triples[i].port = htons(item->port());
-    }
-    // Compute size and send reponse
-    size_t resp_size = 1+(1+std::min(owners.size(), DHT_K))*DHT_HASH_SIZE;
-    _socket.writeDatagram((char *) &resp, resp_size, addr, port);
-  } else {
-    // Get best matching nodes from the buckets
-    QList<NodeItem> best;
-    _buckets.getNearest(msg.payload.find_node.id, best);
-    // Assemble response
-    memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
-    resp.payload.result.success = 0;
-    QList<NodeItem>::iterator item = best.begin();
-    for (size_t i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
-      memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
-      resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
-      resp.payload.result.triples[i].port = htons(item->port());
-    }
-    // Compute size and send reponse
-    size_t resp_size = 1+(1+std::min(best.size(), DHT_K))*DHT_HASH_SIZE;
-    _socket.writeDatagram((char *) &resp, resp_size, addr, port);
-  }
+  /// @todo Implement
 }

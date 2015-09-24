@@ -1,26 +1,25 @@
 #ifndef __VLF_DHT_H__
 #define __VLF_DHT_H__
 
-#include <QObject>
+#include <inttypes.h>
 
 #include <QObject>
 #include <QHostAddress>
 #include <QUdpSocket>
-#include <inttypes.h>
 #include <QPair>
 #include <QList>
 #include <QVector>
 #include <QSet>
 #include <QHash>
 #include <QDateTime>
-
+#include <QTimer>
 
 /** Size of of the hash to use, e.g. RMD160 -> 20bytes. */
 #define DHT_HASH_SIZE        20
 /** Maximum message size per UDP packet. */
 #define DHT_MAX_MESSAGE_SIZE 1024
 /** Minimum message size per UDP packet. */
-#define DHT_MIN_MESSAGE_SIZE DHT_HASH_SIZE
+#define DHT_MIN_MESSAGE_SIZE (DHT_HASH_SIZE+1)
 
 /** The max. number of hashes fitting into an "announce" message payload. */
 #define DHT_MAX_NUM_HASHES int((DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-1)/DHT_HASH_SIZE)
@@ -77,6 +76,10 @@ public:
   Distance operator-(const Identifier &other) const;
 };
 
+inline QDebug &operator<<(QDebug &stream, const Identifier &id) {
+  stream << id.toHex();
+  return stream;
+}
 
 /** Represents a peer (IP address + port) in the network. */
 class PeerItem
@@ -470,10 +473,14 @@ protected:
   Buckets    _buckets;
   /** A list of candidate peers to join the buckets. */
   QList<PeerItem> _candidates;
-  /** The key->value map. */
-  QHash<Identifier, QList<NodeItem> > _table;
+  /** The key->value map of the received announcements. */
+  QHash<Identifier, QList<AnnouncementItem> > _announcements;
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
+
+  QTimer _requestTimer;
+  QTimer _nodeTimer;
+  QTimer _announcementTimer;
 };
 
 
