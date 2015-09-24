@@ -1,5 +1,5 @@
-#include "application.h"
-#include "dht.h"
+#include "lib/dht.h"
+#include <QApplication>
 #include <time.h>
 
 int main(int argc, char *argv[]) {

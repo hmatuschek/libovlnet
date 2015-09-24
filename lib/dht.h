@@ -21,8 +21,6 @@
 /** Minimum message size per UDP packet. */
 #define DHT_MIN_MESSAGE_SIZE (DHT_HASH_SIZE+1)
 
-/** The max. number of hashes fitting into an "announce" message payload. */
-#define DHT_MAX_NUM_HASHES int((DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-1)/DHT_HASH_SIZE)
 /** The size of the triple (hash, IPv4, port). */
 #define DHT_TRIPLE_SIZE (DHT_HASH_SIZE + 4 + 2)
 /** The max. number of triples in a response. */
@@ -118,11 +116,11 @@ protected:
 };
 
 
-class AnnouncementItem: public NodeItem
+class AnnouncementItem: public PeerItem
 {
 public:
   AnnouncementItem();
-  AnnouncementItem(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  AnnouncementItem(const QHostAddress &addr, uint16_t port);
   AnnouncementItem(const AnnouncementItem &other);
 
   AnnouncementItem &operator =(const AnnouncementItem &other);
@@ -277,7 +275,8 @@ typedef struct {
 
     struct {
       uint8_t type; // == ANNOUNCE
-      char    payload[DHT_MAX_NUM_HASHES];
+      char    who[DHT_HASH_SIZE];
+      char    what[DHT_HASH_SIZE];
     } announce;
 
     struct {
@@ -417,6 +416,9 @@ public:
   void ping(const PeerItem &peer);
   void findNode(const Identifier &id);
   void findValue(const Identifier &id);
+  void announce(const Identifier &id);
+
+  virtual QIODevice *data(const Identifier &id);
 
 signals:
   void nodeReachable(const NodeItem &node);
@@ -432,6 +434,8 @@ protected:
    * Any response to that request will be forwarded to the specified @c query. */
   void sendFindNode(const NodeItem &to, FindNodeQuery *query);
   void sendFindValue(const NodeItem &to, FindValueQuery *query);
+  bool isPendingAnnouncement(const Identifier &id) const;
+  void sendAnnouncement(const NodeItem &to, const Identifier &what);
 
   void _processPingResponse(const Message &msg, size_t size, PingRequest *req,
                             const QHostAddress &addr, uint16_t port);
@@ -474,7 +478,9 @@ protected:
   /** A list of candidate peers to join the buckets. */
   QList<PeerItem> _candidates;
   /** The key->value map of the received announcements. */
-  QHash<Identifier, QList<AnnouncementItem> > _announcements;
+  QHash<Identifier, QHash<Identifier, AnnouncementItem> > _announcements;
+  /** The kay->timestamp table of the data this node provides. */
+  QHash<Identifier, QDateTime> _announcedData;
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
 

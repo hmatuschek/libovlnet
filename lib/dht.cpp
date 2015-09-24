@@ -165,26 +165,26 @@ NodeItem::id() const {
  * Implementation of AnnouncementItem
  * ******************************************************************************************** */
 AnnouncementItem::AnnouncementItem()
-  : NodeItem(), _timestamp()
+  : PeerItem(), _timestamp()
 {
   // pass...
 }
 
-AnnouncementItem::AnnouncementItem(const Identifier &id, const QHostAddress &addr, uint16_t port)
-  : NodeItem(id, addr, port), _timestamp(QDateTime::currentDateTime())
+AnnouncementItem::AnnouncementItem(const QHostAddress &addr, uint16_t port)
+  : PeerItem(addr, port), _timestamp(QDateTime::currentDateTime())
 {
   // pass...
 }
 
 AnnouncementItem::AnnouncementItem(const AnnouncementItem &other)
-  : NodeItem(other), _timestamp(other._timestamp)
+  : PeerItem(other), _timestamp(other._timestamp)
 {
   // pass...
 }
 
 AnnouncementItem &
 AnnouncementItem::operator =(const AnnouncementItem &other) {
-  NodeItem::operator =(other);
+  PeerItem::operator =(other);
   _timestamp = other._timestamp;
   return *this;
 }
@@ -612,7 +612,9 @@ Node::findNode(const Identifier &id) {
   NodeItem next;
   if (! query->next(next)) {
     qDebug() << "Can not find node" << id << ". Buckets empty.";
-    delete query; emit nodeNotFound(id);
+    delete query;
+    // Emmit signal if failiour is not a pending announcement
+    if (! isPendingAnnouncement(id)) { emit nodeNotFound(id); }
   } else {
     sendFindNode(next, query);
   }
@@ -635,6 +637,23 @@ Node::findValue(const Identifier &id) {
   }
 }
 
+void
+Node::announce(const Identifier &id) {
+  qDebug() << "Announce data " << id << "to the world.";
+  _announcedData[id] = QDateTime();
+  // lets search for the nodes closest to the data id
+  findNode(id);
+}
+
+QIODevice *
+Node::data(const Identifier &id) {
+  return 0;
+}
+
+
+/*
+ * Implementation of internal used methods.
+ */
 void
 Node::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
   qDebug() << "Send FindNode request to" << to.id()
@@ -673,11 +692,30 @@ Node::sendFindValue(const NodeItem &to, FindValueQuery *query) {
   }
 }
 
+bool
+Node::isPendingAnnouncement(const Identifier &id) const {
+  return _announcedData.contains(id);
+}
+
+void
+Node::sendAnnouncement(const NodeItem &to, const Identifier &what) {
+  qDebug() << "Send Announcement of" << what << "to" << to.id()
+           << "@" << to.addr() << ":" << to.port();
+  // Assemble & send message
+  Message msg;
+  memcpy(msg.cookie, Identifier().data(), DHT_HASH_SIZE);
+  memcpy(msg.payload.announce.what, what.data(), DHT_HASH_SIZE);
+  memcpy(msg.payload.announce.who, _self.data(), DHT_HASH_SIZE);
+  msg.payload.announce.type = Message::ANNOUNCE;
+  if (0 > _socket.writeDatagram((char *)&msg, 3*DHT_HASH_SIZE+1, to.addr(), to.port())) {
+    qDebug() << "Failed to send Announce request to" << to.id()
+             << "@" << to.addr() << ":" << to.port();
+  }
+}
+
 void
 Node::_onReadyRead() {
   while (_socket.hasPendingDatagrams()) {
-    qDebug() << "Received UDP packet of " << _socket.pendingDatagramSize() << "bytes.";
-
     // check datagram size
     if ( (_socket.pendingDatagramSize() > DHT_MAX_MESSAGE_SIZE) ||
          (_socket.pendingDatagramSize() < DHT_MIN_MESSAGE_SIZE)) {
@@ -691,8 +729,6 @@ Node::_onReadyRead() {
       int64_t size = _socket.readDatagram((char *) &msg, DHT_MAX_MESSAGE_SIZE, &addr, &port);
 
       Identifier cookie(msg.cookie);
-      qDebug() << "Received message" << cookie << "from" << addr << ":" << port;
-
       if (_pendingRequests.contains(cookie)) {
         // Message is a response -> dispatch by type from table
         Request *item = _pendingRequests[cookie];
@@ -715,8 +751,8 @@ Node::_onReadyRead() {
           _processFindNodeRequest(msg, size, addr, port);
         } else if ((size == (2*DHT_HASH_SIZE+1)) && (Message::FIND_VALUE == msg.payload.find_value.type)) {
           _processFindValueRequest(msg, size, addr, port);
-        } else if ((size >= (2*DHT_HASH_SIZE+1)) && (Message::ANNOUNCE == msg.payload.announce.type)) {
-          _processFindValueRequest(msg, size, addr, port);
+        } else if ((size == (3*DHT_HASH_SIZE+1)) && (Message::ANNOUNCE == msg.payload.announce.type)) {
+          _processAnnounceRequest(msg, size, addr, port);
         } else {
           qDebug() << "Unknown request from " << addr << ":" << port;
         }
@@ -737,7 +773,10 @@ Node::_processPingResponse(
   // Given that this is a ping response -> add the node to the corresponding
   // bucket if space is left
   _buckets.add(msg.payload.ping.id, addr, port);
-  if (bootstrapping) { findNode(_self); }
+  if (bootstrapping) {
+    qDebug() << "Still bootstrapping: Search for myown.";
+    findNode(_self);
+  }
 }
 
 void
@@ -764,6 +803,8 @@ Node::_processFindNodeResponse(
 
     // If the node was found -> signal success
     if (req->query()->found()) {
+      qDebug() << "Found node" << req->query()->first().id()
+               << "@" << req->query()->first().addr() << ":" << req->query()->first().port();
       // Signal node found
       emit nodeFound(req->query()->first());
       // delete query
@@ -777,8 +818,18 @@ Node::_processFindNodeResponse(
   NodeItem next;
   // get next node to query, if there is no next node -> search failed
   if (! req->query()->next(next)) {
-    // signal error
-    emit nodeNotFound(req->query()->id());
+    // If the node search is a pending announcement
+    if (isPendingAnnouncement(req->query()->id())) {
+      // -> send announcement to the best nodes
+      QList<NodeItem>::iterator node = req->query()->best().begin();
+      for (; node != req->query()->best().end(); node++) {
+        sendAnnouncement(*node, req->query()->id());
+      }
+    } else {
+      qDebug() << "Node" << req->query()->id() << "not found.";
+      // if it was a regular node search -> signal error
+      emit nodeNotFound(req->query()->id());
+    }
     // delete query
     delete req->query();
     // done.
@@ -883,7 +934,7 @@ Node::_processFindNodeRequest(
   }
 
   // Compute size and send reponse
-  size_t resp_size = 1+(1+std::min(best.size(), DHT_K))*DHT_HASH_SIZE;
+  size_t resp_size = 1+DHT_HASH_SIZE+std::min(best.size(), DHT_K)*DHT_TRIPLE_SIZE;
   _socket.writeDatagram((char *) &resp, resp_size, addr, port);
 }
 
@@ -894,18 +945,19 @@ Node::_processFindValueRequest(
   Message resp;
 
   if (_announcements.contains(msg.payload.find_value.id)) {
-    QList<AnnouncementItem> &owners = _announcements[msg.payload.find_value.id];
+    QHash<Identifier, AnnouncementItem> &owners
+        = _announcements[msg.payload.find_value.id];
     // Assemble response
     memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
     resp.payload.result.success = 1;
-    QList<AnnouncementItem>::iterator item = owners.begin();
+    QHash<Identifier, AnnouncementItem>::iterator item = owners.begin();
     for (int i = 0; (item!=owners.end()) && (i<DHT_K); item++, i++) {
-      memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
+      memcpy(resp.payload.result.triples[i].id, item.key().data(), DHT_HASH_SIZE);
       resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
       resp.payload.result.triples[i].port = htons(item->port());
     }
     // Compute size and send reponse
-    size_t resp_size = 1+(1+std::min(owners.size(), DHT_K))*DHT_HASH_SIZE;
+    size_t resp_size = 1+DHT_HASH_SIZE+std::min(owners.size(), DHT_K)*DHT_TRIPLE_SIZE;
     _socket.writeDatagram((char *) &resp, resp_size, addr, port);
   } else {
     // Get best matching nodes from the buckets
@@ -921,8 +973,26 @@ Node::_processFindValueRequest(
       resp.payload.result.triples[i].port = htons(item->port());
     }
     // Compute size and send reponse
-    size_t resp_size = 1+(1+std::min(best.size(), DHT_K))*DHT_HASH_SIZE;
+    size_t resp_size = 1+DHT_HASH_SIZE+std::min(best.size(), DHT_K)*DHT_TRIPLE_SIZE;
     _socket.writeDatagram((char *) &resp, resp_size, addr, port);
+  }
+}
+
+void
+Node::_processAnnounceRequest(
+    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+{
+  //
+  Identifier value(msg.payload.announce.what);
+  // Check if I am closer to the value than any of my nodes in the bucket
+  QList<NodeItem> best;
+  _buckets.getNearest(value, best);
+  if ((best.last().id()-value)>(_self-value)) {
+    if (!_announcements.contains(value)) {
+      _announcements.insert(value, QHash<Identifier, AnnouncementItem>());
+    }
+    _announcements[value][msg.payload.announce.who]
+        = AnnouncementItem(addr, port);
   }
 }
 
@@ -947,8 +1017,17 @@ Node::_onCheckRequestTimeout() {
       NodeItem next;
       // get next node to query, if there is no next node -> search failed
       if (! query->next(next)) {
-        // signal error
-        emit nodeNotFound(query->id());
+        // If the node search is a pending announcement
+        if (isPendingAnnouncement(query->id())) {
+          // -> send announcement to the best nodes
+          QList<NodeItem>::iterator node = query->best().begin();
+          for (; node != query->best().end(); node++) {
+            sendAnnouncement(*node, query->id());
+          }
+        } else {
+          // if it was a regular node search -> signal error
+          emit nodeNotFound(query->id());
+        }
         // delete query
         delete query;
       }
@@ -973,6 +1052,7 @@ Node::_onCheckRequestTimeout() {
 
 void
 Node::_onCheckNodeTimeout() {
+  qDebug() << "Refresh buckets.";
   // Collect old nodes from buckets
   QList<NodeItem> oldNodes;
   _buckets.getOlderThan(15*60, oldNodes);
@@ -991,9 +1071,11 @@ Node::_onCheckNodeTimeout() {
 
 void
 Node::_onCheckAnnouncementTimeout() {
-  QHash<Identifier, QList<AnnouncementItem> >::iterator entry = _announcements.begin();
+  qDebug() << "Refresh announcements.";
+  // Check announcements I store for others
+  QHash<Identifier, QHash<Identifier, AnnouncementItem> >::iterator entry = _announcements.begin();
   while (entry != _announcements.end()) {
-    QList<AnnouncementItem>::iterator ann = entry->begin();
+    QHash<Identifier, AnnouncementItem>::iterator ann = entry->begin();
     while (ann != entry->end()) {
       if (ann->olderThan(30*60)) {
         ann = entry->erase(ann);
@@ -1007,5 +1089,13 @@ Node::_onCheckAnnouncementTimeout() {
       entry++;
     }
   }
-  /// @todo Implement
+
+  // Check announcements I have to make (data that I provide).
+  QHash<Identifier, QDateTime>::iterator item = _announcedData.begin();
+  for (; item != _announcedData.end(); item++) {
+    // re-announce the data every 20minutes
+    if (item->addSecs(20*60) < QDateTime::currentDateTime()) {
+      announce(item.key());
+    }
+  }
 }
