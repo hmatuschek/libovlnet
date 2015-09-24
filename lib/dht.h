@@ -249,6 +249,8 @@ public:
   virtual ~DHT();
 
   /** Sends a ping request to the given peer. */
+  void ping(const QString &addr, uint16_t port);
+  /** Sends a ping request to the given peer. */
   void ping(const QHostAddress &addr, uint16_t port);
   /** Sends a ping request to the given peer. */
   void ping(const PeerItem &peer);

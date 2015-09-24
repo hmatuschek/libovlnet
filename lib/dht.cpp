@@ -1,4 +1,5 @@
 #include "dht.h"
+#include <QHostInfo>
 #include <netinet/in.h>
 
 /** Size of of the hash to use, e.g. RMD160 -> 20bytes. */
@@ -760,6 +761,12 @@ DHT::DHT(const Identifier &id, const QHostAddress &addr, quint16 port, QObject *
 
 DHT::~DHT() {
   // pass...
+}
+
+void
+DHT::ping(const QString &addr, uint16_t port) {
+  QHostInfo info = QHostInfo::fromName(addr);
+  ping(info.addresses().front(), port);
 }
 
 void
