@@ -15,8 +15,8 @@
 #include <QDateTime>
 
 
-/** Size of of the hash to use. */
-#define DHT_HASH_SIZE        32
+/** Size of of the hash to use, e.g. RMD160 -> 20bytes. */
+#define DHT_HASH_SIZE        20
 /** Maximum message size per UDP packet. */
 #define DHT_MAX_MESSAGE_SIZE 1024
 /** Minimum message size per UDP packet. */
@@ -24,7 +24,7 @@
 
 /** The max. number of hashes fitting into an "announce" message payload. */
 #define DHT_MAX_NUM_HASHES int((DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-1)/DHT_HASH_SIZE)
-/** The size of the triple (hash, IP, port). */
+/** The size of the triple (hash, IPv4, port). */
 #define DHT_TRIPLE_SIZE (DHT_HASH_SIZE + 4 + 2)
 /** The max. number of triples in a response. */
 #define DHT_MAX_TRIPLES int((DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE)
@@ -33,7 +33,7 @@
 
 /** The bucket size.
  * It is ensured that a complete bucket can be transferred with one UDP message. */
-#define DHT_K std::min(20, DHT_MAX_TRIPLES)
+#define DHT_K std::min(8, DHT_MAX_TRIPLES)
 
 // Forward declarations
 class Identifier;
@@ -78,6 +78,59 @@ public:
 };
 
 
+/** Represents a peer (IP address + port) in the network. */
+class PeerItem
+{
+public:
+  PeerItem();
+  PeerItem(const QHostAddress &addr, uint16_t port);
+  PeerItem(const PeerItem &other);
+
+  PeerItem &operator=(const PeerItem &other);
+
+  const QHostAddress &addr() const;
+  uint16_t port() const;
+
+protected:
+  QHostAddress _addr;
+  uint16_t     _port;
+};
+
+
+/** Represents a node (ID + IP address + port) in the network. */
+class NodeItem: public PeerItem
+{
+public:
+  NodeItem();
+  NodeItem(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  NodeItem(const Identifier &id, const PeerItem &peer);
+  NodeItem(const NodeItem &other);
+
+  NodeItem &operator=(const NodeItem &other);
+
+  const Identifier &id() const;
+
+protected:
+  Identifier _id;
+};
+
+
+class AnnouncementItem: public NodeItem
+{
+public:
+  AnnouncementItem();
+  AnnouncementItem(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  AnnouncementItem(const AnnouncementItem &other);
+
+  AnnouncementItem &operator =(const AnnouncementItem &other);
+
+  bool olderThan(size_t seconds);
+
+protected:
+  QDateTime _timestamp;
+};
+
+
 /** Represents a single k-bucket. */
 class Bucket
 {
@@ -87,53 +140,52 @@ public:
     /** Empty constructor. */
     Item();
     /** Constructor from identifier, address, port and prefix. */
-    Item(const Identifier &id, const QHostAddress &addr, uint16_t port, size_t prefix);
+    Item(const QHostAddress &addr, uint16_t port, size_t prefix);
     /** Copy constructor. */
     Item(const Item &other);
     /** Assignment operator. */
     Item &operator=(const Item &other);
 
-    /** Returns the ID of the item. */
-    const Identifier &id() const;
-    /** Returns the @c prefix of the item w.r.t. the ID of the node. */
+    /** Returns the precomputed @c prefix of the item w.r.t. the ID of the node. */
     size_t prefix() const;
+    const PeerItem &peer() const;
     /** The address of the item. */
     const QHostAddress &addr() const;
     /** The port of the item. */
     uint16_t port() const;
     /** The time of the item last seen. */
     const QDateTime &lastSeen() const;
+    /** Returns true if the entry is older than the specified seconds. */
+    inline size_t olderThan(size_t seconds) const {
+      return (_lastSeen.addSecs(seconds) < QDateTime::currentDateTime());
+    }
 
   protected:
-    /** The identifier of the item. */
-    Identifier   _id;
     /** The prefix -- index of the leading bit of the difference between this identifier and the
      * identifier of the node. */
     size_t       _prefix;
-    /** The address of the item. */
-    QHostAddress _addr;
-    /** The port of the item. */
-    uint16_t     _port;
+    PeerItem     _peer;
     /** The time, the item was last seen. */
     QDateTime    _lastSeen;
   };
 
 public:
   /** Constructor. */
-  Bucket(size_t size=DHT_K);
+  Bucket(const Identifier &self, size_t size=DHT_K);
   /** Copy constructor. */
   Bucket(const Bucket &other);
 
-  /** Returns the table of triples in the bucket. */
-  inline const QHash<Identifier, Item> &triples() { return _triples; }
+  void getNearest(const Identifier &id, QList<NodeItem> &best) const;
+  void getOlderThan(size_t age, QList<NodeItem> &nodes) const;
+  void removeOlderThan(size_t age);
 
   /** Returns @c true if the bucket is full. */
   bool full() const;
   /** Returns @c true if the bucket contains the given identifier. */
-  bool contains(const Identifier &id);
+  bool contains(const Identifier &id) const;
   /** Add or updates an item. */
-  void add(const Item &item);
-  /** The minimum prefix of the bucket. */
+  void add(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  /** The prefix of the bucket. */
   size_t prefix() const;
 
   /** Splits the bucket at its prefix. Means all item with a higher prefix (smaller distance)
@@ -141,14 +193,17 @@ public:
   void split(Bucket &newBucket);
 
 protected:
+  /** Adds an item. */
+  void add(const Identifier &id, const Item &item);
+
+protected:
+  Identifier _self;
   /** The maximal bucket size. */
   size_t _maxSize;
   /** The prefix of the bucket. */
   size_t _prefix;
-  /** Triple table. */
+  /** Item table. */
   QHash<Identifier, Item> _triples;
-  /** History of items (oldest first). */
-  QList<Identifier>       _history;
 };
 
 
@@ -157,17 +212,29 @@ class Buckets
 {
 public:
   /** Constructor. */
-  Buckets();
+  Buckets(const Identifier &self);
+
+  bool empty() const;
+  bool contains(const Identifier &id) const;
 
   /** Adds or updates an item. */
-  void add(const Bucket::Item &item);
-  const Bucket &getBucket(const Bucket::Item &item);
+  void add(const Identifier &id, const QHostAddress &addr, uint16_t port);
+
+  /** Collects the nearest known nodes. */
+  void getNearest(const Identifier &id, QList<NodeItem> &best) const;
+
+  /** Collects all nodes that are "older" than the specified age (in seconds). */
+  void getOlderThan(size_t seconds, QList<NodeItem> &nodes) const;
+
+  /** Removes all nodes that are "older" than the specified age (in seconds). */
+  void removeOlderThan(size_t seconds);
 
 protected:
   /** Returns the bucket index, an item should be searched for. */
-  QList<Bucket>::iterator index(const Bucket::Item &item);
+  QList<Bucket>::iterator index(const Identifier &id);
 
 protected:
+  Identifier _self;
   /** The bucket list. */
   QList<Bucket> _buckets;
 };
@@ -244,46 +311,87 @@ typedef struct {
 } Message;
 
 
-class QueryItem: public QObject
+class SearchQuery
 {
-  Q_OBJECT
+protected:
+  SearchQuery(const Identifier &id);
+
+public:
+  const Identifier &id() const;
+  void update(const NodeItem &nodes);
+  bool next(NodeItem &node);
+  QList<NodeItem> &best();
+  const NodeItem &first() const;
 
 protected:
-  QueryItem(Message::Type type, const Identifier &destination);
+  Identifier _id;
+  QList<NodeItem> _best;
+  QSet<Identifier> _queried;
+};
+
+
+class FindNodeQuery: public SearchQuery
+{
+public:
+  FindNodeQuery(const Identifier &id);
+
+  bool found() const;
+};
+
+
+class FindValueQuery: public SearchQuery
+{
+public:
+  FindValueQuery(const Identifier &id);
+};
+
+
+class Request
+{
+protected:
+  Request(Message::Type type);
 
 public:
   inline Message::Type type() const { return _type; }
-  inline const Identifier &destination() const { return _destination; }
-  inline const Identifier &identifier() const { return _queryId; }
-  inline const QDateTime &timestamp() const { return _timeStamp; }
+  inline const Identifier &cookie() const { return _cookie; }
+  inline const QDateTime &timestamp() const { return _timestamp; }
+  inline size_t olderThan(size_t seconds) const {
+    return (_timestamp.addSecs(seconds) < QDateTime::currentDateTime());
+  }
 
 protected:
   Message::Type _type;
-  Identifier    _queryId;
-  Identifier    _destination;
-  QDateTime     _timeStamp;
+  Identifier    _cookie;
+  QDateTime     _timestamp;
 };
 
 
-class PingQueryItem: public QueryItem
+class PingRequest: public Request
 {
-  Q_OBJECT
-
 public:
-  PingQueryItem(const Identifier &destination);
+  PingRequest();
 };
 
-
-class FindNodeQuery: public QueryItem
+class FindNodeRequest: public Request
 {
 public:
-  FindNodeQuery(const Identifier &destination, const Identifier &id);
-  ~FindNodeQuery();
+  FindNodeRequest(FindNodeQuery *query);
+  inline FindNodeQuery *query() const { return _findNodeQuery; }
 
 protected:
+  FindNodeQuery *_findNodeQuery;
 };
 
 
+class FindValueRequest: public Request
+{
+public:
+  FindValueRequest(FindValueQuery *query);
+  inline FindValueQuery *query() const { return _findValueQuery; }
+
+protected:
+  FindValueQuery *_findValueQuery;
+};
 
 
 /** Implements a node in the DHT. */
@@ -302,28 +410,70 @@ public:
   /** Destructor. */
   virtual ~Node();
 
+  void ping(const QHostAddress &addr, uint16_t port);
+  void ping(const PeerItem &peer);
+  void findNode(const Identifier &id);
+  void findValue(const Identifier &id);
+
 signals:
+  void nodeReachable(const NodeItem &node);
+
+  void nodeFound(const NodeItem &node);
+  void nodeNotFound(const Identifier &id);
+
+  void valueFound(const Identifier &id, const QList<NodeItem> &nodes);
+  void valueNotFound(const Identifier &id);
 
 protected:
   /** Sends a FindNode message to the node @c to to search for the node specified by @c id.
    * Any response to that request will be forwarded to the specified @c query. */
-  void sendFindNode(const Identifier &id, const Identifier &to, FindNodeQuery *query);
+  void sendFindNode(const NodeItem &to, FindNodeQuery *query);
+  void sendFindValue(const NodeItem &to, FindValueQuery *query);
+
+  void _processPingResponse(const Message &msg, size_t size, PingRequest *req,
+                            const QHostAddress &addr, uint16_t port);
+
+  void _processFindNodeResponse(const Message &msg, size_t size, FindNodeRequest *req,
+                                const QHostAddress &addr, uint16_t port);
+
+  void _processFindValueResponse(const Message &msg, size_t size, FindValueRequest *req,
+                                const QHostAddress &addr, uint16_t port);
+
+  void _processPingRequest(const Message &msg, size_t size,
+                           const QHostAddress &addr, uint16_t port);
+
+  void _processFindNodeRequest(const Message &msg, size_t size,
+                               const QHostAddress &addr, uint16_t port);
+
+  void _processFindValueRequest(const Message &msg, size_t size,
+                                const QHostAddress &addr, uint16_t port);
+
+  void _processAnnounceRequest(const Message &msg, size_t size,
+                               const QHostAddress &addr, uint16_t port);
 
 protected slots:
   /** Gets called on the reception of a UDP package. */
   void _onReadyRead();
+  /** Gets called regulary to check the request timeouts. */
+  void _onCheckRequestTimeout();
+  /** Gets called regulary to check the timeout of the node in the buckets. */
+  void _onCheckNodeTimeout();
+  /** Gets called regulary to check the announcement timeouts. */
+  void _onCheckAnnouncementTimeout();
 
 protected:
   /** The identifier of the node. */
-  Identifier _id;
+  Identifier _self;
   /** The network socket. */
   QUdpSocket _socket;
   /** The routing table. */
   Buckets    _buckets;
-  /** The kex->value map. */
-  QHash<Identifier, QVector<Bucket::Item> > _table;
+  /** A list of candidate peers to join the buckets. */
+  QList<PeerItem> _candidates;
+  /** The key->value map. */
+  QHash<Identifier, QList<NodeItem> > _table;
   /** The list of pending requests. */
-  QHash<Identifier, QueryItem *> _pendingRequests;
+  QHash<Identifier, Request *> _pendingRequests;
 };
 
 

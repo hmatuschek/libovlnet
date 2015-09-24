@@ -82,57 +82,166 @@ Distance::leadingBit() const {
   return 8*DHT_HASH_SIZE;
 }
 
+/* ******************************************************************************************** *
+ * Implementation of PeerItem
+ * ******************************************************************************************** */
+PeerItem::PeerItem()
+  : _addr(), _port(0)
+{
+  // pass...
+}
+
+PeerItem::PeerItem(const QHostAddress &addr, uint16_t port)
+  : _addr(addr), _port(port)
+{
+  // pass...
+}
+
+PeerItem::PeerItem(const PeerItem &other)
+  : _addr(other._addr), _port(other._port)
+{
+  // pass...
+}
+
+PeerItem &
+PeerItem::operator =(const PeerItem &other) {
+  _addr = other.addr();
+  _port = other.port();
+  return *this;
+}
+
+const QHostAddress &
+PeerItem::addr() const {
+  return _addr;
+}
+
+uint16_t
+PeerItem::port() const {
+  return _port;
+}
+
+
+/* ******************************************************************************************** *
+ * Implementation of NodeItem
+ * ******************************************************************************************** */
+NodeItem::NodeItem()
+  : PeerItem(), _id()
+{
+  // pass...
+}
+
+NodeItem::NodeItem(const Identifier &id, const QHostAddress &addr, uint16_t port)
+  : PeerItem(addr, port), _id(id)
+{
+  // pass...
+}
+
+NodeItem::NodeItem(const Identifier &id, const PeerItem &peer)
+  : PeerItem(peer), _id(id)
+{
+  // pass...
+}
+
+NodeItem::NodeItem(const NodeItem &other)
+  : PeerItem(other), _id(other._id)
+{
+  // pass...
+}
+
+NodeItem &
+NodeItem::operator =(const NodeItem &other) {
+  PeerItem::operator =(other);
+  _id   = other.id();
+  return *this;
+}
+
+const Identifier &
+NodeItem::id() const {
+  return _id;
+}
+
+
+/* ******************************************************************************************** *
+ * Implementation of AnnouncementItem
+ * ******************************************************************************************** */
+AnnouncementItem::AnnouncementItem()
+  : NodeItem(), _timestamp()
+{
+  // pass...
+}
+
+AnnouncementItem::AnnouncementItem(const Identifier &id, const QHostAddress &addr, uint16_t port)
+  : NodeItem(id, addr, port), _timestamp(QDateTime::currentDateTime())
+{
+  // pass...
+}
+
+AnnouncementItem::AnnouncementItem(const AnnouncementItem &other)
+  : NodeItem(other), _timestamp(other._timestamp)
+{
+  // pass...
+}
+
+AnnouncementItem &
+AnnouncementItem::operator =(const AnnouncementItem &other) {
+  NodeItem::operator =(other);
+  _timestamp = other._timestamp;
+  return *this;
+}
+
+bool
+AnnouncementItem::olderThan(size_t seconds) {
+  return (_timestamp.addSecs(seconds)<QDateTime::currentDateTime());
+}
 
 
 /* ******************************************************************************************** *
  * Implementation of Bucket::Item
  * ******************************************************************************************** */
 Bucket::Item::Item()
-  : _id(), _prefix(0), _addr(), _port(0), _lastSeen()
+  : _prefix(0), _peer(QHostAddress(), 0), _lastSeen()
 {
   // pass...
 }
 
-Bucket::Item::Item(const Identifier &id, const QHostAddress &addr, uint16_t port, size_t prefix)
-  : _id(id), _prefix(prefix), _addr(addr), _port(port), _lastSeen(QDateTime::currentDateTime())
+Bucket::Item::Item(const QHostAddress &addr, uint16_t port, size_t prefix)
+  : _prefix(prefix), _peer(addr, port), _lastSeen(QDateTime::currentDateTime())
 {
   // pass...
 }
 
 Bucket::Item::Item(const Item &other)
-  : _id(other._id), _prefix(other._prefix), _addr(other._addr), _port(other._port),
-    _lastSeen(other._lastSeen)
+  : _prefix(other._prefix), _peer(other._peer), _lastSeen(other._lastSeen)
 {
   // pass...
 }
 
 Bucket::Item &
 Bucket::Item::operator =(const Item &other) {
-  _id = other._id;
-  _prefix = other._prefix;
-  _addr = other._addr;
-  _port = other._port;
+  _prefix   = other._prefix;
+  _peer     = other._peer;
   _lastSeen = other._lastSeen;
   return *this;
-}
-
-const Identifier &
-Bucket::Item::id() const {
-  return _id;
 }
 
 size_t
 Bucket::Item::prefix() const {
   return _prefix;
 }
+
+const PeerItem &
+Bucket::Item::peer() const {
+  return _peer;
+}
+
 const QHostAddress &
 Bucket::Item::addr() const {
-  return _addr;
+  return _peer.addr();
 }
 
 uint16_t
 Bucket::Item::port() const {
-  return _port;
+  return _peer.port();
 }
 
 const QDateTime &
@@ -144,14 +253,14 @@ Bucket::Item::lastSeen() const {
 /* ******************************************************************************************** *
  * Implementation of Bucket
  * ******************************************************************************************** */
-Bucket::Bucket(size_t size)
-  : _maxSize(size), _prefix(0), _triples()
+Bucket::Bucket(const Identifier &self, size_t size)
+  : _self(self), _maxSize(size), _prefix(0), _triples()
 {
   // pass...
 }
 
 Bucket::Bucket(const Bucket &other)
-  : _maxSize(other._maxSize), _prefix(other._prefix), _triples(other._triples)
+  : _self(other._self), _maxSize(other._maxSize), _prefix(other._prefix), _triples(other._triples)
 {
   // pass...
 }
@@ -162,22 +271,20 @@ Bucket::full() const {
 }
 
 bool
-Bucket::contains(const Identifier &id) {
+Bucket::contains(const Identifier &id) const {
   return _triples.contains(id);
 }
 
 void
-Bucket::add(const Item &item) {
-  if (contains(item.id())) {
-    _history.removeOne(item.id());
-  } else if (full()) {
-    Identifier oldest = _history.front();
-    _history.pop_front(); _triples.remove(oldest);
+Bucket::add(const Identifier &id, const Item &item) {
+  _triples[id] = item;
+}
+
+void
+Bucket::add(const Identifier &id, const QHostAddress &addr, uint16_t port) {
+  if (contains(id) || (!full())) {
+    _triples[id] = Item(addr, port, (id-_self).leadingBit());
   }
-  // add item as the newest
-  _history.append(item.id());
-  // Add or update item
-  _triples.insert(item.id(), item);
 }
 
 size_t
@@ -187,16 +294,52 @@ Bucket::prefix() const {
 
 void
 Bucket::split(Bucket &newBucket) {
-  QList<Identifier>::iterator id = _history.begin();
-  for (; id != _history.end(); id++) {
-    Item &item = _triples[*id];
-    if (item.prefix() > _prefix) {
-      newBucket.add(item);
+  // Add all items from this bucket to the new one, which have a higher
+  // prefix than the prefix of this bucket
+  QHash<Identifier, Item>::iterator item = _triples.begin();
+  for (; item != _triples.end(); item++) {
+    if (item->prefix() > _prefix) {
+      newBucket.add(item.key(), *item);
     }
   }
-  id = newBucket._history.begin();
-  for (; id != newBucket._history.begin(); id++) {
-    _history.removeOne(*id); _triples.remove(*id);
+  item = newBucket._triples.begin();
+  for (; item != newBucket._triples.end(); item++) {
+    _triples.remove(item.key());
+  }
+}
+
+void
+Bucket::getNearest(const Identifier &id, QList<NodeItem> &best) const {
+  QHash<Identifier, Item>::const_iterator item = _triples.begin();
+  for (; item != _triples.end(); item++) {
+    // Perform an "insort" into best list
+    Distance d = id - item.key();
+    QList<NodeItem>::iterator node = best.begin();
+    while ((node != best.end()) && (d>=(id-node->id()))) { node++; }
+    best.insert(node, NodeItem(item.key(), item->addr(), item->port()));
+    while (best.size() > DHT_K) { best.pop_back(); }
+  }
+}
+
+void
+Bucket::getOlderThan(size_t age, QList<NodeItem> &nodes) const {
+  QHash<Identifier, Item>::const_iterator item = _triples.begin();
+  for (; item != _triples.end(); item++) {
+    if (item->olderThan(age)) {
+      nodes.append(NodeItem(item.key(), item->addr(), item->port()));
+    }
+  }
+}
+
+void
+Bucket::removeOlderThan(size_t age) {
+  QHash<Identifier, Item>::iterator item = _triples.begin();
+  while (item != _triples.end()) {
+    if (item->olderThan(age)) {
+      item = _triples.erase(item);
+    } else {
+      item++;
+    }
   }
 }
 
@@ -204,77 +347,197 @@ Bucket::split(Bucket &newBucket) {
 /* ******************************************************************************************** *
  * Implementation of Buckets
  * ******************************************************************************************** */
-Buckets::Buckets()
-  : _buckets()
+Buckets::Buckets(const Identifier &self)
+  : _self(self), _buckets()
 {
   _buckets.reserve(8*DHT_HASH_SIZE);
 }
 
+bool
+Buckets::empty() const {
+  return 0 == _buckets.size();
+}
+
+bool
+Buckets::contains(const Identifier &id) const {
+  QList<Bucket>::const_iterator bucket = _buckets.begin();
+  for (; bucket != _buckets.end(); bucket++) {
+    if (bucket->contains(id)) { return true; }
+  }
+  return false;
+}
+
 void
-Buckets::add(const Bucket::Item &item) {
+Buckets::add(const Identifier &id, const QHostAddress &addr, uint16_t port) {
+  // Do not add myself
+  if (id == _self) { return; }
+
   // If there are no buckets -> create one.
-  if (0 == _buckets.size()) {
-    _buckets.append(Bucket());
-    _buckets.back().add(item);
+  if (empty()) {
+    _buckets.append(Bucket(_self));
+    _buckets.back().add(id, addr, port);
     return;
   }
 
   // Find the bucket, the item belongs to
-  QList<Bucket>::iterator bucket = index(item);
+  QList<Bucket>::iterator bucket = index(id);
 
-  if (bucket->contains(item.id()) || (! bucket->full())) {
-    // If the bucket contains the item already -> update
-    bucket->add(item);
+  if (bucket->contains(id) || (! bucket->full())) {
+    // If the bucket contains the item already or the bucket is not full
+    //  -> update
+    bucket->add(id, addr, port);
   } else {
     // If the item is new to the bucket and if the bucket is full
     //  -> check if it can be splitted
     QList<Bucket>::iterator next = bucket; next++;
     if (next==_buckets.end()) {
-      Bucket newBucket;
+      Bucket newBucket(_self);
       bucket->split(newBucket);
       _buckets.insert(next, newBucket);
-    } else {
-      // If I cannot split the bucket -> override one
-      bucket->add(item);
+      size_t prefix = (id-_self).leadingBit();
+      if (next->prefix() == prefix) { next->add(id, addr, port); }
+      else { this->add(id, addr, port); }
     }
   }
 }
 
+void
+Buckets::getNearest(const Identifier &id, QList<NodeItem> &best) const {
+  QList<Bucket>::const_iterator bucket = _buckets.begin();
+  for (; bucket != _buckets.end(); bucket++) {
+    bucket->getNearest(id, best);
+  }
+}
+
+void
+Buckets::getOlderThan(size_t seconds, QList<NodeItem> &nodes) const {
+  QList<Bucket>::const_iterator bucket = _buckets.begin();
+  for (; bucket != _buckets.end(); bucket++) {
+    bucket->getOlderThan(seconds, nodes);
+  }
+}
+
+void
+Buckets::removeOlderThan(size_t seconds) {
+  QList<Bucket>::iterator bucket = _buckets.begin();
+  for (; bucket != _buckets.end(); bucket++) {
+    bucket->removeOlderThan(seconds);
+  }
+}
+
 QList<Bucket>::iterator
-Buckets::index(const Bucket::Item &item) {
+Buckets::index(const Identifier &id) {
+  size_t prefix = (id-_self).leadingBit();
   if (2 > _buckets.size()) { return _buckets.begin(); }
   QList<Bucket>::iterator current = _buckets.begin();
   QList<Bucket>::iterator next = _buckets.begin(); next++;
   for (; next < _buckets.end(); current++, next++) {
-    if (current->prefix() == item.prefix()) { return current; }
-    if (next->prefix() > item.prefix()) { return current; }
+    if (current->prefix() == prefix) { return current; }
+    if (next->prefix() > prefix) { return current; }
   }
   return _buckets.end()--;
 }
 
 
 /* ******************************************************************************************** *
- * Implementation of RequestItem etc.
+ * Implementation of SearchQuery etc.
  * ******************************************************************************************** */
-QueryItem::QueryItem(Message::Type type, const Identifier &destination)
-  : _type(type), _destination(destination), _timeStamp(QDateTime::currentDateTime())
+SearchQuery::SearchQuery(const Identifier &id)
+  : _id(id), _best()
 {
   // pass...
 }
 
-PingQueryItem::PingQueryItem(const Identifier &destination)
-  : QueryItem(Message::PING, destination)
+const Identifier &
+SearchQuery::id() const {
+  return _id;
+}
+
+void
+SearchQuery::update(const NodeItem &node) {
+  // Skip nodes already queried or in the best list -> done
+  if (_queried.contains(node.id())) { return; }
+  // Perform an "insort" into best list
+  Distance d = _id-node.id();
+  QList<NodeItem>::iterator item = _best.begin();
+  while ((item != _best.end()) && (d>=(_id-item->id()))) {
+    // if the node is in list -> quit
+    if (item->id() == node.id()) { return; }
+    // continue
+    item++;
+  }
+  _best.insert(item, node);
+  while (_best.size() > DHT_K) { _best.pop_back(); }
+}
+
+bool
+SearchQuery::next(NodeItem &node) {
+  QList<NodeItem>::iterator item = _best.begin();
+  for (; item != _best.end(); item++) {
+    if (! _queried.contains(item->id())) {
+      _queried.insert(item->id());
+      node = *item;
+      return true;
+    }
+  }
+  return false;
+}
+
+QList<NodeItem> &
+SearchQuery::best() {
+  return _best;
+}
+
+const NodeItem &
+SearchQuery::first() const {
+  return _best.first();
+}
+
+
+FindNodeQuery::FindNodeQuery(const Identifier &id)
+  : SearchQuery(id)
 {
   // pass...
 }
 
-FindNodeQuery::FindNodeQuery(const Identifier &destination, const Identifier &id)
-  : QueryItem(Message::FIND_NODE, id)
+bool
+FindNodeQuery::found() const {
+  if (0 == _best.size()) { return false; }
+  return _id == _best.front().id();
+}
+
+FindValueQuery::FindValueQuery(const Identifier &id)
+  : SearchQuery(id)
 {
   // pass...
 }
 
-FindNodeQuery::~FindNodeQuery() {
+
+/* ******************************************************************************************** *
+ * Implementation of Request etc.
+ * ******************************************************************************************** */
+Request::Request(Message::Type type)
+  : _type(type), _cookie(), _timestamp(QDateTime::currentDateTime())
+{
+  // pass...
+}
+
+PingRequest::PingRequest()
+  : Request(Message::PING)
+{
+  // pass...
+}
+
+FindNodeRequest::FindNodeRequest(FindNodeQuery *query)
+  : Request(Message::FIND_NODE), _findNodeQuery(query)
+{
+  // pass...
+}
+
+FindValueRequest::FindValueRequest(FindValueQuery *query)
+  : Request(Message::FIND_VALUE), _findValueQuery(query)
+{
+  // pass...
 }
 
 
@@ -282,7 +545,7 @@ FindNodeQuery::~FindNodeQuery() {
  * Implementation of Node
  * ******************************************************************************************** */
 Node::Node(const Identifier &id, const QHostAddress &addr, quint16 port, QObject *parent)
-  : QObject(parent), _id(id), _socket()
+  : QObject(parent), _self(id), _socket(), _buckets(_self)
 {
   if (!_socket.bind(addr, port)) {
     qDebug() << "Cannot bind to port" << addr << ":" << port;
@@ -294,6 +557,82 @@ Node::Node(const Identifier &id, const QHostAddress &addr, quint16 port, QObject
 
 Node::~Node() {
   // pass...
+}
+
+void
+Node::ping(const PeerItem &peer) {
+  ping(peer.addr(), peer.port());
+}
+
+void
+Node::ping(const QHostAddress &addr, uint16_t port) {
+  // Create ping request
+  PingRequest *req = new PingRequest();
+  // Assemble message
+  Message msg;
+  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
+  memcpy(msg.payload.ping.id, _self.data(), DHT_HASH_SIZE);
+  msg.payload.ping.type = Message::PING;
+  // send it
+  _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port);
+}
+
+void
+Node::findNode(const Identifier &id) {
+  // Create a query instance
+  FindNodeQuery *query = new FindNodeQuery(id);
+  // Collect DHT_K nearest nodes
+  _buckets.getNearest(id, query->best());
+  // Send request to the first element in the list
+  NodeItem next;
+  if (! query->next(next)) {
+    delete query; emit nodeNotFound(id);
+  } else {
+    sendFindNode(next, query);
+  }
+}
+
+void
+Node::findValue(const Identifier &id) {
+  // Create a query instance
+  FindValueQuery *query = new FindValueQuery(id);
+  // Collect DHT_K nearest nodes
+  _buckets.getNearest(id, query->best());
+  // Send request to the first element in the list
+  NodeItem next;
+  if (! query->next(next)) {
+    delete query; emit valueNotFound(id);
+  } else {
+    sendFindValue(next, query);
+  }
+}
+
+void
+Node::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
+  // Construct request item
+  FindNodeRequest *req = new FindNodeRequest(query);
+  // Queue request
+  _pendingRequests.insert(req->cookie(), req);
+  // Assemble & send message
+  Message msg;
+  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
+  msg.payload.find_node.type = Message::FIND_NODE;
+  memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
+  _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port());
+}
+
+void
+Node::sendFindValue(const NodeItem &to, FindValueQuery *query) {
+  // Construct request item
+  FindValueRequest *req = new FindValueRequest(query);
+  // Queue request
+  _pendingRequests.insert(req->cookie(), req);
+  // Assemble & send message
+  Message msg;
+  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
+  msg.payload.find_node.type = Message::FIND_VALUE;
+  memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
+  _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port());
 }
 
 void
@@ -315,46 +654,289 @@ Node::_onReadyRead() {
 
     if (_pendingRequests.contains(cookie)) {
       // Message is a response -> dispatch by type from table
-      QueryItem *item = _pendingRequests[cookie];
+      Request *item = _pendingRequests[cookie];
+      _pendingRequests.remove(cookie);
       if (Message::PING == item->type()) {
-        // Response to a ping request -> update buckets.
-        PingQueryItem *pitem = reinterpret_cast<PingQueryItem *>(item);
-        _buckets.add(Bucket::Item(pitem->destination(), addr, port,
-                                  (pitem->destination()-_id).leadingBit()));
-        // Request finished -> remove from table
-        _pendingRequests.remove(cookie);
-        delete pitem;
+        _processPingResponse(msg, size, static_cast<PingRequest *>(item), addr, port);
       } else if (Message::FIND_NODE == item->type()) {
-        // Response to a find node request -> unpack result
-        FindNodeQuery *ritem = reinterpret_cast<FindNodeQuery *>(item);
-        // payload length must be a multiple of triple length
-        if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
-          qDebug() << "Received a malformed FIND_NODE response from"
-                   << addr << ":" << port;
-          _pendingRequests.remove(ritem->destination());
-          delete ritem;
-          continue;
-        }
-        // unpack
-        size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
-        QList<Bucket::Item> items; items.reserve(Ntriple);
-        for (size_t i=0; i<Ntriple; i++) {
-          Identifier id(msg.payload.result.triples[i].id);
-          items.push_back(Bucket::Item(
-                            id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
-                            ntohs(msg.payload.result.triples[i].port),
-                            (id-_id).leadingBit()));
-        }
-        // signal results to query
-        ritem->query()->update(items);
-        // remove request from list
-        _pendingRequests.remove(ritem->destination());
-        delete ritem;
+        _processFindNodeResponse(msg, size, static_cast<FindNodeRequest *>(item), addr, port);
+      } else if (Message::FIND_VALUE == item->type()) {
+        _processFindValueResponse(msg, size, static_cast<FindValueRequest *>(item), addr, port);
+      } else {
+        qDebug() << "Unknown response from " << addr << ":" << port;
       }
+      delete item;
     } else {
       // Message is likely a request
+      if ((size == (2*DHT_HASH_SIZE+1)) && (Message::PING == msg.payload.ping.type)){
+        _processPingRequest(msg, size, addr, port);
+      } else if ((size == (2*DHT_HASH_SIZE+1)) && (Message::FIND_NODE == msg.payload.find_node.type)) {
+        _processFindNodeRequest(msg, size, addr, port);
+      } else if ((size == (2*DHT_HASH_SIZE+1)) && (Message::FIND_VALUE == msg.payload.find_value.type)) {
+        _processFindValueRequest(msg, size, addr, port);
+      } else if ((size >= (2*DHT_HASH_SIZE+1)) && (Message::ANNOUNCE == msg.payload.announce.type)) {
+        _processFindValueRequest(msg, size, addr, port);
+      } else {
+        qDebug() << "Unknown request from " << addr << ":" << port;
+      }
     }
   }
 }
 
+void
+Node::_processPingResponse(
+    const Message &msg, size_t size, PingRequest *req, const QHostAddress &addr, uint16_t port)
+{
+  // sinal success
+  emit nodeReachable(NodeItem(msg.payload.ping.id, addr, port));
+  // If the buckets are empty -> we are likely bootstrapping
+  bool bootstrapping = _buckets.empty();
+  // Given that this is a ping response -> add the node to the corresponding
+  // bucket if space is left
+  _buckets.add(msg.payload.ping.id, addr, port);
+  if (bootstrapping) { findNode(_self); }
+}
 
+void
+Node::_processFindNodeResponse(
+    const Message &msg, size_t size, FindNodeRequest *req, const QHostAddress &addr, uint16_t port)
+{
+  // payload length must be a multiple of triple length
+  if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
+    qDebug() << "Received a malformed FIND_NODE response from"
+             << addr << ":" << port;
+  } else {
+    // unpack and update query
+    size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
+    for (size_t i=0; i<Ntriple; i++) {
+      Identifier id(msg.payload.result.triples[i].id);
+      NodeItem item(id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
+                    ntohs(msg.payload.result.triples[i].port));
+      // Add discovered node to buckets
+      _buckets.add(id, item.addr(), item.port());
+      // Update node list of query
+      req->query()->update(item);
+    }
+
+    // If the node was found -> signal success
+    if (req->query()->found()) {
+      // Signal node found
+      emit nodeFound(req->query()->first());
+      // delete query
+      delete req->query();
+      // done
+      return;
+    }
+  }
+
+  // Get next node to query
+  NodeItem next;
+  // get next node to query, if there is no next node -> search failed
+  if (! req->query()->next(next)) {
+    // signal error
+    emit nodeNotFound(req->query()->id());
+    // delete query
+    delete req->query();
+  }
+  // Send next request
+  sendFindNode(next, req->query());
+}
+
+void
+Node::_onCheckRequestTimeout() {
+  QList<Request *> deadRequests;
+  QHash<Identifier, Request *>::iterator item = _pendingRequests.begin();
+  for (; item != _pendingRequests.end(); item++) {
+    if ((*item)->olderThan(2)) { deadRequests.append(*item); }
+  }
+
+  // Process dead requests, dispatch by type
+  QList<Request *>::iterator req = deadRequests.begin();
+  for (; req != deadRequests.end(); req++) {
+    _pendingRequests.remove((*req)->cookie());
+    if (Message::PING == (*req)->type()) {
+      // Just ignore
+      delete *req;
+    } else if (Message::FIND_NODE == (*req)->type()) {
+      FindNodeQuery *query = static_cast<FindNodeRequest *>(*req)->query();
+      // Get next node to query
+      NodeItem next;
+      // get next node to query, if there is no next node -> search failed
+      if (! query->next(next)) {
+        // signal error
+        emit nodeNotFound(query->id());
+        // delete query
+        delete query;
+      }
+      // Send next request
+      sendFindNode(next, query);
+    } else if (Message::FIND_VALUE == (*req)->type()) {
+      FindValueQuery *query = static_cast<FindValueRequest *>(*req)->query();
+      // Get next node to query
+      NodeItem next;
+      // get next node to query, if there is no next node -> search failed
+      if (! query->next(next)) {
+        // signal error
+        emit valueNotFound(query->id());
+        // delete query
+        delete query;
+      }
+      // Send next request
+      sendFindValue(next, query);
+    }
+  }
+}
+
+void
+Node::_onCheckNodeTimeout() {
+  // Collect old nodes from buckets
+  QList<NodeItem> oldNodes;
+  _buckets.getOlderThan(15*60, oldNodes);
+  // send a ping to all of them
+  QList<NodeItem>::iterator node = oldNodes.begin();
+  for (; node != oldNodes.end(); node++) {
+    ping(node->addr(), node->port());
+  }
+  // Remove dead nodes from the buckets
+  _buckets.removeOlderThan(20*60);
+  // Send pings to candidates
+  while (_candidates.size()) {
+    ping(_candidates.first()); _candidates.pop_front();
+  }
+}
+
+void
+Node::_onCheckAnnouncementTimeout() {
+  /// @todo Implement
+}
+
+void
+Node::_processFindValueResponse(
+    const Message &msg, size_t size, FindValueRequest *req, const QHostAddress &addr, uint16_t port)
+{
+  // payload length must be a multiple of triple length
+  if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
+    qDebug() << "Received a malformed FIND_NODE response from"
+             << addr << ":" << port;
+  } else {
+    // unpack and update query
+    size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
+
+    // If queried node has value
+    if (msg.payload.result.success) {
+      // Get list of nodes providing the data
+      QList<NodeItem> nodes; nodes.reserve(Ntriple);
+      for (size_t i=0; i<Ntriple; i++) {
+        nodes.push_back(NodeItem(msg.payload.result.triples[i].id,
+                                 QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
+                                 ntohs(msg.payload.result.triples[i].port)));
+      }
+      // signal success
+      emit valueFound(req->query()->id(), nodes);
+      // query done
+      delete req->query();
+    }
+
+    // If value was not found -> proceed with returned nodes
+    for (size_t i=0; i<Ntriple; i++) {
+      Identifier id(msg.payload.result.triples[i].id);
+      NodeItem item(id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
+                    ntohs(msg.payload.result.triples[i].port));
+      // Add discovered node to buckets
+      _buckets.add(id, item.addr(), item.port());
+      // Update node list of query
+      req->query()->update(item);
+    }
+  }
+
+  NodeItem next;
+  // get next node to query, if there is no next node -> search failed
+  if (! req->query()->next(next)) {
+    // signal error
+    emit valueNotFound(req->query()->id());
+    // delete query
+    delete req->query();
+  }
+  // Send next request
+  sendFindValue(next, req->query());
+}
+
+void
+Node::_processPingRequest(
+    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+{
+  // simply assemble a pong response including my own ID
+  Message resp;
+  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+  memcpy(resp.payload.ping.id, _self.data(), DHT_HASH_SIZE);
+  resp.payload.ping.type = Message::PING;
+  // send
+  _socket.writeDatagram((char *) &resp, 2*DHT_HASH_SIZE+1, addr, port);
+
+  // Add node to candidate nodes for the bucket table if not known already
+  if ((! _buckets.contains(msg.payload.ping.id)) && (10 > _candidates.size())) {
+    _candidates.push_back(PeerItem(addr, port));
+  }
+}
+
+void
+Node::_processFindNodeRequest(
+    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+{
+  QList<NodeItem> best;
+  _buckets.getNearest(msg.payload.find_node.id, best);
+
+  Message resp;
+  // Assemble response
+  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+  resp.payload.result.success = 0;
+  QList<NodeItem>::iterator item = best.begin();
+  for (size_t i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
+    memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
+    resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
+    resp.payload.result.triples[i].port = htons(item->port());
+  }
+
+  // Compute size and send reponse
+  size_t resp_size = 1+(1+std::min(best.size(), DHT_K))*DHT_HASH_SIZE;
+  _socket.writeDatagram((char *) &resp, resp_size, addr, port);
+}
+
+void
+Node::_processFindValueRequest(
+    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+{
+  Message resp;
+
+  if (_table.contains(msg.payload.find_value.id)) {
+    QList<NodeItem> &owners = _table[msg.payload.find_value.id];
+    // Assemble response
+    memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+    resp.payload.result.success = 1;
+    QList<NodeItem>::iterator item = owners.begin();
+    for (size_t i = 0; (item!=owners.end()) && (i<DHT_K); item++, i++) {
+      memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
+      resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
+      resp.payload.result.triples[i].port = htons(item->port());
+    }
+    // Compute size and send reponse
+    size_t resp_size = 1+(1+std::min(owners.size(), DHT_K))*DHT_HASH_SIZE;
+    _socket.writeDatagram((char *) &resp, resp_size, addr, port);
+  } else {
+    // Get best matching nodes from the buckets
+    QList<NodeItem> best;
+    _buckets.getNearest(msg.payload.find_node.id, best);
+    // Assemble response
+    memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+    resp.payload.result.success = 0;
+    QList<NodeItem>::iterator item = best.begin();
+    for (size_t i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
+      memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
+      resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
+      resp.payload.result.triples[i].port = htons(item->port());
+    }
+    // Compute size and send reponse
+    size_t resp_size = 1+(1+std::min(best.size(), DHT_K))*DHT_HASH_SIZE;
+    _socket.writeDatagram((char *) &resp, resp_size, addr, port);
+  }
+}

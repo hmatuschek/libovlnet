@@ -3,6 +3,7 @@
 
 int main(int argc, char *argv[]) {
   qsrand(time(0));
+
   Application app(argc, argv);
 
   app.exec();
