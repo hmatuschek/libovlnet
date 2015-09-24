@@ -6,7 +6,7 @@
 #include <QDateTime>
 #include <QHostAddress>
 #include <QString>
-
+#include <inttypes.h>
 
 class NTPClient: public QObject
 {
