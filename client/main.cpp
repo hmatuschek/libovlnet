@@ -1,4 +1,5 @@
 #include "lib/dht.h"
+#include "lib/ntp.h"
 #include <QApplication>
 #include <time.h>
 
@@ -7,12 +8,10 @@ int main(int argc, char *argv[]) {
 
   QApplication app(argc, argv);
 
-  Node a(Identifier(), QHostAddress::LocalHost, 7740);
-  Node b(Identifier(), QHostAddress::LocalHost, 7741);
-  Node c(Identifier(), QHostAddress::LocalHost, 7742);
+  DHT node1(Identifier(), QHostAddress::LocalHost, 7741);
+  DHT node2(Identifier(), QHostAddress::LocalHost, 7742);
 
-  b.ping(QHostAddress::LocalHost, 7740);
-  c.ping(QHostAddress::LocalHost, 7740);
+  node2.ping(QHostAddress::LocalHost, 7741);
 
   app.exec();
 

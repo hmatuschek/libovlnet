@@ -32,11 +32,8 @@
  * It is ensured that a complete bucket can be transferred with one UDP message. */
 #define DHT_K std::min(8, DHT_MAX_TRIPLES)
 
-// Forward declarations
+// Forward declaration
 class Identifier;
-class FindNodeQuery;
-class Node;
-
 
 /** The distance between two identifiers. */
 class Distance : public QByteArray
@@ -242,162 +239,19 @@ protected:
 
 
 
-/** The structure of the UDP datagrams transferred. */
-typedef struct {
-  /** Possible message types. */
-  typedef enum {
-    PING = 0,
-    ANNOUNCE,
-    FIND_NODE,
-    FIND_VALUE,
-    GET_DATA,
-  } Type;
 
-  /** Represents a triple of ID, IP address and port as transferred via UDP. */
-  typedef struct {
-    /** The ID of a node. */
-    char     id[DHT_HASH_SIZE];
-    /** The IP of the node. */
-    uint32_t  ip;
-    /** The port of the node. */
-    uint16_t port;
-  } DHTTriple;
-
-  /** The magic cookie to match a response to a request. */
-  char    cookie[DHT_HASH_SIZE];
-
-  /** Payload */
-  union {
-    struct {
-      uint8_t type; // == PING;
-      char    id[DHT_HASH_SIZE];
-    } ping;
-
-    struct {
-      uint8_t type; // == ANNOUNCE
-      char    who[DHT_HASH_SIZE];
-      char    what[DHT_HASH_SIZE];
-    } announce;
-
-    struct {
-      uint8_t type; // == FIND_NODE
-      char    id[DHT_HASH_SIZE];
-    } find_node;
-
-    struct {
-      uint8_t type; // == FIND_VALUE
-      char    id[DHT_HASH_SIZE];
-    } find_value;
-
-    struct {
-      uint8_t   success;
-      DHTTriple triples[DHT_MAX_TRIPLES];
-    } result;
-
-    struct {
-      uint8_t  type; // == GET_DATA
-      char     id[DHT_HASH_SIZE];
-      uint64_t offset;
-      uint64_t length;
-    } get_data;
-
-    struct {
-      uint64_t offset;
-      char     data[DHT_MAX_DATA_SIZE];
-    } data;
-
-    struct {
-      uint64_t offset;
-    } ack_data;
-  } payload;
-} Message;
-
-
-class SearchQuery
-{
-protected:
-  SearchQuery(const Identifier &id);
-
-public:
-  const Identifier &id() const;
-  void update(const NodeItem &nodes);
-  bool next(NodeItem &node);
-  QList<NodeItem> &best();
-  const NodeItem &first() const;
-
-protected:
-  Identifier _id;
-  QList<NodeItem> _best;
-  QSet<Identifier> _queried;
-};
-
-
-class FindNodeQuery: public SearchQuery
-{
-public:
-  FindNodeQuery(const Identifier &id);
-
-  bool found() const;
-};
-
-
-class FindValueQuery: public SearchQuery
-{
-public:
-  FindValueQuery(const Identifier &id);
-};
-
-
-class Request
-{
-protected:
-  Request(Message::Type type);
-
-public:
-  inline Message::Type type() const { return _type; }
-  inline const Identifier &cookie() const { return _cookie; }
-  inline const QDateTime &timestamp() const { return _timestamp; }
-  inline size_t olderThan(size_t seconds) const {
-    return (_timestamp.addSecs(seconds) < QDateTime::currentDateTime());
-  }
-
-protected:
-  Message::Type _type;
-  Identifier    _cookie;
-  QDateTime     _timestamp;
-};
-
-
-class PingRequest: public Request
-{
-public:
-  PingRequest();
-};
-
-class FindNodeRequest: public Request
-{
-public:
-  FindNodeRequest(FindNodeQuery *query);
-  inline FindNodeQuery *query() const { return _findNodeQuery; }
-
-protected:
-  FindNodeQuery *_findNodeQuery;
-};
-
-
-class FindValueRequest: public Request
-{
-public:
-  FindValueRequest(FindValueQuery *query);
-  inline FindValueQuery *query() const { return _findValueQuery; }
-
-protected:
-  FindValueQuery *_findValueQuery;
-};
+struct Message;
+class Request;
+class FindNodeQuery;
+class FindValueQuery;
+class Request;
+class PingRequest;
+class FindNodeRequest;
+class FindValueRequest;
 
 
 /** Implements a node in the DHT. */
-class Node: public QObject
+class DHT: public QObject
 {
   Q_OBJECT
 
@@ -407,58 +261,73 @@ public:
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
-  explicit Node(const Identifier &id, const QHostAddress &addr=QHostAddress::Any, quint16 port=7741,
+  explicit DHT(const Identifier &id, const QHostAddress &addr=QHostAddress::Any, quint16 port=7741,
                 QObject *parent=0);
   /** Destructor. */
-  virtual ~Node();
+  virtual ~DHT();
 
+  /** Sends a ping request to the given peer. */
   void ping(const QHostAddress &addr, uint16_t port);
+  /** Sends a ping request to the given peer. */
   void ping(const PeerItem &peer);
+  /** Starts the search for a node with the given identifier. */
   void findNode(const Identifier &id);
+  /** Starts the search for a value with the given identifier. */
   void findValue(const Identifier &id);
+  /** Announces a value. */
   void announce(const Identifier &id);
 
+  /** Needs to be implemented to provide the data for the given id. */
   virtual QIODevice *data(const Identifier &id);
 
 signals:
+  /** Gets emitted if a ping was replied. */
   void nodeReachable(const NodeItem &node);
-
+  /** Gets emitted if the given node has been found. */
   void nodeFound(const NodeItem &node);
+  /** Gets emitted if the given node was not found. */
   void nodeNotFound(const Identifier &id);
-
+  /** Gets emitted if the given value was found. */
   void valueFound(const Identifier &id, const QList<NodeItem> &nodes);
+  /** Gets emitted if the given value was not found. */
   void valueNotFound(const Identifier &id);
 
 protected:
   /** Sends a FindNode message to the node @c to to search for the node specified by @c id.
    * Any response to that request will be forwarded to the specified @c query. */
   void sendFindNode(const NodeItem &to, FindNodeQuery *query);
+  /** Sends a FindValue message to the node @c to to search for the node specified by @c id.
+   * Any response to that request will be forwarded to the specified @c query. */
   void sendFindValue(const NodeItem &to, FindValueQuery *query);
+  /** Returns @c true if the given identifier belongs to a value being announced. */
   bool isPendingAnnouncement(const Identifier &id) const;
+  /** Sends an Annouce message to the given node. */
   void sendAnnouncement(const NodeItem &to, const Identifier &what);
 
+private:
+  /** Processes a Ping response. */
   void _processPingResponse(const Message &msg, size_t size, PingRequest *req,
                             const QHostAddress &addr, uint16_t port);
-
+  /** Processes a FindNode response. */
   void _processFindNodeResponse(const Message &msg, size_t size, FindNodeRequest *req,
                                 const QHostAddress &addr, uint16_t port);
-
+  /** Processes a FindValue response. */
   void _processFindValueResponse(const Message &msg, size_t size, FindValueRequest *req,
                                 const QHostAddress &addr, uint16_t port);
-
+  /** Processes a Ping request. */
   void _processPingRequest(const Message &msg, size_t size,
                            const QHostAddress &addr, uint16_t port);
-
+  /** Processes a FindNode request. */
   void _processFindNodeRequest(const Message &msg, size_t size,
                                const QHostAddress &addr, uint16_t port);
-
+  /** Processes a FindValue request. */
   void _processFindValueRequest(const Message &msg, size_t size,
                                 const QHostAddress &addr, uint16_t port);
-
+  /** Processes an Announce request. */
   void _processAnnounceRequest(const Message &msg, size_t size,
                                const QHostAddress &addr, uint16_t port);
 
-protected slots:
+private slots:
   /** Gets called on the reception of a UDP package. */
   void _onReadyRead();
   /** Gets called regulary to check the request timeouts. */
@@ -483,9 +352,11 @@ protected:
   QHash<Identifier, QDateTime> _announcedData;
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
-
+  /** Timer to check timeouts of requests. */
   QTimer _requestTimer;
+  /** Timer to check nodes in buckets. */
   QTimer _nodeTimer;
+  /** Timer to keep announcements up-to-date. */
   QTimer _announcementTimer;
 };
 

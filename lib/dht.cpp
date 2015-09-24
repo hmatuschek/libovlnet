@@ -2,6 +2,160 @@
 #include <netinet/in.h>
 
 
+/** The structure of the UDP datagrams transferred. */
+struct Message {
+  /** Possible message types. */
+  typedef enum {
+    PING = 0,
+    ANNOUNCE,
+    FIND_NODE,
+    FIND_VALUE,
+    GET_DATA,
+  } Type;
+
+  /** Represents a triple of ID, IP address and port as transferred via UDP. */
+  typedef struct {
+    /** The ID of a node. */
+    char     id[DHT_HASH_SIZE];
+    /** The IP of the node. */
+    uint32_t  ip;
+    /** The port of the node. */
+    uint16_t port;
+  } DHTTriple;
+
+  /** The magic cookie to match a response to a request. */
+  char    cookie[DHT_HASH_SIZE];
+
+  /** Payload */
+  union {
+    struct {
+      uint8_t type; // == PING;
+      char    id[DHT_HASH_SIZE];
+    } ping;
+
+    struct {
+      uint8_t type; // == ANNOUNCE
+      char    who[DHT_HASH_SIZE];
+      char    what[DHT_HASH_SIZE];
+    } announce;
+
+    struct {
+      uint8_t type; // == FIND_NODE
+      char    id[DHT_HASH_SIZE];
+    } find_node;
+
+    struct {
+      uint8_t type; // == FIND_VALUE
+      char    id[DHT_HASH_SIZE];
+    } find_value;
+
+    struct {
+      uint8_t   success;
+      DHTTriple triples[DHT_MAX_TRIPLES];
+    } result;
+
+    struct {
+      uint8_t  type; // == GET_DATA
+      char     id[DHT_HASH_SIZE];
+      uint64_t offset;
+      uint64_t length;
+    } get_data;
+
+    struct {
+      uint64_t offset;
+      char     data[DHT_MAX_DATA_SIZE];
+    } data;
+
+    struct {
+      uint64_t offset;
+    } ack_data;
+  } payload;
+} Message;
+
+
+class SearchQuery
+{
+protected:
+  SearchQuery(const Identifier &id);
+
+public:
+  const Identifier &id() const;
+  void update(const NodeItem &nodes);
+  bool next(NodeItem &node);
+  QList<NodeItem> &best();
+  const NodeItem &first() const;
+
+protected:
+  Identifier _id;
+  QList<NodeItem> _best;
+  QSet<Identifier> _queried;
+};
+
+
+class FindNodeQuery: public SearchQuery
+{
+public:
+  FindNodeQuery(const Identifier &id);
+
+  bool found() const;
+};
+
+
+class FindValueQuery: public SearchQuery
+{
+public:
+  FindValueQuery(const Identifier &id);
+};
+
+
+class Request
+{
+protected:
+  Request(Message::Type type);
+
+public:
+  inline Message::Type type() const { return _type; }
+  inline const Identifier &cookie() const { return _cookie; }
+  inline const QDateTime &timestamp() const { return _timestamp; }
+  inline size_t olderThan(size_t seconds) const {
+    return (_timestamp.addSecs(seconds) < QDateTime::currentDateTime());
+  }
+
+protected:
+  Message::Type _type;
+  Identifier    _cookie;
+  QDateTime     _timestamp;
+};
+
+
+class PingRequest: public Request
+{
+public:
+  PingRequest();
+};
+
+class FindNodeRequest: public Request
+{
+public:
+  FindNodeRequest(FindNodeQuery *query);
+  inline FindNodeQuery *query() const { return _findNodeQuery; }
+
+protected:
+  FindNodeQuery *_findNodeQuery;
+};
+
+
+class FindValueRequest: public Request
+{
+public:
+  FindValueRequest(FindValueQuery *query);
+  inline FindValueQuery *query() const { return _findValueQuery; }
+
+protected:
+  FindValueQuery *_findValueQuery;
+};
+
+
 /* ******************************************************************************************** *
  * Implementation of Identifier
  * ******************************************************************************************** */
@@ -455,6 +609,8 @@ SearchQuery::id() const {
 
 void
 SearchQuery::update(const NodeItem &node) {
+  qDebug() << "Update search list with" << node.id()
+           << "@" << node.addr() << ":" << node.port();
   // Skip nodes already queried or in the best list -> done
   if (_queried.contains(node.id())) { return; }
   // Perform an "insort" into best list
@@ -542,9 +698,9 @@ FindValueRequest::FindValueRequest(FindValueQuery *query)
 
 
 /* ******************************************************************************************** *
- * Implementation of Node
+ * Implementation of DHT
  * ******************************************************************************************** */
-Node::Node(const Identifier &id, const QHostAddress &addr, quint16 port, QObject *parent)
+DHT::DHT(const Identifier &id, const QHostAddress &addr, quint16 port, QObject *parent)
   : QObject(parent), _self(id), _socket(), _buckets(_self), _requestTimer(), _nodeTimer(),
     _announcementTimer()
 {
@@ -574,23 +730,23 @@ Node::Node(const Identifier &id, const QHostAddress &addr, quint16 port, QObject
   _announcementTimer.start();
 }
 
-Node::~Node() {
+DHT::~DHT() {
   // pass...
 }
 
 void
-Node::ping(const PeerItem &peer) {
+DHT::ping(const PeerItem &peer) {
   ping(peer.addr(), peer.port());
 }
 
 void
-Node::ping(const QHostAddress &addr, uint16_t port) {
+DHT::ping(const QHostAddress &addr, uint16_t port) {
   // Create ping request
   PingRequest *req = new PingRequest();
   _pendingRequests.insert(req->cookie(), req);
 
   // Assemble message
-  Message msg;
+  struct Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   memcpy(msg.payload.ping.id, _self.data(), DHT_HASH_SIZE);
   msg.payload.ping.type = Message::PING;
@@ -602,7 +758,7 @@ Node::ping(const QHostAddress &addr, uint16_t port) {
 }
 
 void
-Node::findNode(const Identifier &id) {
+DHT::findNode(const Identifier &id) {
   qDebug() << "Search for node" << id;
   // Create a query instance
   FindNodeQuery *query = new FindNodeQuery(id);
@@ -621,7 +777,7 @@ Node::findNode(const Identifier &id) {
 }
 
 void
-Node::findValue(const Identifier &id) {
+DHT::findValue(const Identifier &id) {
   qDebug() << "Search for value" << id;
   // Create a query instance
   FindValueQuery *query = new FindValueQuery(id);
@@ -638,7 +794,7 @@ Node::findValue(const Identifier &id) {
 }
 
 void
-Node::announce(const Identifier &id) {
+DHT::announce(const Identifier &id) {
   qDebug() << "Announce data " << id << "to the world.";
   _announcedData[id] = QDateTime();
   // lets search for the nodes closest to the data id
@@ -646,7 +802,7 @@ Node::announce(const Identifier &id) {
 }
 
 QIODevice *
-Node::data(const Identifier &id) {
+DHT::data(const Identifier &id) {
   return 0;
 }
 
@@ -655,7 +811,7 @@ Node::data(const Identifier &id) {
  * Implementation of internal used methods.
  */
 void
-Node::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
+DHT::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
   qDebug() << "Send FindNode request to" << to.id()
            << "@" << to.addr() << ":" << to.port();
   // Construct request item
@@ -663,7 +819,7 @@ Node::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
   // Queue request
   _pendingRequests.insert(req->cookie(), req);
   // Assemble & send message
-  Message msg;
+  struct Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   msg.payload.find_node.type = Message::FIND_NODE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
@@ -674,7 +830,7 @@ Node::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
 }
 
 void
-Node::sendFindValue(const NodeItem &to, FindValueQuery *query) {
+DHT::sendFindValue(const NodeItem &to, FindValueQuery *query) {
   qDebug() << "Send FindValue request to" << to.id()
            << "@" << to.addr() << ":" << to.port();
   // Construct request item
@@ -682,7 +838,7 @@ Node::sendFindValue(const NodeItem &to, FindValueQuery *query) {
   // Queue request
   _pendingRequests.insert(req->cookie(), req);
   // Assemble & send message
-  Message msg;
+  struct Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   msg.payload.find_node.type = Message::FIND_VALUE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
@@ -693,16 +849,16 @@ Node::sendFindValue(const NodeItem &to, FindValueQuery *query) {
 }
 
 bool
-Node::isPendingAnnouncement(const Identifier &id) const {
+DHT::isPendingAnnouncement(const Identifier &id) const {
   return _announcedData.contains(id);
 }
 
 void
-Node::sendAnnouncement(const NodeItem &to, const Identifier &what) {
+DHT::sendAnnouncement(const NodeItem &to, const Identifier &what) {
   qDebug() << "Send Announcement of" << what << "to" << to.id()
            << "@" << to.addr() << ":" << to.port();
   // Assemble & send message
-  Message msg;
+  struct Message msg;
   memcpy(msg.cookie, Identifier().data(), DHT_HASH_SIZE);
   memcpy(msg.payload.announce.what, what.data(), DHT_HASH_SIZE);
   memcpy(msg.payload.announce.who, _self.data(), DHT_HASH_SIZE);
@@ -714,7 +870,7 @@ Node::sendAnnouncement(const NodeItem &to, const Identifier &what) {
 }
 
 void
-Node::_onReadyRead() {
+DHT::_onReadyRead() {
   while (_socket.hasPendingDatagrams()) {
     // check datagram size
     if ( (_socket.pendingDatagramSize() > DHT_MAX_MESSAGE_SIZE) ||
@@ -725,7 +881,7 @@ Node::_onReadyRead() {
       qDebug() << "Invalid UDP packet received from" << addr << ":" << port;
     } else {
       // Read message
-      Message msg; QHostAddress addr; uint16_t port;
+      struct Message msg; QHostAddress addr; uint16_t port;
       int64_t size = _socket.readDatagram((char *) &msg, DHT_MAX_MESSAGE_SIZE, &addr, &port);
 
       Identifier cookie(msg.cookie);
@@ -762,8 +918,8 @@ Node::_onReadyRead() {
 }
 
 void
-Node::_processPingResponse(
-    const Message &msg, size_t size, PingRequest *req, const QHostAddress &addr, uint16_t port)
+DHT::_processPingResponse(
+    const struct Message &msg, size_t size, PingRequest *req, const QHostAddress &addr, uint16_t port)
 {
   qDebug() << "Received Ping response from " << addr << ":" << port;
   // sinal success
@@ -780,8 +936,8 @@ Node::_processPingResponse(
 }
 
 void
-Node::_processFindNodeResponse(
-    const Message &msg, size_t size, FindNodeRequest *req, const QHostAddress &addr, uint16_t port)
+DHT::_processFindNodeResponse(
+    const struct Message &msg, size_t size, FindNodeRequest *req, const QHostAddress &addr, uint16_t port)
 {
   qDebug() << "Received FindNode response from " << addr << ":" << port;
   // payload length must be a multiple of triple length
@@ -791,6 +947,7 @@ Node::_processFindNodeResponse(
   } else {
     // unpack and update query
     size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
+    qDebug() << "Received" << Ntriple << "nodes from"  << addr << ":" << port;
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
       NodeItem item(id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
@@ -813,7 +970,6 @@ Node::_processFindNodeResponse(
       return;
     }
   }
-
   // Get next node to query
   NodeItem next;
   // get next node to query, if there is no next node -> search failed
@@ -836,13 +992,15 @@ Node::_processFindNodeResponse(
     return;
   }
 
+  qDebug() << "Node" << req->query()->id() << "not found yet -> continue with"
+           << next.id() << "@" << next.addr() << ":" << next.port();
   // Send next request
   sendFindNode(next, req->query());
 }
 
 void
-Node::_processFindValueResponse(
-    const Message &msg, size_t size, FindValueRequest *req, const QHostAddress &addr, uint16_t port)
+DHT::_processFindValueResponse(
+    const struct Message &msg, size_t size, FindValueRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // payload length must be a multiple of triple length
   if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
@@ -895,12 +1053,12 @@ Node::_processFindValueResponse(
 }
 
 void
-Node::_processPingRequest(
-    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+DHT::_processPingRequest(
+    const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
   qDebug() << "Received Ping request from" << addr << ":" << port;
   // simply assemble a pong response including my own ID
-  Message resp;
+  struct Message resp;
   memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
   memcpy(resp.payload.ping.id, _self.data(), DHT_HASH_SIZE);
   resp.payload.ping.type = Message::PING;
@@ -916,13 +1074,13 @@ Node::_processPingRequest(
 }
 
 void
-Node::_processFindNodeRequest(
-    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+DHT::_processFindNodeRequest(
+    const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
   QList<NodeItem> best;
   _buckets.getNearest(msg.payload.find_node.id, best);
 
-  Message resp;
+  struct Message resp;
   // Assemble response
   memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
   resp.payload.result.success = 0;
@@ -939,10 +1097,10 @@ Node::_processFindNodeRequest(
 }
 
 void
-Node::_processFindValueRequest(
-    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+DHT::_processFindValueRequest(
+    const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
-  Message resp;
+  struct Message resp;
 
   if (_announcements.contains(msg.payload.find_value.id)) {
     QHash<Identifier, AnnouncementItem> &owners
@@ -979,8 +1137,8 @@ Node::_processFindValueRequest(
 }
 
 void
-Node::_processAnnounceRequest(
-    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+DHT::_processAnnounceRequest(
+    const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
   //
   Identifier value(msg.payload.announce.what);
@@ -997,7 +1155,7 @@ Node::_processAnnounceRequest(
 }
 
 void
-Node::_onCheckRequestTimeout() {
+DHT::_onCheckRequestTimeout() {
   QList<Request *> deadRequests;
   QHash<Identifier, Request *>::iterator item = _pendingRequests.begin();
   for (; item != _pendingRequests.end(); item++) {
@@ -1051,7 +1209,7 @@ Node::_onCheckRequestTimeout() {
 }
 
 void
-Node::_onCheckNodeTimeout() {
+DHT::_onCheckNodeTimeout() {
   qDebug() << "Refresh buckets.";
   // Collect old nodes from buckets
   QList<NodeItem> oldNodes;
@@ -1070,7 +1228,7 @@ Node::_onCheckNodeTimeout() {
 }
 
 void
-Node::_onCheckAnnouncementTimeout() {
+DHT::_onCheckAnnouncementTimeout() {
   qDebug() << "Refresh announcements.";
   // Check announcements I store for others
   QHash<Identifier, QHash<Identifier, AnnouncementItem> >::iterator entry = _announcements.begin();
