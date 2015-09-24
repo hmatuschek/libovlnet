@@ -1,76 +1,101 @@
 #include "dht.h"
 #include <netinet/in.h>
 
+/** Size of of the hash to use, e.g. RMD160 -> 20bytes. */
+#define DHT_HASH_SIZE        20
+/** Maximum message size per UDP packet. */
+#define DHT_MAX_MESSAGE_SIZE 1024
+/** Minimum message size per UDP packet. */
+#define DHT_MIN_MESSAGE_SIZE (DHT_HASH_SIZE+1)
+
+/** The size of the triple (hash, IPv4, port). */
+#define DHT_TRIPLE_SIZE (DHT_HASH_SIZE + 4 + 2)
+/** The max. number of triples in a response. */
+#define DHT_MAX_TRIPLES int((DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE)
+/** The max. data response. */
+#define DHT_MAX_DATA_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-8)
+
+/** The bucket size.
+ * It is ensured that a complete bucket can be transferred with one UDP message. */
+#define DHT_K std::min(8, DHT_MAX_TRIPLES)
+
+/** Possible message types. */
+typedef enum {
+  MSG_PING = 0,
+  MSG_ANNOUNCE,
+  MSG_FIND_NODE,
+  MSG_FIND_VALUE,
+  MSG_GET_DATA,
+} MessageType;
+
+/** Represents a triple of ID, IP address and port as transferred via UDP. */
+struct __attribute__((packed)) DHTTriple {
+  /** The ID of a node. */
+  char     id[DHT_HASH_SIZE];
+  /** The IP of the node. */
+  uint32_t  ip;
+  /** The port of the node. */
+  uint16_t  port;
+};
 
 /** The structure of the UDP datagrams transferred. */
-struct Message {
-  /** Possible message types. */
-  typedef enum {
-    PING = 0,
-    ANNOUNCE,
-    FIND_NODE,
-    FIND_VALUE,
-    GET_DATA,
-  } Type;
-
-  /** Represents a triple of ID, IP address and port as transferred via UDP. */
-  typedef struct {
-    /** The ID of a node. */
-    char     id[DHT_HASH_SIZE];
-    /** The IP of the node. */
-    uint32_t  ip;
-    /** The port of the node. */
-    uint16_t port;
-  } DHTTriple;
-
+struct __attribute__((packed)) Message
+{
   /** The magic cookie to match a response to a request. */
   char    cookie[DHT_HASH_SIZE];
 
   /** Payload */
-  union {
-    struct {
+  union __attribute__((packed)) {
+    struct __attribute__((packed)){
       uint8_t type; // == PING;
       char    id[DHT_HASH_SIZE];
     } ping;
 
-    struct {
+    struct __attribute__((packed)) {
       uint8_t type; // == ANNOUNCE
       char    who[DHT_HASH_SIZE];
       char    what[DHT_HASH_SIZE];
     } announce;
 
-    struct {
+    struct __attribute__((packed)) {
       uint8_t type; // == FIND_NODE
       char    id[DHT_HASH_SIZE];
     } find_node;
 
-    struct {
+    struct __attribute__((packed)) {
       uint8_t type; // == FIND_VALUE
       char    id[DHT_HASH_SIZE];
     } find_value;
 
-    struct {
+    struct __attribute__((packed)) {
       uint8_t   success;
       DHTTriple triples[DHT_MAX_TRIPLES];
     } result;
 
-    struct {
+    struct __attribute__((packed)) {
       uint8_t  type; // == GET_DATA
       char     id[DHT_HASH_SIZE];
       uint64_t offset;
       uint64_t length;
     } get_data;
 
-    struct {
+    struct __attribute__((packed)) {
       uint64_t offset;
       char     data[DHT_MAX_DATA_SIZE];
     } data;
 
-    struct {
+    struct __attribute__((packed)) {
       uint64_t offset;
     } ack_data;
   } payload;
-} Message;
+
+  Message();
+};
+
+Message::Message()
+{
+  memset(this, 0, sizeof(Message));
+}
 
 
 class SearchQuery
@@ -111,10 +136,10 @@ public:
 class Request
 {
 protected:
-  Request(Message::Type type);
+  Request(MessageType type);
 
 public:
-  inline Message::Type type() const { return _type; }
+  inline MessageType type() const { return _type; }
   inline const Identifier &cookie() const { return _cookie; }
   inline const QDateTime &timestamp() const { return _timestamp; }
   inline size_t olderThan(size_t seconds) const {
@@ -122,7 +147,7 @@ public:
   }
 
 protected:
-  Message::Type _type;
+  MessageType _type;
   Identifier    _cookie;
   QDateTime     _timestamp;
 };
@@ -224,7 +249,7 @@ Distance::Distance(const Distance &distance)
 
 bool
 Distance::bit(size_t idx) const {
-  size_t byte = idx/8, bit  = (7-idx%8);
+  size_t byte = idx/8, bit  = (7-(idx%8));
   return (1 == (this->at(byte) >> bit));
 }
 
@@ -259,8 +284,8 @@ PeerItem::PeerItem(const PeerItem &other)
 
 PeerItem &
 PeerItem::operator =(const PeerItem &other) {
-  _addr = other.addr();
-  _port = other.port();
+  _addr = other._addr;
+  _port = other._port;
   return *this;
 }
 
@@ -305,7 +330,7 @@ NodeItem::NodeItem(const NodeItem &other)
 NodeItem &
 NodeItem::operator =(const NodeItem &other) {
   PeerItem::operator =(other);
-  _id   = other.id();
+  _id   = other._id;
   return *this;
 }
 
@@ -407,8 +432,8 @@ Bucket::Item::lastSeen() const {
 /* ******************************************************************************************** *
  * Implementation of Bucket
  * ******************************************************************************************** */
-Bucket::Bucket(const Identifier &self, size_t size)
-  : _self(self), _maxSize(size), _prefix(0), _triples()
+Bucket::Bucket(const Identifier &self)
+  : _self(self), _maxSize(DHT_K), _prefix(0), _triples()
 {
   // pass...
 }
@@ -672,26 +697,26 @@ FindValueQuery::FindValueQuery(const Identifier &id)
 /* ******************************************************************************************** *
  * Implementation of Request etc.
  * ******************************************************************************************** */
-Request::Request(Message::Type type)
+Request::Request(MessageType type)
   : _type(type), _cookie(), _timestamp(QDateTime::currentDateTime())
 {
   // pass...
 }
 
 PingRequest::PingRequest()
-  : Request(Message::PING)
+  : Request(MSG_PING)
 {
   // pass...
 }
 
 FindNodeRequest::FindNodeRequest(FindNodeQuery *query)
-  : Request(Message::FIND_NODE), _findNodeQuery(query)
+  : Request(MSG_FIND_NODE), _findNodeQuery(query)
 {
   // pass...
 }
 
 FindValueRequest::FindValueRequest(FindValueQuery *query)
-  : Request(Message::FIND_VALUE), _findValueQuery(query)
+  : Request(MSG_FIND_VALUE), _findValueQuery(query)
 {
   // pass...
 }
@@ -705,6 +730,9 @@ DHT::DHT(const Identifier &id, const QHostAddress &addr, quint16 port, QObject *
     _announcementTimer()
 {
   qDebug() << "Start node #" << id << "at" << addr << ":" << port;
+  qDebug() << " sizeof(Message)=" << sizeof(Message);
+  qDebug() << " sizeof(DHTTriple)=" << sizeof(DHTTriple);
+
   if (!_socket.bind(addr, port)) {
     qDebug() << "Cannot bind to port" << addr << ":" << port;
     return;
@@ -746,10 +774,10 @@ DHT::ping(const QHostAddress &addr, uint16_t port) {
   _pendingRequests.insert(req->cookie(), req);
 
   // Assemble message
-  struct Message msg;
+  Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   memcpy(msg.payload.ping.id, _self.data(), DHT_HASH_SIZE);
-  msg.payload.ping.type = Message::PING;
+  msg.payload.ping.type = MSG_PING;
   qDebug() << "Send ping to" << addr << ":" << port;
   // send it
   if(0 > _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port)) {
@@ -821,7 +849,7 @@ DHT::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
   // Assemble & send message
   struct Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
-  msg.payload.find_node.type = Message::FIND_NODE;
+  msg.payload.find_node.type = MSG_FIND_NODE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
   if(0 > _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port())) {
     qDebug() << "Failed to send FindNode request to" << to.id()
@@ -840,7 +868,7 @@ DHT::sendFindValue(const NodeItem &to, FindValueQuery *query) {
   // Assemble & send message
   struct Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
-  msg.payload.find_node.type = Message::FIND_VALUE;
+  msg.payload.find_node.type = MSG_FIND_VALUE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
   if (0 > _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port())) {
     qDebug() << "Failed to send FindNode request to" << to.id()
@@ -862,7 +890,7 @@ DHT::sendAnnouncement(const NodeItem &to, const Identifier &what) {
   memcpy(msg.cookie, Identifier().data(), DHT_HASH_SIZE);
   memcpy(msg.payload.announce.what, what.data(), DHT_HASH_SIZE);
   memcpy(msg.payload.announce.who, _self.data(), DHT_HASH_SIZE);
-  msg.payload.announce.type = Message::ANNOUNCE;
+  msg.payload.announce.type = MSG_ANNOUNCE;
   if (0 > _socket.writeDatagram((char *)&msg, 3*DHT_HASH_SIZE+1, to.addr(), to.port())) {
     qDebug() << "Failed to send Announce request to" << to.id()
              << "@" << to.addr() << ":" << to.port();
@@ -882,18 +910,18 @@ DHT::_onReadyRead() {
     } else {
       // Read message
       struct Message msg; QHostAddress addr; uint16_t port;
-      int64_t size = _socket.readDatagram((char *) &msg, DHT_MAX_MESSAGE_SIZE, &addr, &port);
+      int64_t size = _socket.readDatagram((char *) &msg, sizeof(Message), &addr, &port);
 
       Identifier cookie(msg.cookie);
       if (_pendingRequests.contains(cookie)) {
         // Message is a response -> dispatch by type from table
         Request *item = _pendingRequests[cookie];
         _pendingRequests.remove(cookie);
-        if (Message::PING == item->type()) {
+        if (MSG_PING == item->type()) {
           _processPingResponse(msg, size, static_cast<PingRequest *>(item), addr, port);
-        } else if (Message::FIND_NODE == item->type()) {
+        } else if (MSG_FIND_NODE == item->type()) {
           _processFindNodeResponse(msg, size, static_cast<FindNodeRequest *>(item), addr, port);
-        } else if (Message::FIND_VALUE == item->type()) {
+        } else if (MSG_FIND_VALUE == item->type()) {
           _processFindValueResponse(msg, size, static_cast<FindValueRequest *>(item), addr, port);
         } else {
           qDebug() << "Unknown response from " << addr << ":" << port;
@@ -901,13 +929,13 @@ DHT::_onReadyRead() {
         delete item;
       } else {
         // Message is likely a request
-        if ((size == (2*DHT_HASH_SIZE+1)) && (Message::PING == msg.payload.ping.type)){
+        if ((size == (2*DHT_HASH_SIZE+1)) && (MSG_PING == msg.payload.ping.type)){
           _processPingRequest(msg, size, addr, port);
-        } else if ((size == (2*DHT_HASH_SIZE+1)) && (Message::FIND_NODE == msg.payload.find_node.type)) {
+        } else if ((size == (2*DHT_HASH_SIZE+1)) && (MSG_FIND_NODE == msg.payload.find_node.type)) {
           _processFindNodeRequest(msg, size, addr, port);
-        } else if ((size == (2*DHT_HASH_SIZE+1)) && (Message::FIND_VALUE == msg.payload.find_value.type)) {
+        } else if ((size == (2*DHT_HASH_SIZE+1)) && (MSG_FIND_VALUE == msg.payload.find_value.type)) {
           _processFindValueRequest(msg, size, addr, port);
-        } else if ((size == (3*DHT_HASH_SIZE+1)) && (Message::ANNOUNCE == msg.payload.announce.type)) {
+        } else if ((size == (3*DHT_HASH_SIZE+1)) && (MSG_ANNOUNCE == msg.payload.announce.type)) {
           _processAnnounceRequest(msg, size, addr, port);
         } else {
           qDebug() << "Unknown request from " << addr << ":" << port;
@@ -930,7 +958,7 @@ DHT::_processPingResponse(
   // bucket if space is left
   _buckets.add(msg.payload.ping.id, addr, port);
   if (bootstrapping) {
-    qDebug() << "Still bootstrapping: Search for myown.";
+    qDebug() << "Still boot strapping: Search for myself.";
     findNode(_self);
   }
 }
@@ -952,6 +980,7 @@ DHT::_processFindNodeResponse(
       Identifier id(msg.payload.result.triples[i].id);
       NodeItem item(id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
                     ntohs(msg.payload.result.triples[i].port));
+      qDebug() << " got: " << item.id() << "@" << item.addr() << ":" << ntohs(msg.payload.result.triples[i].port);
       // Add discovered node to buckets
       _buckets.add(id, item.addr(), item.port());
       // Update node list of query
@@ -1061,7 +1090,7 @@ DHT::_processPingRequest(
   struct Message resp;
   memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
   memcpy(resp.payload.ping.id, _self.data(), DHT_HASH_SIZE);
-  resp.payload.ping.type = Message::PING;
+  resp.payload.ping.type = MSG_PING;
   // send
   qDebug() << "Send Ping response to" << addr << ":" << port;
   if(0 > _socket.writeDatagram((char *) &resp, 2*DHT_HASH_SIZE+1, addr, port)) {
@@ -1080,19 +1109,24 @@ DHT::_processFindNodeRequest(
   QList<NodeItem> best;
   _buckets.getNearest(msg.payload.find_node.id, best);
 
+  qDebug() << "Assemble FindNode response:";
+
   struct Message resp;
   // Assemble response
   memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
   resp.payload.result.success = 0;
+  // Add items
   QList<NodeItem>::iterator item = best.begin();
   for (int i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
     memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
     resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
     resp.payload.result.triples[i].port = htons(item->port());
+    qDebug() << " add: " << item->id()
+             << "@" << item->addr() << ":" << ntohs(resp.payload.result.triples[i].port);
   }
 
   // Compute size and send reponse
-  size_t resp_size = 1+DHT_HASH_SIZE+std::min(best.size(), DHT_K)*DHT_TRIPLE_SIZE;
+  size_t resp_size = (1 + DHT_HASH_SIZE + std::min(best.size(), DHT_K)*DHT_TRIPLE_SIZE);
   _socket.writeDatagram((char *) &resp, resp_size, addr, port);
 }
 
@@ -1166,10 +1200,10 @@ DHT::_onCheckRequestTimeout() {
   QList<Request *>::iterator req = deadRequests.begin();
   for (; req != deadRequests.end(); req++) {
     _pendingRequests.remove((*req)->cookie());
-    if (Message::PING == (*req)->type()) {
+    if (MSG_PING == (*req)->type()) {
       // Just ignore
       delete *req;
-    } else if (Message::FIND_NODE == (*req)->type()) {
+    } else if (MSG_FIND_NODE == (*req)->type()) {
       FindNodeQuery *query = static_cast<FindNodeRequest *>(*req)->query();
       // Get next node to query
       NodeItem next;
@@ -1191,7 +1225,7 @@ DHT::_onCheckRequestTimeout() {
       }
       // Send next request
       sendFindNode(next, query);
-    } else if (Message::FIND_VALUE == (*req)->type()) {
+    } else if (MSG_FIND_VALUE == (*req)->type()) {
       FindValueQuery *query = static_cast<FindValueRequest *>(*req)->query();
       // Get next node to query
       NodeItem next;

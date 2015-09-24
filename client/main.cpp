@@ -1,6 +1,9 @@
 #include "lib/dht.h"
 #include "lib/ntp.h"
+
 #include <QApplication>
+#include <QDebug>
+
 #include <time.h>
 
 int main(int argc, char *argv[]) {

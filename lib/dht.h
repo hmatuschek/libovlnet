@@ -14,24 +14,6 @@
 #include <QDateTime>
 #include <QTimer>
 
-/** Size of of the hash to use, e.g. RMD160 -> 20bytes. */
-#define DHT_HASH_SIZE        20
-/** Maximum message size per UDP packet. */
-#define DHT_MAX_MESSAGE_SIZE 1024
-/** Minimum message size per UDP packet. */
-#define DHT_MIN_MESSAGE_SIZE (DHT_HASH_SIZE+1)
-
-/** The size of the triple (hash, IPv4, port). */
-#define DHT_TRIPLE_SIZE (DHT_HASH_SIZE + 4 + 2)
-/** The max. number of triples in a response. */
-#define DHT_MAX_TRIPLES int((DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE)
-/** The max. data response. */
-#define DHT_MAX_DATA_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-8)
-
-/** The bucket size.
- * It is ensured that a complete bucket can be transferred with one UDP message. */
-#define DHT_K std::min(8, DHT_MAX_TRIPLES)
-
 // Forward declaration
 class Identifier;
 
@@ -169,7 +151,7 @@ public:
 
 public:
   /** Constructor. */
-  Bucket(const Identifier &self, size_t size=DHT_K);
+  Bucket(const Identifier &self);
   /** Copy constructor. */
   Bucket(const Bucket &other);
 

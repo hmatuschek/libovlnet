@@ -8,7 +8,7 @@
  * ********************************************************************************************* */
 
 /** NTP Timestamp format. */
-struct NTPTimestamp {
+struct __attribute__((packed)) NTPTimestamp {
   /** Number of seconds passed since Jan 1 1900, in big-endian format. */
   quint32 seconds;
   /** Fractional time part, in <tt>1/0xFFFFFFFF</tt>s of a second. */
@@ -21,14 +21,14 @@ struct NTPTimestamp {
 };
 
 
-struct NTPPacketFlags {
+struct __attribute__((packed)) NTPPacketFlags {
   unsigned char mode: 3;
   unsigned char versionNumber: 3;
   unsigned char leapIndicator: 2;
 };
 
 
-struct NTPPacket{
+struct __attribute__((packed)) NTPPacket{
   /** Flags. */
   NTPPacketFlags flags;
   /** Stratum of the clock. */
@@ -60,7 +60,7 @@ struct NTPPacket{
 
 
 /** Optional part of an NTP packet. */
-struct NTPAuthenticationInfo {
+struct __attribute__((packed)) NTPAuthenticationInfo {
   /** Key identifier. */
   quint32 keyId;
   /** Message Digest. */
@@ -68,7 +68,7 @@ struct NTPAuthenticationInfo {
 };
 
 /** Full NTP packet. */
-struct NTPFullPacket {
+struct __attribute__((packed)) NTPFullPacket {
   NTPPacket basic;
   NTPAuthenticationInfo auth;
 
