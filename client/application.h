@@ -5,6 +5,7 @@
 #include <QSystemTrayIcon>
 #include <QAction>
 
+#include "lib/identity.h"
 #include "lib/dht.h"
 #include "dhtstatus.h"
 
@@ -17,13 +18,16 @@ public:
   explicit Application(int argc, char *argv[]);
 
 protected slots:
+  void onBootstrap();
   void onShowStatus();
   void onQuit();
 
 protected:
+  Identity *_identity;
   DHT *_dht;
   DHTStatus *_status;
 
+  QAction *_bootstrap;
   QAction *_showStatus;
   QAction *_quit;
 

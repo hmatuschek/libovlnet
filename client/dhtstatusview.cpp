@@ -20,6 +20,8 @@ DHTStatusView::DHTStatusView(DHTStatus *status, QWidget *parent) :
   setLayout(layout);
 
   QObject::connect(&_updateTimer, SIGNAL(timeout()), this, SLOT(_onUpdate()));
+
+  _updateTimer.start();
 }
 
 void

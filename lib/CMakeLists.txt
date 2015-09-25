@@ -1,7 +1,7 @@
 set(vlf_SOURCES 
-    ntp.cpp dht.cpp pcp.cpp natpmp.cpp)
+    ntp.cpp dht.cpp pcp.cpp natpmp.cpp identity.cpp)
 set(vlf_MOC_HEADERS 
-    ntp.h dht.h pcp.h natpmp.h)
+    ntp.h dht.h pcp.h natpmp.h identity.h)
 set(vlf_HEADERS ${vlf_MOC_HEADERS})
 
 qt5_wrap_cpp(vlf_MOC_SOURCES ${vlf_MOC_HEADERS})
