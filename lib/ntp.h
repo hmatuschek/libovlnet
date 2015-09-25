@@ -8,6 +8,7 @@
 #include <QString>
 #include <inttypes.h>
 
+
 class NTPClient: public QObject
 {
   Q_OBJECT

@@ -450,6 +450,11 @@ Bucket::full() const {
   return int(_maxSize)==_triples.size();
 }
 
+size_t
+Bucket::numNodes() const {
+  return _triples.size();
+}
+
 bool
 Bucket::contains(const Identifier &id) const {
   return _triples.contains(id);
@@ -538,6 +543,16 @@ Buckets::Buckets(const Identifier &self)
 bool
 Buckets::empty() const {
   return 0 == _buckets.size();
+}
+
+size_t
+Buckets::numNodes() const {
+  size_t count = 0;
+  QList<Bucket>::const_iterator item = _buckets.begin();
+  for (; item != _buckets.end(); item++) {
+    count += item->numNodes();
+  }
+  return count;
 }
 
 bool
@@ -834,6 +849,21 @@ DHT::announce(const Identifier &id) {
   _announcedData[id] = QDateTime();
   // lets search for the nodes closest to the data id
   findNode(id);
+}
+
+size_t
+DHT::numNodes() const {
+  return _buckets.numNodes();
+}
+
+size_t
+DHT::numKeys() const {
+  return _announcements.size();
+}
+
+size_t
+DHT::numData() const {
+  return _announcedData.size();
 }
 
 QIODevice *
@@ -1256,7 +1286,6 @@ DHT::_onCheckRequestTimeout() {
 
 void
 DHT::_onCheckNodeTimeout() {
-  qDebug() << "Refresh buckets.";
   // Collect old nodes from buckets
   QList<NodeItem> oldNodes;
   _buckets.getOlderThan(15*60, oldNodes);
@@ -1275,7 +1304,6 @@ DHT::_onCheckNodeTimeout() {
 
 void
 DHT::_onCheckAnnouncementTimeout() {
-  qDebug() << "Refresh announcements.";
   // Check announcements I store for others
   QHash<Identifier, QHash<Identifier, AnnouncementItem> >::iterator entry = _announcements.begin();
   while (entry != _announcements.end()) {

@@ -161,6 +161,8 @@ public:
 
   /** Returns @c true if the bucket is full. */
   bool full() const;
+  /** Returns the number of nodes held in the bucket. */
+  size_t numNodes() const;
   /** Returns @c true if the bucket contains the given identifier. */
   bool contains(const Identifier &id) const;
   /** Add or updates an item. */
@@ -196,16 +198,15 @@ public:
 
   bool empty() const;
   bool contains(const Identifier &id) const;
+  /** Returns the number of nodes in the buckets. */
+  size_t numNodes() const;
 
   /** Adds or updates an item. */
   void add(const Identifier &id, const QHostAddress &addr, uint16_t port);
-
   /** Collects the nearest known nodes. */
   void getNearest(const Identifier &id, QList<NodeItem> &best) const;
-
   /** Collects all nodes that are "older" than the specified age (in seconds). */
   void getOlderThan(size_t seconds, QList<NodeItem> &nodes) const;
-
   /** Removes all nodes that are "older" than the specified age (in seconds). */
   void removeOlderThan(size_t seconds);
 
@@ -260,6 +261,13 @@ public:
   void findValue(const Identifier &id);
   /** Announces a value. */
   void announce(const Identifier &id);
+
+  /** Returns the number of nodes in the buckets. */
+  size_t numNodes() const;
+  /** Returns the number of keys held by this DHT node. */
+  size_t numKeys() const;
+  /** Retunrs the number of data items provided by this node. */
+  size_t numData() const;
 
   /** Needs to be implemented to provide the data for the given id. */
   virtual QIODevice *data(const Identifier &id);
