@@ -7,6 +7,7 @@
 #include <QDateTime>
 #include <QTimer>
 #include <QHash>
+#include <inttypes.h>
 
 
 /** Implements a trivial NAT-PMP client to request a port mapping from a NAT. */
