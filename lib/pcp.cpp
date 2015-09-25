@@ -1,5 +1,6 @@
 #include "pcp.h"
 #include "string.h"
+#include <netinet/in.h>
 
 
 typedef enum {

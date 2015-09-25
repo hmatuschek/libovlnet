@@ -1,4 +1,6 @@
 #include "natpmp.h"
+#include <netinet/in.h>
+
 
 /** Possible result codes. */
 typedef enum {

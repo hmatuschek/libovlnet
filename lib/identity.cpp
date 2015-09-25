@@ -85,7 +85,7 @@ Identity::newIdentity(const QFile &path)
     goto error;
   if (!PEM_write_bio_PrivateKey(out, pkey, NULL, NULL, 0, 0, NULL))
     goto error;
-  BIO_flush(out);
+  (void) BIO_flush(out);
   BIO_free_all(out);
 
   // Create identity instance with key pair
