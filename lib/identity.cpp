@@ -33,7 +33,7 @@ Identity::Identity(EVP_PKEY *key, QObject *parent)
   if (!EVP_DigestFinal(&mdctx, fingerprint, &siglen))
     goto error;
 
-  EVP_MD_CTX_destroy(&mdctx);
+  EVP_MD_CTX_cleanup(&mdctx);
   BIO_free_all(buffer);
 
   _fingerprint = Identifier((char *)fingerprint);
@@ -42,7 +42,7 @@ Identity::Identity(EVP_PKEY *key, QObject *parent)
 error:
   ERR_load_crypto_strings();
   ERR_print_errors_fp(stderr);
-  EVP_MD_CTX_destroy(&mdctx);
+  EVP_MD_CTX_cleanup(&mdctx);
   if (buffer) { BIO_free_all(buffer); }
 }
 
