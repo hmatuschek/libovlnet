@@ -6,6 +6,11 @@ DHTStatus::DHTStatus(DHT *dht, QObject *parent)
   // pass...
 }
 
+const Identifier &
+DHTStatus::identifier() const {
+  return _dht->id();
+}
+
 size_t
 DHTStatus::numNeighbors() const {
   return _dht->numNodes();

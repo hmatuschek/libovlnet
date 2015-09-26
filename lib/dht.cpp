@@ -1,24 +1,10 @@
 #include "dht.h"
+#include "crypto.h"
+#include "dht_config.h"
+
 #include <QHostInfo>
 #include <netinet/in.h>
 
-/** Size of of the hash to use, e.g. RMD160 -> 20bytes. */
-#define DHT_HASH_SIZE        20
-/** Maximum message size per UDP packet. */
-#define DHT_MAX_MESSAGE_SIZE 1024
-/** Minimum message size per UDP packet. */
-#define DHT_MIN_MESSAGE_SIZE (DHT_HASH_SIZE+1)
-
-/** The size of the triple (hash, IPv4, port). */
-#define DHT_TRIPLE_SIZE (DHT_HASH_SIZE + 4 + 2)
-/** The max. number of triples in a response. */
-#define DHT_MAX_TRIPLES int((DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE)
-/** The max. data response. */
-#define DHT_MAX_DATA_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-8)
-
-/** The bucket size.
- * It is ensured that a complete bucket can be transferred with one UDP message. */
-#define DHT_K std::min(8, DHT_MAX_TRIPLES)
 
 /** Possible message types. */
 typedef enum {
@@ -26,7 +12,7 @@ typedef enum {
   MSG_ANNOUNCE,
   MSG_FIND_NODE,
   MSG_FIND_VALUE,
-  MSG_GET_DATA,
+  MSG_START_STREAM,
 } MessageType;
 
 /** Represents a triple of ID, IP address and port as transferred via UDP. */
@@ -74,20 +60,15 @@ struct __attribute__((packed)) Message
     } result;
 
     struct __attribute__((packed)) {
-      uint8_t  type; // == GET_DATA
-      char     id[DHT_HASH_SIZE];
-      uint64_t offset;
-      uint64_t length;
-    } get_data;
+      uint8_t  type;      // == START_STREAM
+      /** A stream service id (not part of the DHT specification). */
+      uint16_t service;
+      /** Public (ECDH) key of the requesting or responding node. */
+      uint8_t  pubkey[DHT_MAX_PUBKEY_SIZE];
+    } start_stream;
 
-    struct __attribute__((packed)) {
-      uint64_t offset;
-      char     data[DHT_MAX_DATA_SIZE];
-    } data;
-
-    struct __attribute__((packed)) {
-      uint64_t offset;
-    } ack_data;
+    /** A stream datagram. */
+    uint8_t datagram[DHT_MAX_DATA_SIZE];
   } payload;
 
   Message();
@@ -179,6 +160,21 @@ public:
 
 protected:
   FindValueQuery *_findValueQuery;
+};
+
+class StartStreamRequest: public Request
+{
+public:
+  StartStreamRequest(uint16_t service, const Identifier &peer, SecureStream *stream);
+
+  inline SecureStream *query() const { return _stream; }
+  inline uint16_t service() const { return _service; }
+  inline const Identifier &peedId() const { return _peer; }
+
+protected:
+  uint16_t _service;
+  Identifier _peer;
+  SecureStream *_stream;
 };
 
 
@@ -739,13 +735,21 @@ FindValueRequest::FindValueRequest(FindValueQuery *query)
   // pass...
 }
 
+StartStreamRequest::StartStreamRequest(uint16_t service, const Identifier &peer, SecureStream *stream)
+  : Request(MSG_START_STREAM), _service(service), _peer(peer), _stream(stream)
+{
+  // pass...
+}
+
 
 /* ******************************************************************************************** *
  * Implementation of DHT
  * ******************************************************************************************** */
-DHT::DHT(const Identifier &id, const QHostAddress &addr, quint16 port, QObject *parent)
-  : QObject(parent), _self(id), _socket(), _buckets(_self), _requestTimer(), _nodeTimer(),
-    _announcementTimer()
+DHT::DHT(const Identifier &id, StreamHandler *streamHandler,
+         const QHostAddress &addr, quint16 port, QObject *parent)
+  : QObject(parent), _self(id), _socket(), _buckets(_self),
+    _streamHandler(streamHandler), _streams(),
+    _requestTimer(), _nodeTimer(), _announcementTimer()
 {
   qDebug() << "Start node #" << id << "at" << addr << ":" << port;
 
@@ -851,6 +855,41 @@ DHT::announce(const Identifier &id) {
   findNode(id);
 }
 
+bool
+DHT::startStream(uint16_t service, const NodeItem &node) {
+  if (0 == _streamHandler) { return false; }
+  qDebug() << "Send start stream to" << node.id() << "@" << node.addr() << ":" << node.port();
+  SecureStream *stream = _streamHandler->newStream(service);
+  if (! stream) { return false; }
+  StartStreamRequest *req = new StartStreamRequest(service, node.id(), stream);
+
+  // Assemble message
+  Message msg;
+  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
+  msg.payload.start_stream.type = MSG_START_STREAM;
+  msg.payload.start_stream.service = htons(service);
+  int keyLen = 0;
+  if (0 > (keyLen = stream->prepare(msg.payload.start_stream.pubkey, DHT_MAX_PUBKEY_SIZE)) ) {
+    delete stream; delete req; return false;
+  }
+
+  // Compute total size
+  keyLen += DHT_HASH_SIZE + 1 + 2;
+
+  // add to pending request list & send it
+  _pendingRequests.insert(req->cookie(), req);
+  if (keyLen == _socket.writeDatagram((char *)&msg, keyLen, node.addr(), node.port())) {
+    return true;
+  }
+  _pendingRequests.remove(req->cookie());
+  delete stream; delete req; return false;
+}
+
+const Identifier &
+DHT::id() const {
+  return _self;
+}
+
 size_t
 DHT::numNodes() const {
   return _buckets.numNodes();
@@ -864,11 +903,6 @@ DHT::numKeys() const {
 size_t
 DHT::numData() const {
   return _announcedData.size();
-}
-
-QIODevice *
-DHT::data(const Identifier &id) {
-  return 0;
 }
 
 
@@ -950,7 +984,10 @@ DHT::_onReadyRead() {
       int64_t size = _socket.readDatagram((char *) &msg, sizeof(Message), &addr, &port);
 
       Identifier cookie(msg.cookie);
-      if (_pendingRequests.contains(cookie)) {
+      if (_streams.contains(cookie)) {
+        // Process streams
+        _streams[cookie]->handleData(((uint8_t *)&msg)+DHT_HASH_SIZE, size-DHT_HASH_SIZE);
+      } else if (_pendingRequests.contains(cookie)) {
         // Message is a response -> dispatch by type from table
         Request *item = _pendingRequests[cookie];
         _pendingRequests.remove(cookie);
@@ -960,7 +997,9 @@ DHT::_onReadyRead() {
           _processFindNodeResponse(msg, size, static_cast<FindNodeRequest *>(item), addr, port);
         } else if (MSG_FIND_VALUE == item->type()) {
           _processFindValueResponse(msg, size, static_cast<FindValueRequest *>(item), addr, port);
-        } else {
+        } else if (MSG_START_STREAM == item->type()) {
+          _processStartStreamResponse(msg, size, static_cast<StartStreamRequest *>(item), addr, port);
+        }else {
           qDebug() << "Unknown response from " << addr << ":" << port;
         }
         delete item;
@@ -974,6 +1013,8 @@ DHT::_onReadyRead() {
           _processFindValueRequest(msg, size, addr, port);
         } else if ((size == (3*DHT_HASH_SIZE+1)) && (MSG_ANNOUNCE == msg.payload.announce.type)) {
           _processAnnounceRequest(msg, size, addr, port);
+        } else if ((size > (DHT_HASH_SIZE+3)) && (MSG_START_STREAM == msg.payload.announce.type)) {
+          _processStartStreamRequest(msg, size, addr, port);
         } else {
           qDebug() << "Unknown request from " << addr << ":" << port;
         }
@@ -1119,6 +1160,32 @@ DHT::_processFindValueResponse(
 }
 
 void
+DHT::_processStartStreamResponse(
+    const Message &msg, size_t size, StartStreamRequest *req, const QHostAddress &addr, uint16_t port)
+{
+  // Verify session key
+  if (! req->query()->verify(msg.payload.start_stream.pubkey, size-DHT_HASH_SIZE-3)) {
+    qDebug() << "Verification of peer session key failed.";
+    delete req->query(); return;
+  }
+  // Verify fingerprints
+  if (!(req->query()->peerId() == req->peedId())) {
+    qDebug() << "Peer fingerprint mismatch!";
+    delete req->query(); return;
+  }
+
+  // Success -> start stream
+  if (! req->query()->start(req->cookie(), PeerItem(addr, port), &_socket)) {
+    qDebug() << "Can not start sym. crypt.";
+    delete req->query(); return;
+  }
+
+  // Stream started: register stream & notify stream handler
+  _streams[req->cookie()] = req->query();
+  _streamHandler->streamStarted(req->query());
+}
+
+void
 DHT::_processPingRequest(
     const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
@@ -1226,6 +1293,52 @@ DHT::_processAnnounceRequest(
 }
 
 void
+DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddress &addr, uint16_t port) {
+  if (0 == _streamHandler) { return; }
+  // Request new stream
+  SecureStream *stream = 0;
+  if (0 == (stream =_streamHandler->newStream(ntohs(msg.payload.start_stream.service))) )
+    return;
+  // Verify
+  if (! stream->verify(msg.payload.start_stream.pubkey, size-DHT_HASH_SIZE-3)) {
+    qDebug() << "Can not verify stream peer.";
+    delete stream; return;
+  }
+  // check if stream is allowed
+  if (! _streamHandler->allowStream(ntohs(msg.payload.start_stream.service), NodeItem(stream->peerId(), addr, port))) {
+    qDebug() << "Stream recjected by StreamHandler";
+    delete stream; return;
+  }
+
+  // Assemble response
+  Message resp; int keyLen=0;
+  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+  resp.payload.start_stream.type = MSG_START_STREAM;
+  resp.payload.start_stream.service = msg.payload.start_stream.service;
+  if (0 > (keyLen = stream->prepare(resp.payload.start_stream.pubkey, DHT_MAX_PUBKEY_SIZE))) {
+    qDebug() << "Can not prepare stream.";
+    delete stream; return;
+  }
+
+  if (! stream->start(resp.cookie, PeerItem(addr, port), &_socket)) {
+    qDebug() << "Can not finish SecureStream handshake.";
+    delete stream; return;
+  }
+
+  // compute message size
+  keyLen += DHT_HASH_SIZE+3;
+  // Send response
+  if (keyLen != _socket.writeDatagram((char *)&resp, keyLen, addr, port)) {
+    qDebug() << "Can not send StartStream response";
+    delete stream; return;
+  }
+
+  // Stream started..
+  _streams[resp.cookie] = stream;
+  _streamHandler->streamStarted(stream);
+}
+
+void
 DHT::_onCheckRequestTimeout() {
   QList<Request *> deadRequests;
   QHash<Identifier, Request *>::iterator item = _pendingRequests.begin();
@@ -1265,7 +1378,7 @@ DHT::_onCheckRequestTimeout() {
         delete query;
       }
       // Send next request
-      sendFindNode(next, query);
+      sendFindNode(next, query); delete *req;
     } else if (MSG_FIND_VALUE == (*req)->type()) {
       qDebug() << "FindValue request timeout...";
       FindValueQuery *query = static_cast<FindValueRequest *>(*req)->query();
@@ -1279,7 +1392,12 @@ DHT::_onCheckRequestTimeout() {
         delete query;
       }
       // Send next request
-      sendFindValue(next, query);
+      sendFindValue(next, query); delete *req;
+    } else if (MSG_START_STREAM == (*req)->type()) {
+      qDebug() << "StartStream request timeout...";
+      // delete stream
+      delete static_cast<StartStreamRequest *>(*req)->query();
+      delete *req;
     }
   }
 }

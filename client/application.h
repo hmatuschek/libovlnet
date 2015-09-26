@@ -5,7 +5,7 @@
 #include <QSystemTrayIcon>
 #include <QAction>
 
-#include "lib/identity.h"
+#include "lib/crypto.h"
 #include "lib/dht.h"
 #include "dhtstatus.h"
 

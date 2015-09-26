@@ -1,6 +1,6 @@
 #include "lib/dht.h"
 #include "lib/ntp.h"
-#include "lib/identity.h"
+#include "lib/crypto.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  DHT node(identity->id(), QHostAddress::Any, 7741);
+  DHT node(identity->id(), 0, QHostAddress::Any, 7741);
 
   app.exec();
 

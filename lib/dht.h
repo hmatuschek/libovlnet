@@ -231,7 +231,10 @@ class Request;
 class PingRequest;
 class FindNodeRequest;
 class FindValueRequest;
+class StartStreamRequest;
 
+class StreamHandler;
+class SecureStream;
 
 /** Implements a node in the DHT. */
 class DHT: public QObject
@@ -244,10 +247,19 @@ public:
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
-  explicit DHT(const Identifier &id, const QHostAddress &addr=QHostAddress::Any, quint16 port=7741,
-                QObject *parent=0);
+  explicit DHT(const Identifier &id, StreamHandler *streamHandler=0,
+               const QHostAddress &addr=QHostAddress::Any, quint16 port=7741, QObject *parent=0);
   /** Destructor. */
   virtual ~DHT();
+
+  /** Returns the identifier of the DHT node. */
+  const Identifier &id() const;
+  /** Returns the number of nodes in the buckets. */
+  size_t numNodes() const;
+  /** Returns the number of keys held by this DHT node. */
+  size_t numKeys() const;
+  /** Retunrs the number of data items provided by this node. */
+  size_t numData() const;
 
   /** Sends a ping request to the given peer. */
   void ping(const QString &addr, uint16_t port);
@@ -261,16 +273,8 @@ public:
   void findValue(const Identifier &id);
   /** Announces a value. */
   void announce(const Identifier &id);
-
-  /** Returns the number of nodes in the buckets. */
-  size_t numNodes() const;
-  /** Returns the number of keys held by this DHT node. */
-  size_t numKeys() const;
-  /** Retunrs the number of data items provided by this node. */
-  size_t numData() const;
-
-  /** Needs to be implemented to provide the data for the given id. */
-  virtual QIODevice *data(const Identifier &id);
+  /** Starts a secure stream connection. */
+  bool startStream(uint16_t service, const NodeItem &node);
 
 signals:
   /** Gets emitted if a ping was replied. */
@@ -306,6 +310,9 @@ private:
   /** Processes a FindValue response. */
   void _processFindValueResponse(const Message &msg, size_t size, FindValueRequest *req,
                                 const QHostAddress &addr, uint16_t port);
+  /** Processes a StartStream response. */
+  void _processStartStreamResponse(const Message &msg, size_t size, StartStreamRequest *req,
+                                   const QHostAddress &addr, uint16_t port);
   /** Processes a Ping request. */
   void _processPingRequest(const Message &msg, size_t size,
                            const QHostAddress &addr, uint16_t port);
@@ -318,6 +325,9 @@ private:
   /** Processes an Announce request. */
   void _processAnnounceRequest(const Message &msg, size_t size,
                                const QHostAddress &addr, uint16_t port);
+  /** Processes a StartStream request. */
+  void _processStartStreamRequest(const Message &msg, size_t size,
+                                  const QHostAddress &addr, uint16_t port);
 
 private slots:
   /** Gets called on the reception of a UDP package. */
@@ -344,6 +354,10 @@ protected:
   QHash<Identifier, QDateTime> _announcedData;
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
+  /** Stream handler instance. */
+  StreamHandler *_streamHandler;
+  /** The list of open streams. */
+  QHash<Identifier, SecureStream *> _streams;
   /** Timer to check timeouts of requests. */
   QTimer _requestTimer;
   /** Timer to check nodes in buckets. */

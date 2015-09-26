@@ -57,7 +57,7 @@ Application::Application(int argc, char *argv[])
 void
 Application::onBootstrap() {
   while (true) {
-    QString host = QInputDialog::getText(0, tr("Bootstrap from..."), tr("Host & port"));
+    QString host = QInputDialog::getText(0, tr("Bootstrap from..."), tr("Host and optional port:"));
     if (0 == host.size()) { return; }
 
     // Extract port

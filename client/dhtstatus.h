@@ -15,6 +15,8 @@ public:
   /** Constructor. */
   explicit DHTStatus(DHT *dht, QObject *parent = 0);
 
+  const Identifier &identifier() const;
+
   /** Returns the number of neighbors in the routing table of the DHT node. */
   size_t numNeighbors() const;
 
