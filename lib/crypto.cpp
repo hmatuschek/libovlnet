@@ -10,6 +10,8 @@
 #include <openssl/pem.h>
 #include <openssl/ripemd.h>
 
+#include "netinet/in.h"
+
 
 Identity::Identity(EVP_PKEY *key, QObject *parent)
   : _keyPair(key)
