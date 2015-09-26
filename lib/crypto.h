@@ -11,10 +11,39 @@
 
 class Identity;
 
+class Identity
+{
+protected:
+  explicit Identity(EVP_PKEY *key, QObject *parent = 0);
+
+public:
+  virtual ~Identity();
+
+  const Identifier &id() const;
+  bool hasPublicKey() const;
+  bool hasPrivateKey() const;
+  int publicKey(uint8_t *key, size_t len) const;
+
+  /** Requires the private key. */
+  int sign(const uint8_t *data, size_t datalen, uint8_t *sig, size_t siglen) const;
+  /** Requires the public key. */
+  bool verify(const uint8_t *data, size_t datalen, const uint8_t *sig, size_t siglen) const;
+
+public:
+  static Identity *newIdentity(const QFile &path);
+  static Identity *load(const QFile &path);
+  static Identity *fromPublicKey(const uint8_t *key, size_t len);
+
+protected:
+  EVP_PKEY *_keyPair;
+  Identifier _fingerprint;
+};
+
+
 class SecureStream
 {
 public:
-  SecureStream(const Identity &id);
+  SecureStream(Identity &id);
   virtual ~SecureStream();
 
   /** Peer identifier derived from its pubkey. */
@@ -57,7 +86,7 @@ protected:
   int decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out);
 
 protected:
-  const Identity &_identity;
+  Identity &_identity;
   EVP_PKEY *_sessionKeyPair;
   /** Public session key provided by the peer. */
   EVP_PKEY *_peerPubKey;
@@ -92,33 +121,5 @@ public:
   virtual void streamStarted(SecureStream *stream) = 0;
 };
 
-
-class Identity
-{
-protected:
-  explicit Identity(EVP_PKEY *key, QObject *parent = 0);
-
-public:
-  virtual ~Identity();
-
-  const Identifier &id() const;
-  bool hasPublicKey() const;
-  bool hasPrivateKey() const;
-  int publicKey(uint8_t *key, size_t len) const;
-
-  /** Requires the private key. */
-  int sign(const uint8_t *data, size_t datalen, uint8_t *sig, size_t siglen) const;
-  /** Requires the public key. */
-  bool verify(const uint8_t *data, size_t datalen, const uint8_t *sig, size_t siglen) const;
-
-public:
-  static Identity *newIdentity(const QFile &path);
-  static Identity *load(const QFile &path);
-  static Identity *fromPublicKey(const uint8_t *key, size_t len);
-
-protected:
-  EVP_PKEY *_keyPair;
-  Identifier _fingerprint;
-};
 
 #endif // IDENTITY_H

@@ -196,7 +196,7 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
 /* ******************************************************************************************** *
  * Implementation of SecureSession
  * ******************************************************************************************** */
-SecureStream::SecureStream(const Identity &id)
+SecureStream::SecureStream(Identity &id)
   : _identity(id), _sessionKeyPair(0), _peerPubKey(0)
 {
   // pass...
