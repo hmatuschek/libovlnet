@@ -104,7 +104,7 @@ Identity::verify(const uint8_t *data, size_t datalen, const uint8_t *sig, size_t
     goto error;
   if (1 != EVP_DigestVerifyUpdate(&mdctx, data, datalen))
     goto error;
-  if (1 != EVP_DigestVerifyFinal(&mdctx, sig, siglen))
+  if (1 != EVP_DigestVerifyFinal(&mdctx, (uint8_t *)sig, siglen))
     goto error;
 
   EVP_MD_CTX_cleanup(&mdctx);
