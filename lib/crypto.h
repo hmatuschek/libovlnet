@@ -55,10 +55,10 @@ public:
   virtual void handleDatagram(uint32_t seq, const uint8_t *data, size_t len) = 0;
   bool sendDatagram(const uint8_t *data, size_t len);
 
+
 protected:
   void handleData(const uint8_t *data, size_t len);
 
-protected:
   /** Creates a session key pair and an intialization message.
    * struct {
    *   uint16_t pubkeyLen;         // length of identity pubkey, network order
@@ -70,6 +70,7 @@ protected:
    * };
    */
   int prepare(uint8_t *ptr, size_t maxlen);
+
   /** Verifies the peer.
    * struct {
    *   uint16_t pubkeyLen;         // length of identity pubkey, network order
@@ -81,6 +82,7 @@ protected:
    * };
    */
   bool verify(const uint8_t *ptr, size_t len);
+
   /** Derives the session secret from the session keys & initializes the symmetric
    * encryption/decryption. */
   bool start(const Identifier &streamId, const PeerItem &peer, QUdpSocket *socket);

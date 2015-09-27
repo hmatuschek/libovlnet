@@ -44,17 +44,22 @@ Identity::~Identity() {
 
 bool
 Identity::hasPublicKey() const {
-  return 0<i2d_PrivateKey(_keyPair,0);
+  return 0<i2d_PUBKEY(_keyPair,0);
 }
 
 int Identity::publicKey(uint8_t *key, size_t len) const {
   // Get pubkey
-  unsigned char *ptr = 0; int keylen = 0;
-  if (0 > (keylen = i2d_PublicKey(_keyPair, &ptr)) )
+  int keylen = 0;
+  if (0 > (keylen = i2d_PUBKEY(_keyPair, 0)) )
     return -1;
+  // If just length is requested -> done
   if (0 == key) { return keylen; }
-  memcpy(key, ptr, std::min(keylen, int(len)));
-  return std::min(keylen, int(len));
+  // If not enough space is available -> error
+  if (keylen > len) { return -1; }
+  // Store key
+  if (0 > i2d_PUBKEY(_keyPair, &key))
+    return -1;
+  return keylen;
 }
 
 bool
@@ -189,8 +194,10 @@ error:
 
 Identity *
 Identity::fromPublicKey(const uint8_t *key, size_t len) {
-  EVP_PKEY *pkey=0;
-  if (! d2i_PublicKey(EVP_PKEY_EC, &pkey, &key, len)) {
+  EVP_PKEY *pkey = EVP_PKEY_new();
+  if (0 == d2i_PUBKEY(&pkey, &key, len)) {
+    ERR_load_crypto_strings();
+    ERR_print_errors_fp(stderr);
     return 0;
   }
   return new Identity(pkey);
@@ -213,12 +220,13 @@ SecureStream::~SecureStream() {
 
 int
 SecureStream::prepare(uint8_t *ptr, size_t len) {
+  memset(ptr, 0, len);
   uint8_t *keyPtr = 0; int keyLen =0;
   EC_KEY *key = 0;
   size_t stored=0;
 
   // Store public key and its length into output buffer
-  if (0 > (keyLen = _identity.publicKey(ptr+2, len-1)) )
+  if (0 > (keyLen = _identity.publicKey(ptr+2, len-2)) )
     goto error;
   *((uint16_t *)ptr) = htons(uint16_t(keyLen));
   stored += keyLen+2; ptr += keyLen+2; len -= keyLen+2;
@@ -236,13 +244,16 @@ SecureStream::prepare(uint8_t *ptr, size_t len) {
   if (! EVP_PKEY_assign_EC_KEY(_sessionKeyPair, key))
     goto error;
   // store public key in output buffer
-  if (0 > (keyLen = i2d_PublicKey(_sessionKeyPair, &keyPtr)) )
+  if (0 > (keyLen = i2d_PUBKEY(_sessionKeyPair, 0)) )
     goto error;
   if (keyLen>(len-2))
     goto error;
-  memcpy(ptr+2, keyPtr, keyLen);
   *((uint16_t *)ptr) = htons(uint16_t(keyLen));
-  keyPtr = ptr+2;  //< save ptr to public key
+  keyPtr = ptr+2;
+  if (0 > i2d_PUBKEY(_sessionKeyPair, &keyPtr) )
+    goto error;
+  // Save a pointer to the session public key
+  keyPtr = ptr+2;
   // update pointer
   stored += keyLen+2; ptr += keyLen+2; len -= keyLen+2;
 
@@ -254,7 +265,7 @@ SecureStream::prepare(uint8_t *ptr, size_t len) {
   return stored;
 
 error:
-  if (key) { EC_KEY_free(key); }
+  if (key && !_sessionKeyPair) { EC_KEY_free(key); }
   if (_sessionKeyPair) {
     EVP_PKEY_free(_sessionKeyPair);
     _sessionKeyPair = 0;
@@ -283,10 +294,12 @@ SecureStream::verify(const uint8_t *ptr, size_t len)
   // get length of key
   keyLen = ntohs(*(uint16_t *)ptr);
   // read peer public key
-  if (keyLen>(len-2))
+  if (keyLen>(len-2)) {
     goto error;
-  if (0 == (peer = Identity::fromPublicKey(ptr+2, keyLen)))
+  }
+  if (0 == (peer = Identity::fromPublicKey(ptr+2, keyLen))) {
     goto error;
+  }
   _peerId = peer->id();
   ptr += keyLen+2; len -= keyLen+2;
 
@@ -295,7 +308,7 @@ SecureStream::verify(const uint8_t *ptr, size_t len)
   if (keyLen>(len-2))
     goto error;
   keyPtr = ptr+2;
-  if (0 == (_peerPubKey = d2i_PublicKey(EVP_PKEY_EC, &_peerPubKey, &keyPtr, len-2)))
+  if (0 == (_peerPubKey = d2i_PUBKEY(&_peerPubKey, &keyPtr, len-2)))
     goto error;
   ptr += keyLen+2; len -= keyLen+2;
 
