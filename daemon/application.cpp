@@ -20,7 +20,7 @@ Application::Application(int argc, char *argv[]) :
   }
 
   if (_identity) {
-    _dht = new DHT(_identity->id());
+    _dht = new DHT(_identity->id(), this);
   } else {
     qDebug() << "Error while loading or creating my identity.";
   }
