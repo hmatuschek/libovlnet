@@ -1366,12 +1366,20 @@ DHT::_processAnnounceRequest(
 }
 
 void
-DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddress &addr, uint16_t port) {
-  if (0 == _streamHandler) { return; }
-  // Request new stream
-  SecureStream *stream = 0;
-  if (0 == (stream =_streamHandler->newStream(ntohs(msg.payload.start_stream.service))) )
+DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+{
+  qDebug() << "Received StartStream request, service:" << ntohs(msg.payload.start_stream.service);
+  // check if a stream handler is installed
+  if (0 == _streamHandler) {
+    qDebug() << "No stream handler installed -> ignore request";
     return;
+  }
+  // Request new stream from stream handler
+  SecureStream *stream = 0;
+  if (0 == (stream =_streamHandler->newStream(ntohs(msg.payload.start_stream.service))) ) {
+    qDebug() << "Stream handler refuses to create a new stream.";
+    return;
+  }
   // Verify
   if (! stream->verify(msg.payload.start_stream.pubkey, size-DHT_HASH_SIZE-3)) {
     qDebug() << "Can not verify stream peer.";
@@ -1406,6 +1414,7 @@ DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddr
     delete stream; return;
   }
 
+  qDebug() << "Stream started.";
   // Stream started..
   _streams[resp.cookie] = stream;
   _streamHandler->streamStarted(stream);
@@ -1424,7 +1433,9 @@ DHT::_onCheckRequestTimeout() {
   // Process dead requests, dispatch by type
   QList<Request *>::iterator req = deadRequests.begin();
   for (; req != deadRequests.end(); req++) {
+    // First of all, remove it from the list of pending requests
     _pendingRequests.remove((*req)->cookie());
+    // Then, dispatch by type
     if (MSG_PING == (*req)->type()) {
       qDebug() << "Ping request timeout...";
       // Just ignore
