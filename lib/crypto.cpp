@@ -310,9 +310,12 @@ SecureStream::verify(const uint8_t *ptr, size_t len)
   keyPtr = ptr+2;
   if (0 == (_peerPubKey = d2i_PUBKEY(&_peerPubKey, &keyPtr, len-2)))
     goto error;
+  // Restore ptr to public session key
+  keyPtr = ptr+2;
   ptr += keyLen+2; len -= keyLen+2;
 
   // verify session key
+  sigLen = ntohs(*(uint16_t *)ptr);
   if (! peer->verify(keyPtr, keyLen, ptr+2, sigLen))
     goto error;
 
