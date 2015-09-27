@@ -254,9 +254,15 @@ SecureStream::prepare(uint8_t *ptr, size_t len) {
 error:
   if (key) { EC_KEY_free(key); }
   if (_sessionKeyPair) {
-    EVP_PKEY_free(_sessionKeyPair); _sessionKeyPair = 0;
+    EVP_PKEY_free(_sessionKeyPair);
+    _sessionKeyPair = 0;
   }
   return -1;
+}
+
+const Identifier &
+SecureStream::id() const {
+  return _streamId;
 }
 
 const Identifier &

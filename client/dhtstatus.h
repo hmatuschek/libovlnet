@@ -26,6 +26,14 @@ public:
   /** Returns the number of data items provided by the node. */
   size_t numDataItems() const;
 
+  /** Returns the number of active streams. */
+  size_t numStreams() const;
+
+  size_t bytesReceived() const;
+  size_t bytesSend() const;
+  double inRate() const;
+  double outRate() const;
+
   /** Stores the neighbors of DHT node into the list with their distance on a logarithmic
    * scale (0,1]. */
   void neighbors(QList< QPair<double, NodeItem> > &nodes) const;

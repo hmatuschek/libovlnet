@@ -163,6 +163,8 @@ public:
   bool full() const;
   /** Returns the number of nodes held in the bucket. */
   size_t numNodes() const;
+  /** Returns the list of all nodes held in the bucket. */
+  void nodes(QList<NodeItem> &lst) const;
   /** Returns @c true if the bucket contains the given identifier. */
   bool contains(const Identifier &id) const;
   /** Add or updates an item. */
@@ -200,7 +202,8 @@ public:
   bool contains(const Identifier &id) const;
   /** Returns the number of nodes in the buckets. */
   size_t numNodes() const;
-
+  /** Returns the list of all nodes in the buckets. */
+  void nodes(QList<NodeItem> &lst) const;
   /** Adds or updates an item. */
   void add(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** Collects the nearest known nodes. */
@@ -256,10 +259,22 @@ public:
   const Identifier &id() const;
   /** Returns the number of nodes in the buckets. */
   size_t numNodes() const;
+  /** Returns the list of all nodes in the buckets. */
+  void nodes(QList<NodeItem> &lst);
   /** Returns the number of keys held by this DHT node. */
   size_t numKeys() const;
   /** Retunrs the number of data items provided by this node. */
   size_t numData() const;
+  /** Retunrs the number of active streams. */
+  size_t numStreams() const;
+  /** Returns the number of bytes send. */
+  size_t bytesSend() const;
+  /** Returns the number of bytes received. */
+  size_t bytesReceived() const;
+  /** Returns the download rate. */
+  double inRate() const;
+  /** Returns the upload rate. */
+  double outRate() const;
 
   /** Sends a ping request to the given peer. */
   void ping(const QString &addr, uint16_t port);
@@ -273,8 +288,10 @@ public:
   void findValue(const Identifier &id);
   /** Announces a value. */
   void announce(const Identifier &id);
+
   /** Starts a secure stream connection. */
   bool startStream(uint16_t service, const NodeItem &node);
+  void closeStream(const Identifier &id);
 
 signals:
   /** Gets emitted if a ping was replied. */
@@ -282,7 +299,7 @@ signals:
   /** Gets emitted if the given node has been found. */
   void nodeFound(const NodeItem &node);
   /** Gets emitted if the given node was not found. */
-  void nodeNotFound(const Identifier &id);
+  void nodeNotFound(const Identifier &id, const QList<NodeItem> &best);
   /** Gets emitted if the given value was found. */
   void valueFound(const Identifier &id, const QList<NodeItem> &nodes);
   /** Gets emitted if the given value was not found. */
@@ -337,17 +354,38 @@ private slots:
   /** Gets called regulary to check the timeout of the node in the buckets. */
   void _onCheckNodeTimeout();
   /** Gets called regulary to check the announcement timeouts. */
-  void _onCheckAnnouncementTimeout();
+  void _onCheckAnnouncementTimeout();  
+  /** Gets called regulary to update the statistics. */
+  void _onUpdateStatistics();
+  /** Gets called when some data has been send. */
+  void _onBytesWritten(qint64 n);
 
 protected:
   /** The identifier of the node. */
   Identifier _self;
+
   /** The network socket. */
   QUdpSocket _socket;
+
+  /** The number of bytes received. */
+  size_t _bytesReceived;
+  /** The number of bytes received at the last update. */
+  size_t _lastBytesReceived;
+  /** The input rate. */
+  double _inRate;
+
+  /** The number of bytes send. */
+  size_t _bytesSend;
+  /** The number of bytes send at the last update. */
+  size_t _lastBytesSend;
+  /** The output rate. */
+  double _outRate;
+
   /** The routing table. */
   Buckets    _buckets;
   /** A list of candidate peers to join the buckets. */
   QList<PeerItem> _candidates;
+
   /** The key->value map of the received announcements. */
   QHash<Identifier, QHash<Identifier, AnnouncementItem> > _announcements;
   /** The kay->timestamp table of the data this node provides. */
@@ -358,12 +396,15 @@ protected:
   StreamHandler *_streamHandler;
   /** The list of open streams. */
   QHash<Identifier, SecureStream *> _streams;
+
   /** Timer to check timeouts of requests. */
   QTimer _requestTimer;
   /** Timer to check nodes in buckets. */
   QTimer _nodeTimer;
   /** Timer to keep announcements up-to-date. */
   QTimer _announcementTimer;
+  /** Timer to update i/o statistics every 5 seconds. */
+  QTimer _statisticsTimer;
 };
 
 

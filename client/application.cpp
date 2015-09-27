@@ -1,5 +1,8 @@
 #include "application.h"
 #include "dhtstatusview.h"
+#include "searchdialog.h"
+#include "buddylistview.h"
+#include "chatwindow.h"
 
 #include <QMenu>
 #include <QInputDialog>
@@ -8,6 +11,7 @@
 #include <QMessageBox>
 #include <QString>
 #include <QDir>
+
 
 Application::Application(int argc, char *argv[])
   : QApplication(argc, argv), _identity(0), _dht(0), _status(0)
@@ -26,18 +30,24 @@ Application::Application(int argc, char *argv[])
   }
 
   if (_identity) {
-    _dht = new DHT(_identity->id());
+    _dht = new DHT(_identity->id(), this);
   } else {
     qDebug() << "Error while loading or creating my identity.";
   }
 
   _status = new DHTStatus(_dht);
+  _buddies = new BuddyList(vlfDir.canonicalPath()+"/buddies.json");
 
-  _showStatus = new QAction(QIcon("://settings.png"), tr("Show status ..."), this);
-  _bootstrap  = new QAction(tr("Bootstrap..."), this);
-  _quit = new QAction(QIcon("://quit.png"), tr("Quit"), this);
+  _search      = new QAction(QIcon("://search.png"),    tr("Search..."), this);
+  _showBuddies = new QAction(QIcon("://people.png"),    tr("Contacts..."), this);
+  _bootstrap   = new QAction(QIcon("://bootstrap.png"), tr("Bootstrap..."), this);
+  _showStatus  = new QAction(QIcon("://settings.png"),  tr("Show status ..."), this);
+  _quit        = new QAction(QIcon("://quit.png"),      tr("Quit"), this);
 
   QMenu *ctx = new QMenu();
+  ctx->addAction(_search);
+  ctx->addAction(_showBuddies);
+  ctx->addSeparator();
   ctx->addAction(_bootstrap);
   ctx->addAction(_showStatus);
   ctx->addSeparator();
@@ -48,11 +58,16 @@ Application::Application(int argc, char *argv[])
   _trayIcon->setContextMenu(ctx);
   _trayIcon->show();
 
+  QObject::connect(_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(onNodeFound(NodeItem)));
+  QObject::connect(_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
+                   this, SLOT(onNodeNotFound(Identifier,QList<NodeItem>)));
+
   QObject::connect(_bootstrap, SIGNAL(triggered()), this, SLOT(onBootstrap()));
+  QObject::connect(_showBuddies, SIGNAL(triggered()), this, SLOT(onShowBuddies()));
+  QObject::connect(_search, SIGNAL(triggered()), this, SLOT(onSearch()));
   QObject::connect(_showStatus, SIGNAL(triggered()), this, SLOT(onShowStatus()));
   QObject::connect(_quit, SIGNAL(triggered()), this, SLOT(onQuit()));
 }
-
 
 void
 Application::onBootstrap() {
@@ -85,6 +100,16 @@ Application::onBootstrap() {
 }
 
 void
+Application::onSearch() {
+  (new SearchDialog(_dht, _buddies))->show();
+}
+
+void
+Application::onShowBuddies() {
+  (new BuddyListView(*this,  _buddies))->show();
+}
+
+void
 Application::onShowStatus() {
   (new DHTStatusView(_status))->show();
 }
@@ -94,3 +119,57 @@ Application::onQuit() {
   quit();
 }
 
+SecureStream *
+Application::newStream(uint16_t service) {
+  if (0 == service) {
+    // Chat service
+    return new SecureChat(*_identity, 0);
+  }
+  return 0;
+}
+
+bool
+Application::allowStream(uint16_t service, const NodeItem &peer) {
+  if (0 == service) {
+    // Check if peer is buddy list
+    return _buddies->hasNode(peer.id());
+  }
+  return false;
+}
+
+void
+Application::streamStarted(SecureStream *stream) {
+  SecureChat *chat = 0;
+  if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
+    _pendingChats.remove(stream->peerId());
+    (new ChatWindow(chat))->show();
+  } else {
+    _dht->closeStream(stream->id()); delete stream;
+  }
+}
+
+void
+Application::startChatWith(const Identifier &id) {
+  // Add id to list of pending chats
+  _pendingChats.insert(id);
+  // First search node
+  _dht->findNode(id);
+}
+
+void
+Application::onNodeFound(const NodeItem &node) {
+  if (_pendingChats.contains(node.id())) {
+    qDebug() << "Node" << node.id() << "found: Start chat...";
+    _dht->startStream(0, node);
+  }
+}
+
+void
+Application::onNodeNotFound(const Identifier &id, const QList<NodeItem> &best) {
+  if (_pendingChats.contains(id)) {
+    QMessageBox::critical(
+          0, tr("Can not initialize chat"),
+          tr("Can not initialize chat with node %1: not reachable.").arg(QString(id.toHex())));
+    _pendingChats.remove(id);
+  }
+}

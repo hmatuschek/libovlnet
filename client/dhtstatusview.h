@@ -2,6 +2,7 @@
 #define DHTSTATUSVIEW_H
 
 #include "dhtstatus.h"
+#include "dhtnetgraph.h"
 #include <QWidget>
 #include <QTimer>
 #include <QLabel>
@@ -18,11 +19,22 @@ protected slots:
   void _onUpdate();
 
 protected:
+  QString _formatBytes(size_t bytes);
+  QString _formatRate(double rate);
+
+protected:
   DHTStatus *_status;
 
   QLabel *_numPeers;
   QLabel *_numKeys;
   QLabel *_numData;
+  QLabel *_numStreams;
+  QLabel *_bytesReceived;
+  QLabel *_bytesSend;
+  QLabel *_inRate;
+  QLabel *_outRate;
+
+  DHTNetGraph *_dhtNet;
 
   QTimer _updateTimer;
 };

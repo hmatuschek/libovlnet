@@ -46,6 +46,8 @@ public:
   SecureStream(Identity &id);
   virtual ~SecureStream();
 
+  /** The stream ID. */
+  const Identifier &id() const;
   /** Peer identifier derived from its pubkey. */
   const Identifier &peerId() const;
 

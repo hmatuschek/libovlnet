@@ -90,6 +90,7 @@ public:
   void update(const NodeItem &nodes);
   bool next(NodeItem &node);
   QList<NodeItem> &best();
+  const QList<NodeItem> &best() const;
   const NodeItem &first() const;
 
 protected:
@@ -451,6 +452,14 @@ Bucket::numNodes() const {
   return _triples.size();
 }
 
+void
+Bucket::nodes(QList<NodeItem> &lst) const {
+  QHash<Identifier, Item>::const_iterator item = _triples.begin();
+  for (; item != _triples.end(); item++) {
+    lst.push_back(NodeItem(item.key(), item->addr(), item->port()));
+  }
+}
+
 bool
 Bucket::contains(const Identifier &id) const {
   return _triples.contains(id);
@@ -549,6 +558,14 @@ Buckets::numNodes() const {
     count += item->numNodes();
   }
   return count;
+}
+
+void
+Buckets::nodes(QList<NodeItem> &lst) const {
+  QList<Bucket>::const_iterator bucket = _buckets.begin();
+  for (; bucket != _buckets.end(); bucket++) {
+    bucket->nodes(lst);
+  }
 }
 
 bool
@@ -683,6 +700,11 @@ SearchQuery::best() {
   return _best;
 }
 
+const QList<NodeItem> &
+SearchQuery::best() const {
+  return _best;
+}
+
 const NodeItem &
 SearchQuery::first() const {
   return _best.first();
@@ -747,9 +769,10 @@ StartStreamRequest::StartStreamRequest(uint16_t service, const Identifier &peer,
  * ******************************************************************************************** */
 DHT::DHT(const Identifier &id, StreamHandler *streamHandler,
          const QHostAddress &addr, quint16 port, QObject *parent)
-  : QObject(parent), _self(id), _socket(), _buckets(_self),
+  : QObject(parent), _self(id), _socket(), _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
+    _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self),
     _streamHandler(streamHandler), _streams(),
-    _requestTimer(), _nodeTimer(), _announcementTimer()
+    _requestTimer(), _nodeTimer(), _announcementTimer(), _statisticsTimer()
 {
   qDebug() << "Start node #" << id << "at" << addr << ":" << port;
 
@@ -767,15 +790,21 @@ DHT::DHT(const Identifier &id, StreamHandler *streamHandler,
   // check announcements every 5 minutes
   _announcementTimer.setInterval(1000*60*5);
   _announcementTimer.setSingleShot(false);
+  // Update statistics every 5 seconds
+  _statisticsTimer.setInterval(1000*5);
+  _statisticsTimer.setSingleShot(false);
 
   QObject::connect(&_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+  QObject::connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
   QObject::connect(&_requestTimer, SIGNAL(timeout()), this, SLOT(_onCheckRequestTimeout()));
   QObject::connect(&_nodeTimer, SIGNAL(timeout()), this, SLOT(_onCheckNodeTimeout()));
   QObject::connect(&_announcementTimer, SIGNAL(timeout()), this, SLOT(_onCheckAnnouncementTimeout()));
+  QObject::connect(&_statisticsTimer, SIGNAL(timeout()), this, SLOT(_onUpdateStatistics()));
 
   _requestTimer.start();
   _nodeTimer.start();
   _announcementTimer.start();
+  _statisticsTimer.start();
 }
 
 DHT::~DHT() {
@@ -822,9 +851,11 @@ DHT::findNode(const Identifier &id) {
   NodeItem next;
   if (! query->next(next)) {
     qDebug() << "Can not find node" << id << ". Buckets empty.";
-    delete query;
     // Emmit signal if failiour is not a pending announcement
-    if (! isPendingAnnouncement(id)) { emit nodeNotFound(id); }
+    if (! isPendingAnnouncement(id)) {
+      emit nodeNotFound(id, query->best());
+    }
+    delete query;
   } else {
     sendFindNode(next, query);
   }
@@ -885,6 +916,11 @@ DHT::startStream(uint16_t service, const NodeItem &node) {
   delete stream; delete req; return false;
 }
 
+void
+DHT::closeStream(const Identifier &id) {
+  _streams.remove(id);
+}
+
 const Identifier &
 DHT::id() const {
   return _self;
@@ -895,6 +931,11 @@ DHT::numNodes() const {
   return _buckets.numNodes();
 }
 
+void
+DHT::nodes(QList<NodeItem> &lst) {
+  _buckets.nodes(lst);
+}
+
 size_t
 DHT::numKeys() const {
   return _announcements.size();
@@ -903,6 +944,31 @@ DHT::numKeys() const {
 size_t
 DHT::numData() const {
   return _announcedData.size();
+}
+
+size_t
+DHT::numStreams() const {
+  return _streams.size();
+}
+
+size_t
+DHT::bytesReceived() const {
+  return _bytesReceived;
+}
+
+size_t
+DHT::bytesSend() const {
+  return _bytesSend;
+}
+
+double
+DHT::inRate() const {
+  return _inRate;
+}
+
+double
+DHT::outRate() const {
+  return _outRate;
 }
 
 
@@ -979,6 +1045,8 @@ DHT::_onReadyRead() {
       _socket.readDatagram(0, 0, &addr, &port);
       qDebug() << "Invalid UDP packet received from" << addr << ":" << port;
     } else {
+      // Update statistics
+      _bytesReceived += _socket.pendingDatagramSize();
       // Read message
       struct Message msg; QHostAddress addr; uint16_t port;
       int64_t size = _socket.readDatagram((char *) &msg, sizeof(Message), &addr, &port);
@@ -1021,6 +1089,11 @@ DHT::_onReadyRead() {
       }
     }
   }
+}
+
+void
+DHT::_onBytesWritten(qint64 n) {
+  _bytesSend += n;
 }
 
 void
@@ -1091,7 +1164,7 @@ DHT::_processFindNodeResponse(
     } else {
       qDebug() << "Node" << req->query()->id() << "not found.";
       // if it was a regular node search -> signal error
-      emit nodeNotFound(req->query()->id());
+      emit nodeNotFound(req->query()->id(), req->query()->best());
     }
     // delete query
     delete req->query();
@@ -1247,7 +1320,7 @@ DHT::_processFindValueRequest(
     memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
     resp.payload.result.success = 1;
     QHash<Identifier, AnnouncementItem>::iterator item = owners.begin();
-    for (int i = 0; (item!=owners.end()) && (i<DHT_K); item++, i++) {
+    for (int i = 0; (item!=owners.end()) && (i<DHT_MAX_TRIPLES); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item.key().data(), DHT_HASH_SIZE);
       resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
       resp.payload.result.triples[i].port = htons(item->port());
@@ -1372,7 +1445,7 @@ DHT::_onCheckRequestTimeout() {
           }
         } else {
           // if it was a regular node search -> signal error
-          emit nodeNotFound(query->id());
+          emit nodeNotFound(query->id(), query->best());
         }
         // delete query
         delete query;
@@ -1448,4 +1521,12 @@ DHT::_onCheckAnnouncementTimeout() {
       announce(item.key());
     }
   }
+}
+
+void
+DHT::_onUpdateStatistics() {
+  _inRate = (_bytesReceived-_lastBytesReceived)/5;
+  _lastBytesReceived = _bytesReceived;
+  _outRate = (_bytesSend - _lastBytesSend)/5;
+  _lastBytesSend = _bytesSend;
 }
