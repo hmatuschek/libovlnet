@@ -38,6 +38,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ggdb")
 add_subdirectory(lib)
 add_subdirectory(client)
 add_subdirectory(daemon)
+add_subdirectory(test)
 
 # Source distribution packages:
 set(CPACK_PACKAGE_VERSION_MAJOR "1")

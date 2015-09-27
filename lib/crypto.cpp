@@ -52,7 +52,7 @@ int Identity::publicKey(uint8_t *key, size_t len) const {
   unsigned char *ptr = 0; int keylen = 0;
   if (0 > (keylen = i2d_PublicKey(_keyPair, &ptr)) )
     return -1;
-  if (0 == key) { return -1; }
+  if (0 == key) { return keylen; }
   memcpy(key, ptr, std::min(keylen, int(len)));
   return std::min(keylen, int(len));
 }
@@ -75,7 +75,7 @@ Identity::sign(const uint8_t *data, size_t datalen, uint8_t *sig, size_t siglen)
   EVP_MD_CTX_init(&mdctx);
   size_t slen = 0;
 
-  if (1 != EVP_DigestSignInit(&mdctx, 0, EVP_ripemd160(), 0, _keyPair))
+  if (1 != EVP_DigestSignInit(&mdctx, 0, EVP_sha256(), 0, _keyPair))
     goto error;
   if (1 != EVP_DigestSignUpdate(&mdctx, data, datalen))
     goto error;
@@ -89,6 +89,8 @@ Identity::sign(const uint8_t *data, size_t datalen, uint8_t *sig, size_t siglen)
   return slen;
 
 error:
+  ERR_load_crypto_strings();
+  ERR_print_errors_fp(stderr);
   EVP_MD_CTX_cleanup(&mdctx);
   return -1;
 }
@@ -100,7 +102,7 @@ Identity::verify(const uint8_t *data, size_t datalen, const uint8_t *sig, size_t
   EVP_MD_CTX mdctx;
   EVP_MD_CTX_init(&mdctx);
 
-  if (1 != EVP_DigestVerifyInit(&mdctx, 0, EVP_ripemd160(), 0, _keyPair))
+  if (1 != EVP_DigestVerifyInit(&mdctx, 0, EVP_sha256(), 0, _keyPair))
     goto error;
   if (1 != EVP_DigestVerifyUpdate(&mdctx, data, datalen))
     goto error;
