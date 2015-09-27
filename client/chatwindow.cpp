@@ -1,11 +1,19 @@
 #include "chatwindow.h"
 #include <QTextCursor>
+#include <QVBoxLayout>
 
 ChatWindow::ChatWindow(SecureChat *chat, QWidget *parent)
   : QWidget(parent), _chat(chat)
 {
   _view = new QTextBrowser();
   _text = new QLineEdit();
+
+  QVBoxLayout *layout = new QVBoxLayout();
+  layout->setSpacing(0);
+  layout->setContentsMargins(0,0,0,0);
+  layout->addWidget(_view);
+  layout->addWidget(_text);
+  setLayout(layout);
 
   QObject::connect(_chat, SIGNAL(messageReceived(QString)), this, SLOT(_onMessageReceived(QString)));
   QObject::connect(_text, SIGNAL(returnPressed()), this, SLOT(_onMessageSend()));

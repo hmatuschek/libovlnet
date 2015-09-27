@@ -389,6 +389,7 @@ SecureStream::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   int len1=0, len2=0;
   // Append seq to shared IV
   *((uint32_t *)(_sharedIV+16)) = seq;
+  // Compute IV from shared IV + 4bytes seq number
   SHA256(_sharedIV, 20, iv);
   // Init encryption
   EVP_CIPHER_CTX ctx;
@@ -463,7 +464,7 @@ SecureStream::sendDatagram(const uint8_t *data, size_t len) {
   // Store stream cookie
   memcpy(ptr, _streamId.data(), DHT_HASH_SIZE); ptr += DHT_HASH_SIZE;
   // store sequence number
-  *((uint32_t *)ptr) = _outSeq; ptr += 4;
+  *((uint32_t *)ptr) = htonl(_outSeq); ptr += 4;
   // store encrypted data
   if(0 > (txlen = encrypt(_outSeq, data, len, ptr)))
     return false;
@@ -472,7 +473,7 @@ SecureStream::sendDatagram(const uint8_t *data, size_t len) {
   if (0 > _socket->writeDatagram((char *)msg, txlen, _peer.addr(), _peer.port()))
     return false;
   // Update seq
-  _outSeq += txlen;
+  _outSeq += len;
   return true;
 }
 
