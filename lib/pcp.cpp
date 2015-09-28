@@ -89,7 +89,7 @@ PCPClient::requestMap(uint16_t iport, const QHostAddress &addr, uint16_t port)
   // eport & eipv6 are left 0 -> means any mapping possible
 
   qDebug() << "Send MAP request.";
-  if (sizeof(PCPRequest) > _socket.writeDatagram((char *)&request, addr, port)) {
+  if (int(sizeof(PCPRequest)) > _socket.writeDatagram((char *)&request, addr, port)) {
     qDebug() << "Can not send PCP request to" << addr << ":" << port;
   }
   _socket.disconnectFromHost();

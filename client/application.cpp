@@ -36,7 +36,7 @@ Application::Application(int argc, char *argv[])
   }
 
   _status = new DHTStatus(_dht);
-  _buddies = new BuddyList(vlfDir.canonicalPath()+"/buddies.json");
+  _buddies = new BuddyList(*this, vlfDir.canonicalPath()+"/buddies.json");
 
   _search      = new QAction(QIcon("://search.png"),    tr("Search..."), this);
   _showBuddies = new QAction(QIcon("://people.png"),    tr("Contacts..."), this);

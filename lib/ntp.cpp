@@ -166,7 +166,7 @@ NTPClient::onDatagramReceived() {
     QHostAddress address;
     quint16 port;
 
-    if(sizeof(NTPPacket) > _socket.readDatagram(
+    if(int(sizeof(NTPPacket)) > _socket.readDatagram(
          (char *)&packet, sizeof(NTPFullPacket), &address, &port)) {
       continue;
     }

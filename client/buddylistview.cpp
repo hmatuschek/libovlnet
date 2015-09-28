@@ -22,10 +22,10 @@ BuddyListView::BuddyListView(Application &application, BuddyList *buddies, QWidg
     QTreeWidgetItem *item = new QTreeWidgetItem(_tree);
     item->setText(0, buddy.key());
     item->setIcon(0, QIcon("://person.png"));
-    QSet<Identifier>::const_iterator node = (*buddy)->nodes().begin();
+    QHash<Identifier, Buddy::NodeItem>::const_iterator node = (*buddy)->nodes().begin();
     for (; node != (*buddy)->nodes().end(); node++) {
       QTreeWidgetItem *nodeitem = new QTreeWidgetItem(item);
-      nodeitem->setText(0, QString(node->toHex()));
+      nodeitem->setText(0, QString(node.key().toHex()));
       nodeitem->setIcon(0, QIcon("://icon.png"));
     }
   }
@@ -44,10 +44,10 @@ BuddyListView::buddyAdded(const QString &name) {
   QTreeWidgetItem *item = new QTreeWidgetItem(_tree);
   item->setText(0, name);
   item->setIcon(0, QIcon("://person.png"));
-  QSet<Identifier>::const_iterator node = buddy->nodes().begin();
+  QHash<Identifier, Buddy::NodeItem>::const_iterator node = buddy->nodes().begin();
   for (; node != buddy->nodes().end(); node++) {
     QTreeWidgetItem *nodeitem = new QTreeWidgetItem(item);
-    nodeitem->setText(0, QString(node->toHex()));
+    nodeitem->setText(0, QString(node.key().toHex()));
     nodeitem->setIcon(0, QIcon("://icon.png"));
   }
 }
@@ -77,7 +77,7 @@ BuddyListView::nodeRemoved(const QString &buddy, const Identifier &id) {
   QList<QTreeWidgetItem *> items = _tree->findItems(buddy, Qt::MatchExactly);
   QList<QTreeWidgetItem *>::iterator item = items.begin();
   for (; item != items.end(); item++) {
-    for (size_t i=0; i<(*item)->childCount(); i++) {
+    for (int i=0; i<(*item)->childCount(); i++) {
       if ((*item)->child(i)->text(0) == QString(id.toHex())) {
         (*item)->removeChild((*item)->child(i));
         return;

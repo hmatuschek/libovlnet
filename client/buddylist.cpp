@@ -31,13 +31,20 @@ Buddy::NodeItem::NodeItem(const NodeItem &other)
 }
 
 bool
+Buddy::NodeItem::hasBeenSeen() const {
+  return _lastSeen.isValid() && (!_addr.isNull());
+}
+
+bool
 Buddy::NodeItem::isOlderThan(size_t seconds) const {
   return (_lastSeen.addSecs(seconds) < QDateTime::currentDateTime());
 }
 
 void
-Buddy::NodeItem::update() {
+Buddy::NodeItem::update(const QHostAddress &addr, uint16_t port) {
   _lastSeen = QDateTime::currentDateTime();
+  _addr = addr;
+  _port = port;
 }
 
 
@@ -55,11 +62,6 @@ Buddy::nodes() const {
   return _nodes;
 }
 
-const Buddy::NodeItem &
-Buddy::node(const Identifier &id) const {
-  return _nodes[id];
-}
-
 Buddy::NodeItem &
 Buddy::node(const Identifier &id) {
   return _nodes[id];
@@ -70,9 +72,9 @@ Buddy::toJson() const {
   QJsonObject obj;
   QJsonArray nodes;
 
-  QSet<Identifier>::const_iterator node = _nodes.begin();
+  QHash<Identifier, Buddy::NodeItem>::const_iterator node = _nodes.begin();
   for (; node != _nodes.end(); node++) {
-    nodes.append(QString(node->toHex()));
+    nodes.append(QString(node.key().toHex()));
   }
   obj.insert("nodes", nodes);
   return obj;
@@ -83,7 +85,7 @@ Buddy::fromJson(const QJsonObject &obj) {
   Buddy *buddy = new Buddy();
   if (obj.contains("nodes") && obj["nodes"].isArray()) {
     QJsonArray nodes = obj["nodes"].toArray();
-    for (size_t i=0; i<nodes.size(); i++) {
+    for (int i=0; i<nodes.size(); i++) {
       buddy->_nodes.insert(
             QByteArray::fromHex(nodes.at(i).toString().toLocal8Bit()), NodeItem());
     }
@@ -115,9 +117,9 @@ BuddyList::BuddyList(Application &application, const QString path, QObject *pare
     if ((obj.value().isObject()) && (buddy = Buddy::fromJson(obj.value().toObject()))) {
       _buddies[obj.key()] = buddy;
       // Add to node table
-      QSet<Identifier>::const_iterator node = buddy->nodes().begin();
+      QHash<Identifier, Buddy::NodeItem>::const_iterator node = buddy->nodes().begin();
       for (; node != buddy->nodes().end(); node++) {
-        _nodes.insert(*node, buddy);
+        _nodes.insert(node.key(), buddy);
       }
     } else {
       qDebug() << "Malformed buddy" << obj.key() << "in list.";

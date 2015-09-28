@@ -18,8 +18,9 @@ public:
     NodeItem(const QHostAddress &addr, uint16_t port);
     NodeItem(const NodeItem &other);
 
+    bool hasBeenSeen() const;
     bool isOlderThan(size_t seconds) const;
-    void update();
+    void update(const QHostAddress &addr, uint16_t port);
 
   protected:
     QDateTime _lastSeen;
@@ -28,9 +29,8 @@ public:
 public:
   Buddy();
 
-  const QHash<Identifier> &nodes() const;
-  const NodeItem &node(const Identifier &id) const;
-  NodeItem node(const Identifier &id);
+  const QHash<Identifier, NodeItem> &nodes() const;
+  NodeItem &node(const Identifier &id);
   QJsonObject toJson() const;
 
 public:
@@ -85,6 +85,8 @@ signals:
   void buddyRemoved(const QString &name);
   void nodeAdded(const QString &buddy, const Identifier &node);
   void nodeRemoved(const QString &buddy, const Identifier &node);
+  void appeared(const Identifier &id);
+  void disappeared(const Identifier &id);
 
 protected slots:
   void _onNodeReacable(const NodeItem &node);
