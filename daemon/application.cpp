@@ -10,12 +10,12 @@ Application::Application(int argc, char *argv[]) :
   // Try to load identity from file
   QDir vlfDir = QDir::home();
   if (! vlfDir.cd(".vlf")) { vlfDir.mkdir(".vlf"); vlfDir.cd(".vlf"); }
-  QFile idFile(vlfDir.canonicalPath()+"/identity.pem");
-  if (!idFile.exists()) {
+  QString idFile(vlfDir.canonicalPath()+"/identity.pem");
+  if (!QFile::exists(idFile)) {
     qDebug() << "No identity found -> create one.";
     _identity = Identity::newIdentity(idFile);
   } else {
-    qDebug() << "Load identity from" << idFile.fileName();
+    qDebug() << "Load identity from" << idFile;
     _identity = Identity::load(idFile);
   }
 

@@ -20,12 +20,12 @@ Application::Application(int argc, char *argv[])
   // Try to load identity from file
   QDir vlfDir = QDir::home();
   if (! vlfDir.cd(".vlf")) { vlfDir.mkdir(".vlf"); vlfDir.cd(".vlf"); }
-  QFile idFile(vlfDir.canonicalPath()+"/identity.pem");
-  if (!idFile.exists()) {
+  QString idFile(vlfDir.canonicalPath()+"/identity.pem");
+  if (!QFile::exists(idFile)) {
     qDebug() << "No identity found -> create one.";
     _identity = Identity::newIdentity(idFile);
   } else {
-    qDebug() << "Load identity from" << idFile.fileName();
+    qDebug() << "Load identity from" << idFile;
     _identity = Identity::load(idFile);
   }
 
@@ -123,7 +123,7 @@ SecureStream *
 Application::newStream(uint16_t service) {
   if (0 == service) {
     // Chat service
-    return new SecureChat(*_identity, 0);
+    return new SecureChat(*this);
   }
   return 0;
 }
@@ -154,6 +154,21 @@ Application::startChatWith(const Identifier &id) {
   _pendingChats.insert(id);
   // First search node
   _dht->findNode(id);
+}
+
+DHT &
+Application::dht() {
+  return *_dht;
+}
+
+Identity &
+Application::identity() {
+  return *_identity;
+}
+
+BuddyList &
+Application::buddies() {
+  return *_buddies;
 }
 
 void

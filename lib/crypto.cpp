@@ -123,7 +123,7 @@ error:
 }
 
 Identity *
-Identity::newIdentity(const QFile &path)
+Identity::newIdentity(const QString &path)
 {
   BIO *out = 0;
   EC_KEY *key = 0;
@@ -145,7 +145,7 @@ Identity::newIdentity(const QFile &path)
   key = 0;
 
   // Store keys in file
-  if (0 == (out = BIO_new_file(path.fileName().toLocal8Bit(), "w")))
+  if (0 == (out = BIO_new_file(path.toLocal8Bit(), "w")))
     goto error;
   if (!PEM_write_bio_PUBKEY(out, pkey))
     goto error;
@@ -153,6 +153,9 @@ Identity::newIdentity(const QFile &path)
     goto error;
   (void) BIO_flush(out);
   BIO_free_all(out);
+
+  // Senure proper file permissions:
+  QFile::setPermissions(path, QFileDevice::ReadOwner|QFileDevice::WriteOwner);
 
   // Create identity instance with key pair
   return new Identity(pkey);
@@ -167,12 +170,12 @@ error:
 }
 
 Identity *
-Identity::load(const QFile &path)
+Identity::load(const QString &path)
 {
   BIO *bio = 0;
   EVP_PKEY *pkey = 0;
   // Read key from file
-  if (0 == (bio = BIO_new_file(path.fileName().toLocal8Bit(), "r")))
+  if (0 == (bio = BIO_new_file(path.toLocal8Bit(), "r")))
     goto error;
   if (! (pkey = PEM_read_bio_PUBKEY(bio, 0, 0,0)))
     goto error;

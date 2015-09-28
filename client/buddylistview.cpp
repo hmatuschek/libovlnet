@@ -11,6 +11,8 @@ BuddyListView::BuddyListView(Application &application, BuddyList *buddies, QWidg
   setMinimumHeight(500);
 
   _tree = new QTreeWidget();
+  _tree->setHeaderHidden(true);
+
   QToolBar *box = new QToolBar();
   box->addAction(QIcon("://message.png"), tr("Chat"), this, SLOT(onChat()));
   box->addAction(QIcon("://phone.png"), tr("Call"), this, SLOT(onCall()));
