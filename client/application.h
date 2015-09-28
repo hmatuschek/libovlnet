@@ -25,6 +25,10 @@ public:
 
   void startChatWith(const Identifier &id);
 
+  DHT &dht();
+  Identity &identity();
+  BuddyList &buddies();
+
 signals:
   void chatStarted(SecureChat *chat);
 

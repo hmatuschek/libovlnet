@@ -1,4 +1,5 @@
 #include "buddylist.h"
+#include "application.h"
 
 #include <QString>
 #include <QIODevice>
@@ -9,10 +10,93 @@
 
 
 /* ********************************************************************************************* *
+ * Implementation of Buddy::NodeItem
+ * ********************************************************************************************* */
+Buddy::NodeItem::NodeItem()
+  : PeerItem(), _lastSeen()
+{
+  // pass...
+}
+
+Buddy::NodeItem::NodeItem(const QHostAddress &addr, uint16_t port)
+  : PeerItem(addr, port), _lastSeen(QDateTime::currentDateTime())
+{
+  // pass...
+}
+
+Buddy::NodeItem::NodeItem(const NodeItem &other)
+  : PeerItem(other), _lastSeen(other._lastSeen)
+{
+  // pass...
+}
+
+bool
+Buddy::NodeItem::isOlderThan(size_t seconds) const {
+  return (_lastSeen.addSecs(seconds) < QDateTime::currentDateTime());
+}
+
+void
+Buddy::NodeItem::update() {
+  _lastSeen = QDateTime::currentDateTime();
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of Buddy
+ * ********************************************************************************************* */
+Buddy::Buddy()
+  : _nodes()
+{
+  // pass...
+}
+
+const QHash<Identifier, Buddy::NodeItem> &
+Buddy::nodes() const {
+  return _nodes;
+}
+
+const Buddy::NodeItem &
+Buddy::node(const Identifier &id) const {
+  return _nodes[id];
+}
+
+Buddy::NodeItem &
+Buddy::node(const Identifier &id) {
+  return _nodes[id];
+}
+
+QJsonObject
+Buddy::toJson() const {
+  QJsonObject obj;
+  QJsonArray nodes;
+
+  QSet<Identifier>::const_iterator node = _nodes.begin();
+  for (; node != _nodes.end(); node++) {
+    nodes.append(QString(node->toHex()));
+  }
+  obj.insert("nodes", nodes);
+  return obj;
+}
+
+Buddy *
+Buddy::fromJson(const QJsonObject &obj) {
+  Buddy *buddy = new Buddy();
+  if (obj.contains("nodes") && obj["nodes"].isArray()) {
+    QJsonArray nodes = obj["nodes"].toArray();
+    for (size_t i=0; i<nodes.size(); i++) {
+      buddy->_nodes.insert(
+            QByteArray::fromHex(nodes.at(i).toString().toLocal8Bit()), NodeItem());
+    }
+  }
+  return buddy;
+}
+
+
+/* ********************************************************************************************* *
  * Implementation of BuddyList
  * ********************************************************************************************* */
-BuddyList::BuddyList(const QString path, QObject *parent)
-  : QObject(parent), _file(path)
+BuddyList::BuddyList(Application &application, const QString path, QObject *parent)
+  : QObject(parent), _application(application), _file(path)
 {
   // Read buddy list from file
   if (! _file.open(QIODevice::ReadOnly)) {
@@ -73,12 +157,12 @@ void
 BuddyList::addBuddy(const QString &name, const Identifier &node) {
   if (! _buddies.contains(name)) {
     Buddy *buddy = new Buddy();
-    buddy->_nodes.insert(node);
+    buddy->_nodes.insert(node, Buddy::NodeItem());
     _buddies.insert(name, buddy);
     _nodes.insert(node, buddy);
     emit buddyAdded(name);
   } else {
-    _buddies[name]->_nodes.insert(node);
+    _buddies[name]->_nodes.insert(node, Buddy::NodeItem());
     _nodes.insert(node, _buddies[name]);
     emit nodeAdded(name, node);
   }
@@ -92,7 +176,7 @@ BuddyList::addBuddy(const QString &name, const QList<Identifier> &nodes) {
     _buddies.insert(name, buddy);
     QList<Identifier>::const_iterator item = nodes.begin();
     for (; item != nodes.end(); item++) {
-      buddy->_nodes.insert(*item);
+      buddy->_nodes.insert(*item, Buddy::NodeItem());
       _nodes.insert(*item, buddy);
     }
     emit buddyAdded(name);
@@ -100,7 +184,7 @@ BuddyList::addBuddy(const QString &name, const QList<Identifier> &nodes) {
     Buddy *buddy = _buddies[name];
     QList<Identifier>::const_iterator item = nodes.begin();
     for (; item != nodes.end(); item++) {
-      buddy->_nodes.insert(*item);
+      buddy->_nodes.insert(*item, Buddy::NodeItem());
       _nodes.insert(*item, buddy);
       emit nodeAdded(name, *item);
     }
@@ -115,7 +199,7 @@ BuddyList::addBuddy(const QString &name, const QSet<Identifier> &nodes) {
     _buddies.insert(name, buddy);
     QSet<Identifier>::const_iterator item = nodes.begin();
     for (; item != nodes.end(); item++) {
-      buddy->_nodes.insert(*item);
+      buddy->_nodes.insert(*item, Buddy::NodeItem());
       _nodes.insert(*item, buddy);
     }
     emit buddyAdded(name);
@@ -123,7 +207,7 @@ BuddyList::addBuddy(const QString &name, const QSet<Identifier> &nodes) {
     Buddy *buddy = _buddies[name];
     QSet<Identifier>::const_iterator item = nodes.begin();
     for (; item != nodes.end(); item++) {
-      buddy->_nodes.insert(*item);
+      buddy->_nodes.insert(*item, Buddy::NodeItem());
       _nodes.insert(*item, buddy);
       emit nodeAdded(name, *item);
     }
@@ -172,42 +256,23 @@ BuddyList::save()  {
   _file.close();
 }
 
-
-/* ********************************************************************************************* *
- * Implementation of Buddy
- * ********************************************************************************************* */
-Buddy::Buddy()
-  : _nodes()
-{
-  // pass...
+void
+BuddyList::_onNodeFound(const NodeItem &node) {
+  // check if node belongs to a buddy
+  if (! _nodes.contains(node.id())) { return; }
+  // Send ping to node
+  _application.dht().ping(node.addr(), node.port());
 }
 
-const QSet<Identifier> &
-Buddy::nodes() const {
-  return _nodes;
-}
-
-QJsonObject
-Buddy::toJson() const {
-  QJsonObject obj;
-  QJsonArray nodes;
-
-  QSet<Identifier>::const_iterator node = _nodes.begin();
-  for (; node != _nodes.end(); node++) {
-    nodes.append(QString(node->toHex()));
+void
+BuddyList::_onNodeReacable(const NodeItem &node) {
+  // check if node belongs to a buddy
+  if (! _nodes.contains(node.id())) { return; }
+  if (! _nodes[node.id()]->node(node.id()).hasBeenSeen()) {
+    // Update node
+    _nodes[node.id()]->node(node.id()).update(node.addr(), node.port());
+    emit appeared(node.id());
   }
-  obj.insert("nodes", nodes);
-  return obj;
-}
-
-Buddy *
-Buddy::fromJson(const QJsonObject &obj) {
-  Buddy *buddy = new Buddy();
-  if (obj.contains("nodes") && obj["nodes"].isArray()) {
-    QJsonArray nodes = obj["nodes"].toArray();
-    for (size_t i=0; i<nodes.size(); i++) {
-      buddy->_nodes.insert(QByteArray::fromHex(nodes.at(i).toString().toLocal8Bit()));
-    }
-  }
-  return buddy;
+  // Update node
+  _nodes[node.id()]->node(node.id()).update(node.addr(), node.port());
 }

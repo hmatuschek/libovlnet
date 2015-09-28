@@ -8,44 +8,76 @@
 #include <QJsonObject>
 #include <QSet>
 
-
+/** Represents a buddy, a collection of nodes which you trust. */
 class Buddy
 {
 public:
+  class NodeItem : public PeerItem {
+  public:
+    NodeItem();
+    NodeItem(const QHostAddress &addr, uint16_t port);
+    NodeItem(const NodeItem &other);
+
+    bool isOlderThan(size_t seconds) const;
+    void update();
+
+  protected:
+    QDateTime _lastSeen;
+  };
+
+public:
   Buddy();
 
-  const QSet<Identifier> &nodes() const;
+  const QHash<Identifier> &nodes() const;
+  const NodeItem &node(const Identifier &id) const;
+  NodeItem node(const Identifier &id);
   QJsonObject toJson() const;
 
 public:
   static Buddy *fromJson(const QJsonObject &obj);
 
 protected:
-  QSet<Identifier> _nodes;
+  QHash<Identifier, NodeItem> _nodes;
   friend class BuddyList;
 };
 
+class Application;
 
+/** A list of @c Buddy instances being updated regularily. */
 class BuddyList: public QObject
 {
   Q_OBJECT
 
 public:
-  explicit BuddyList(const QString path, QObject *parent=0);
+  /** Constructor.
+   * @param path Specifies the path to the JSON file containing the saved buddy list. */
+  explicit BuddyList(Application &application, const QString path, QObject *parent=0);
+  /** Destructor. */
   virtual ~BuddyList();
 
+  /** Returns @c true of the given buddy is in the list. */
   bool hasBuddy(const QString &name) const;
+  /** Returns @c true if the node is assigned to a buddy. */
   bool hasNode(const Identifier &id) const;
+  /** Returns the specified buddy. */
   Buddy *getBuddy(const QString &name) const;
+  /** Returns the budy associated with the given node. */
   Buddy *getBuddy(const Identifier &name) const;
+  /** Add a buddy to the list or the given node to the speicified buddy. */
   void addBuddy(const QString &name, const Identifier &node);
+  /** Add a buddy to the list or the given nodes to the speicified buddy. */
   void addBuddy(const QString &name, const QSet<Identifier> &nodes);
+  /** Add a buddy to the list or the given nodes to the speicified buddy. */
   void addBuddy(const QString &name, const QList<Identifier> &nodes);
+  /** Removes a buddy from the list. */
   void delBuddy(const QString &name);
+  /** Removes a node from the given buddy. */
   void delNode(const QString &name, const Identifier &node);
+  /** Retruns the table of buddies. */
   const QHash<QString, Buddy *> &buddies() const;
 
 public slots:
+  /** Saves the buddy list. */
   void save();
 
 signals:
@@ -54,7 +86,12 @@ signals:
   void nodeAdded(const QString &buddy, const Identifier &node);
   void nodeRemoved(const QString &buddy, const Identifier &node);
 
+protected slots:
+  void _onNodeReacable(const NodeItem &node);
+  void _onNodeFound(const NodeItem &node);
+
 protected:
+  Application &_application;
   QFile _file;
   QHash<QString, Buddy *> _buddies;
   QHash<Identifier, Buddy *> _nodes;

@@ -13,6 +13,7 @@ class ChatWindow : public QWidget
 
 public:
   explicit ChatWindow(SecureChat *chat, QWidget *parent=0);
+  virtual ~ChatWindow();
 
 protected slots:
   void _onMessageReceived(const QString &msg);

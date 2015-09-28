@@ -1,6 +1,7 @@
 #include "chatwindow.h"
 #include <QTextCursor>
 #include <QVBoxLayout>
+#include <QTextBlockFormat>
 
 ChatWindow::ChatWindow(SecureChat *chat, QWidget *parent)
   : QWidget(parent), _chat(chat)
@@ -19,11 +20,20 @@ ChatWindow::ChatWindow(SecureChat *chat, QWidget *parent)
   QObject::connect(_text, SIGNAL(returnPressed()), this, SLOT(_onMessageSend()));
 }
 
+ChatWindow::~ChatWindow() {
+  _chat->deleteLater();
+}
+
 void
 ChatWindow::_onMessageReceived(const QString &msg) {
   QTextCursor cursor = _view->textCursor();
   cursor.movePosition(QTextCursor::End);
-  cursor.insertBlock();
+  if (!cursor.atStart())
+    cursor.insertBlock();
+  QTextBlockFormat fmt = cursor.blockFormat();
+  fmt.setAlignment(Qt::AlignLeft);
+  fmt.setBottomMargin(10.);
+  cursor.setBlockFormat(fmt);
   cursor.beginEditBlock();
   cursor.insertText(msg);
   cursor.endEditBlock();
@@ -34,11 +44,14 @@ ChatWindow::_onMessageSend() {
   QString msg = _text->text(); _text->clear();
   QTextCursor cursor = _view->textCursor();
   cursor.movePosition(QTextCursor::End);
-  cursor.insertBlock();
+  if (!cursor.atStart())
+    cursor.insertBlock();
+  QTextBlockFormat fmt = cursor.blockFormat();
+  fmt.setAlignment(Qt::AlignRight);
+  fmt.setBottomMargin(10.);
+  cursor.setBlockFormat(fmt);
   cursor.beginEditBlock();
   cursor.insertText(msg);
   cursor.endEditBlock();
   _chat->sendMessage(msg);
 }
-
-

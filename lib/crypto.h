@@ -30,8 +30,8 @@ public:
   bool verify(const uint8_t *data, size_t datalen, const uint8_t *sig, size_t siglen) const;
 
 public:
-  static Identity *newIdentity(const QFile &path);
-  static Identity *load(const QFile &path);
+  static Identity *newIdentity(const QString &path);
+  static Identity *load(const QString &path);
   static Identity *fromPublicKey(const uint8_t *key, size_t len);
 
 protected:
