@@ -81,12 +81,12 @@ DHTStatusView::_formatBytes(size_t bytes) {
 QString
 DHTStatusView::_formatRate(double rate) {
   if (rate < 2000.0) {
-    return QString("%1b/s").arg(QString::number(rate));
+    return QString("%1b/s").arg(QString::number(rate, 'f', 1));
   }
   if (rate < 2e6) {
-    return QString("%1kb").arg(QString::number(rate/1000.));
+    return QString("%1kb").arg(QString::number(rate/1000., 'f', 1));
   }
-  return QString("%1Mb/s").arg(QString::number(rate/1e6));
+  return QString("%1Mb/s").arg(QString::number(rate/1e6, 'f', 1));
 }
 
 void

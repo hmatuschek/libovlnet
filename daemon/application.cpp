@@ -32,20 +32,12 @@ Application::Application(int argc, char *argv[]) :
 
 SecureStream *
 Application::newStream(uint16_t service) {
-  if (0 == service) {
-    return new EchoStream(*_identity);
-  }
-  return 0;
+  return new EchoStream(*_identity);
 }
 
 bool
 Application::allowStream(uint16_t service, const NodeItem &peer) {
-  if (0 == service) {
-    // echo service is accessiable for everyone:
-    return true;
-  }
-  // Deny
-  return false;
+  return true;
 }
 
 void

@@ -107,7 +107,18 @@ BuddyListView::onChat() {
 
 void
 BuddyListView::onCall() {
-  qDebug() << "Not implemented yet.";
+  // Get selected items
+  QList<QTreeWidgetItem *> items = _tree->selectedItems();
+  if (0 == items.size()) { return; }
+  if (items.first()->childCount()) {
+    // If buddy is selected
+    Identifier id(QByteArray::fromHex(items.first()->child(0)->text(0).toLocal8Bit()));
+    _application.call(id);
+  } else {
+    // If node is selected
+    Identifier id(QByteArray::fromHex(items.first()->text(0).toLocal8Bit()));
+    _application.call(id);
+  }
 }
 
 void
