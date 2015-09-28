@@ -1,13 +1,15 @@
 <RCC>
     <qresource prefix="/">
-        <file>icon.png</file>
-        <file>quit.png</file>
-        <file>settings.png</file>
-        <file>bootstrap.png</file>
-        <file>search.png</file>
-        <file>people.png</file>
-        <file>person.png</file>
-        <file>message.png</file>
-        <file>phone.png</file>
+        <file>icons/bootstrap.png</file>
+        <file>icons/fork.png</file>
+        <file>icons/fork_green.png</file>
+        <file>icons/message.png</file>
+        <file>icons/people.png</file>
+        <file>icons/person.png</file>
+        <file>icons/person_green.png</file>
+        <file>icons/phone.png</file>
+        <file>icons/quit.png</file>
+        <file>icons/search.png</file>
+        <file>icons/settings.png</file>
     </qresource>
 </RCC>

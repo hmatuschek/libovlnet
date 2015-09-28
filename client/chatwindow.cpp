@@ -35,11 +35,12 @@ ChatWindow::_onMessageReceived(const QString &msg) {
   cursor.movePosition(QTextCursor::End);
   if (!cursor.atStart())
     cursor.insertBlock();
-  QTextBlockFormat fmt = cursor.blockFormat();
-  fmt.setAlignment(Qt::AlignLeft);
-  fmt.setBottomMargin(10.);
-  cursor.setBlockFormat(fmt);
   cursor.beginEditBlock();
+  cursor.insertText("(");
+  cursor.insertText(QTime::currentTime().toString());
+  cursor.insertText(") ");
+  cursor.insertText(_chat->peerId().toHex());
+  cursor.insertText(":\n");
   cursor.insertText(msg);
   cursor.endEditBlock();
 }
@@ -51,11 +52,10 @@ ChatWindow::_onMessageSend() {
   cursor.movePosition(QTextCursor::End);
   if (!cursor.atStart())
     cursor.insertBlock();
-  QTextBlockFormat fmt = cursor.blockFormat();
-  fmt.setAlignment(Qt::AlignRight);
-  fmt.setBottomMargin(10.);
-  cursor.setBlockFormat(fmt);
   cursor.beginEditBlock();
+  cursor.insertText("(");
+  cursor.insertText(QTime::currentTime().toString());
+  cursor.insertText(") you:\n");
   cursor.insertText(msg);
   cursor.endEditBlock();
   _chat->sendMessage(msg);

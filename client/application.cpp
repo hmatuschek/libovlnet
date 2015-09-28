@@ -41,11 +41,14 @@ Application::Application(int &argc, char *argv[])
   _status = new DHTStatus(_dht);
   _buddies = new BuddyList(*this, vlfDir.canonicalPath()+"/buddies.json");
 
-  _search      = new QAction(QIcon("://search.png"),    tr("Search..."), this);
-  _showBuddies = new QAction(QIcon("://people.png"),    tr("Contacts..."), this);
-  _bootstrap   = new QAction(QIcon("://bootstrap.png"), tr("Bootstrap..."), this);
-  _showStatus  = new QAction(QIcon("://settings.png"),  tr("Show status ..."), this);
-  _quit        = new QAction(QIcon("://quit.png"),      tr("Quit"), this);
+  _search      = new QAction(QIcon("://icons/search.png"),    tr("Search..."), this);
+  _searchWindow = 0;
+  _showBuddies = new QAction(QIcon("://icons/people.png"),    tr("Contacts..."), this);
+  _buddyListWindow = 0;
+  _bootstrap   = new QAction(QIcon("://icons/bootstrap.png"), tr("Bootstrap..."), this);
+  _showStatus  = new QAction(QIcon("://icons/settings.png"),  tr("Show status ..."), this);
+  _statusWindow = 0;
+  _quit        = new QAction(QIcon("://icons/quit.png"),      tr("Quit"), this);
 
   QMenu *ctx = new QMenu();
   ctx->addAction(_search);
@@ -57,7 +60,7 @@ Application::Application(int &argc, char *argv[])
   ctx->addAction(_quit);
 
   _trayIcon = new QSystemTrayIcon();
-  _trayIcon->setIcon(QIcon("://icon.png"));
+  _trayIcon->setIcon(QIcon("://icons/fork.png"));
   _trayIcon->setContextMenu(ctx);
   _trayIcon->show();
 
@@ -104,17 +107,52 @@ Application::onBootstrap() {
 
 void
 Application::onSearch() {
-  (new SearchDialog(_dht, _buddies))->show();
+  if (_searchWindow) {
+    _searchWindow->activateWindow();
+  } else {
+    _searchWindow = new SearchDialog(_dht, _buddies);
+    _searchWindow->show();
+    QObject::connect(_searchWindow, SIGNAL(destroyed()), this, SLOT(onSearchWindowClosed()));
+  }
+}
+
+void
+Application::onSearchWindowClosed() {
+  _searchWindow = 0;
 }
 
 void
 Application::onShowBuddies() {
-  (new BuddyListView(*this,  _buddies))->show();
+  if (_buddyListWindow) {
+    _buddyListWindow->activateWindow();
+  } else {
+    _buddyListWindow = new BuddyListView(*this,  _buddies);
+    _buddyListWindow->show();
+    QObject::connect(_buddyListWindow, SIGNAL(destroyed()),
+                     this, SLOT(onBuddyListClosed()));
+  }
+}
+
+void
+Application::onBuddyListClosed() {
+  _buddyListWindow = 0;
 }
 
 void
 Application::onShowStatus() {
-  (new DHTStatusView(_status))->show();
+  if (_statusWindow) {
+    _statusWindow->activateWindow();
+  } else {
+    _statusWindow = new DHTStatusView(_status);
+    _statusWindow->show();
+    QObject::connect(_statusWindow, SIGNAL(destroyed()),
+                     this, SLOT(onStatusWindowClosed()));
+  }
+}
+
+void
+Application::onStatusWindowClosed() {
+  _statusWindow = 0;
 }
 
 void
@@ -144,7 +182,10 @@ void
 Application::streamStarted(SecureStream *stream) {
   SecureChat *chat = 0;
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
+    // Remove stream ID from pending chats
     _pendingChats.remove(stream->peerId());
+    // start keep alive timer
+    chat->keepAlive();
     (new ChatWindow(chat))->show();
   } else {
     _dht->closeStream(stream->id()); delete stream;

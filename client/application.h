@@ -45,6 +45,11 @@ protected slots:
   void onShowStatus();
   /** Callback for the "quit" action. */
   void onQuit();
+
+  void onSearchWindowClosed();
+  void onBuddyListClosed();
+  void onStatusWindowClosed();
+
   /** Get notified if a node search was successful. */
   void onNodeFound(const NodeItem &node);
   /** Get notified if a node cannot be found. */
@@ -65,6 +70,10 @@ protected:
   QAction *_bootstrap;
   QAction *_showStatus;
   QAction *_quit;
+
+  QWidget *_searchWindow;
+  QWidget *_buddyListWindow;
+  QWidget *_statusWindow;
 
   /** Chat streams bing initialized. */
   QSet<Identifier> _pendingChats;

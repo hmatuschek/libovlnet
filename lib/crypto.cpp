@@ -55,7 +55,7 @@ int Identity::publicKey(uint8_t *key, size_t len) const {
   // If just length is requested -> done
   if (0 == key) { return keylen; }
   // If not enough space is available -> error
-  if (keylen > len) { return -1; }
+  if (keylen > int(len)) { return -1; }
   // Store key
   if (0 > i2d_PUBKEY(_keyPair, &key))
     return -1;
@@ -249,7 +249,7 @@ SecureStream::prepare(uint8_t *ptr, size_t len) {
   // store public key in output buffer
   if (0 > (keyLen = i2d_PUBKEY(_sessionKeyPair, 0)) )
     goto error;
-  if (keyLen>(len-2))
+  if (keyLen>(int(len)-2))
     goto error;
   *((uint16_t *)ptr) = htons(uint16_t(keyLen));
   keyPtr = ptr+2;
@@ -297,7 +297,7 @@ SecureStream::verify(const uint8_t *ptr, size_t len)
   // get length of key
   keyLen = ntohs(*(uint16_t *)ptr);
   // read peer public key
-  if (keyLen>(len-2)) {
+  if (keyLen>(int(len)-2)) {
     goto error;
   }
   if (0 == (peer = Identity::fromPublicKey(ptr+2, keyLen))) {
@@ -308,7 +308,7 @@ SecureStream::verify(const uint8_t *ptr, size_t len)
 
   // read session public key
   keyLen = ntohs(*(uint16_t *)ptr);
-  if (keyLen>(len-2))
+  if (keyLen>(int(len)-2))
     goto error;
   keyPtr = ptr+2;
   if (0 == (_peerPubKey = d2i_PUBKEY(&_peerPubKey, &keyPtr, len-2)))
@@ -446,7 +446,12 @@ error:
 
 void
 SecureStream::handleData(const uint8_t *data, size_t len) {
-  if (len<4) { return; }
+  if (0 == len) {
+    this->handleDatagram(0, 0, 0);
+    return;
+  } else if (len<4) {
+    return;
+  }
   // Get sequence number
   uint32_t seq = ntohl(*((uint32_t *)data)); data +=4;
   int rxlen = 0;
@@ -460,18 +465,21 @@ SecureStream::handleData(const uint8_t *data, size_t len) {
 
 bool
 SecureStream::sendDatagram(const uint8_t *data, size_t len) {
-  uint8_t msg[1024];
+  uint8_t msg[DHT_MAX_MESSAGE_SIZE];
   uint8_t *ptr = msg;
-  int txlen = 0;
+  int txlen = 0, enclen=0;
 
   // Store stream cookie
-  memcpy(ptr, _streamId.data(), DHT_HASH_SIZE); ptr += DHT_HASH_SIZE;
-  // store sequence number
-  *((uint32_t *)ptr) = htonl(_outSeq); ptr += 4;
-  // store encrypted data
-  if(0 > (txlen = encrypt(_outSeq, data, len, ptr)))
-    return false;
-  txlen += DHT_HASH_SIZE + 4;
+  memcpy(ptr, _streamId.data(), DHT_HASH_SIZE);
+  ptr += DHT_HASH_SIZE; txlen += DHT_HASH_SIZE;
+  if (0 != len) {
+    // store sequence number
+    *((uint32_t *)ptr) = htonl(_outSeq); ptr += 4;
+    // store encrypted data
+    if(0 > (enclen = encrypt(_outSeq, data, len, ptr)))
+      return false;
+    txlen += 4 + enclen;
+  }
   // Send datagram
   if (0 > _socket->writeDatagram((char *)msg, txlen, _peer.addr(), _peer.port()))
     return false;
