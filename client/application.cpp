@@ -42,9 +42,12 @@ Application::Application(int &argc, char *argv[])
   _buddies = new BuddyList(*this, vlfDir.canonicalPath()+"/buddies.json");
 
   _search      = new QAction(QIcon("://search.png"),    tr("Search..."), this);
+  _searchWindow = 0;
   _showBuddies = new QAction(QIcon("://people.png"),    tr("Contacts..."), this);
+  _buddyListWindow = 0;
   _bootstrap   = new QAction(QIcon("://bootstrap.png"), tr("Bootstrap..."), this);
   _showStatus  = new QAction(QIcon("://settings.png"),  tr("Show status ..."), this);
+  _statusWindow = 0;
   _quit        = new QAction(QIcon("://quit.png"),      tr("Quit"), this);
 
   QMenu *ctx = new QMenu();
@@ -104,17 +107,52 @@ Application::onBootstrap() {
 
 void
 Application::onSearch() {
-  (new SearchDialog(_dht, _buddies))->show();
+  if (_searchWindow) {
+    _searchWindow->activateWindow();
+  } else {
+    _searchWindow = new SearchDialog(_dht, _buddies);
+    _searchWindow->show();
+    QObject::connect(_searchWindow, SIGNAL(destroyed()), this, SLOT(onSearchWindowClosed()));
+  }
+}
+
+void
+Application::onSearchWindowClosed() {
+  _searchWindow = 0;
 }
 
 void
 Application::onShowBuddies() {
-  (new BuddyListView(*this,  _buddies))->show();
+  if (_buddyListWindow) {
+    _buddyListWindow->activateWindow();
+  } else {
+    _buddyListWindow = new BuddyListView(*this,  _buddies);
+    _buddyListWindow->show();
+    QObject::connect(_buddyListWindow, SIGNAL(destroyed()),
+                     this, SLOT(onBuddyListClosed()));
+  }
+}
+
+void
+Application::onBuddyListClosed() {
+  _buddyListWindow = 0;
 }
 
 void
 Application::onShowStatus() {
-  (new DHTStatusView(_status))->show();
+  if (_statusWindow) {
+    _statusWindow->activateWindow();
+  } else {
+    _statusWindow = new DHTStatusView(_status);
+    _statusWindow->show();
+    QObject::connect(_statusWindow, SIGNAL(destroyed()),
+                     this, SLOT(onStatusWindowClosed()));
+  }
+}
+
+void
+Application::onStatusWindowClosed() {
+  _statusWindow = 0;
 }
 
 void
