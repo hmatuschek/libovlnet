@@ -918,6 +918,7 @@ DHT::startStream(uint16_t service, const NodeItem &node) {
 
 void
 DHT::closeStream(const Identifier &id) {
+  qDebug() << "Close stream" << id;
   _streams.remove(id);
 }
 

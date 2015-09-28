@@ -18,6 +18,7 @@ class Application : public QApplication, public StreamHandler
 
 public:
   explicit Application(int &argc, char *argv[]);
+  virtual ~Application();
 
   // Implementation of StreamHandler interface
   SecureStream *newStream(uint16_t service);
@@ -26,6 +27,8 @@ public:
 
   /** Initializes a chat with the specified node. */
   void startChatWith(const Identifier &id);
+  /** Initializes a voice call to the specified node. */
+  void call(const Identifier &id);
 
   /** Returns a weak reference to the DHT instance. */
   DHT &dht();
@@ -77,6 +80,8 @@ protected:
 
   /** Chat streams bing initialized. */
   QSet<Identifier> _pendingChats;
+  /** Call streams bing initialized. */
+  QSet<Identifier> _pendingCalls;
   /** The system tray icon. */
   QSystemTrayIcon *_trayIcon;
 };

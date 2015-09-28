@@ -3,6 +3,9 @@
 #include "searchdialog.h"
 #include "buddylistview.h"
 #include "chatwindow.h"
+#include "callwindow.h"
+
+#include <portaudio.h>
 
 #include <QMenu>
 #include <QInputDialog>
@@ -16,6 +19,9 @@
 Application::Application(int &argc, char *argv[])
   : QApplication(argc, argv), _identity(0), _dht(0), _status(0)
 {
+  // Init PortAudio
+  Pa_Initialize();
+
   // Do not quit application if the last window is closed.
   setQuitOnLastWindowClosed(false);
 
@@ -73,6 +79,10 @@ Application::Application(int &argc, char *argv[])
   QObject::connect(_search, SIGNAL(triggered()), this, SLOT(onSearch()));
   QObject::connect(_showStatus, SIGNAL(triggered()), this, SLOT(onShowStatus()));
   QObject::connect(_quit, SIGNAL(triggered()), this, SLOT(onQuit()));
+}
+
+Application::~Application() {
+  Pa_Terminate();
 }
 
 void
@@ -163,6 +173,10 @@ Application::onQuit() {
 SecureStream *
 Application::newStream(uint16_t service) {
   if (0 == service) {
+    qDebug() << "Create new SecureCall instance.";
+    // VoIP service
+    return new SecureCall(*this);
+  } else if (1 == service) {
     // Chat service
     return new SecureChat(*this);
   }
@@ -171,8 +185,8 @@ Application::newStream(uint16_t service) {
 
 bool
 Application::allowStream(uint16_t service, const NodeItem &peer) {
-  if (0 == service) {
-    // Check if peer is buddy list
+  if ((0 == service) || (1 == service)) {
+    // VoIP or Chat services: check if peer is buddy list
     return _buddies->hasNode(peer.id());
   }
   return false;
@@ -181,14 +195,22 @@ Application::allowStream(uint16_t service, const NodeItem &peer) {
 void
 Application::streamStarted(SecureStream *stream) {
   SecureChat *chat = 0;
+  SecureCall *call = 0;
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     // Remove stream ID from pending chats
     _pendingChats.remove(stream->peerId());
     // start keep alive timer
     chat->keepAlive();
     (new ChatWindow(chat))->show();
+  } if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
+    // Remove stream ID from pending chats
+    _pendingCalls.remove(stream->peerId());
+    // start streaming
+    call->started();
+    (new CallWindow(call))->show();
   } else {
-    _dht->closeStream(stream->id()); delete stream;
+    _dht->closeStream(stream->id());
+    delete stream;
   }
 }
 
@@ -197,6 +219,14 @@ Application::startChatWith(const Identifier &id) {
   // Add id to list of pending chats
   _pendingChats.insert(id);
   // First search node
+  _dht->findNode(id);
+}
+
+void
+Application::call(const Identifier &id) {
+  // Add id to list of pending calls
+  _pendingCalls.insert(id);
+  // First, search node
   _dht->findNode(id);
 }
 
@@ -219,6 +249,9 @@ void
 Application::onNodeFound(const NodeItem &node) {
   if (_pendingChats.contains(node.id())) {
     qDebug() << "Node" << node.id() << "found: Start chat...";
+    _dht->startStream(1, node);
+  } else if (_pendingCalls.contains(node.id())) {
+    qDebug() << "Node" << node.id() << "found: Start call...";
     _dht->startStream(0, node);
   }
 }
@@ -230,5 +263,10 @@ Application::onNodeNotFound(const Identifier &id, const QList<NodeItem> &best) {
           0, tr("Can not initialize chat"),
           tr("Can not initialize chat with node %1: not reachable.").arg(QString(id.toHex())));
     _pendingChats.remove(id);
+  } else if (_pendingCalls.contains(id)) {
+    QMessageBox::critical(
+          0, tr("Can not initialize call"),
+          tr("Can not initialize call to node %1: not reachable.").arg(QString(id.toHex())));
+    _pendingCalls.remove(id);
   }
 }
