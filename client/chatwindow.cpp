@@ -8,6 +8,9 @@
 ChatWindow::ChatWindow(SecureChat *chat, QWidget *parent)
   : QWidget(parent), _chat(chat)
 {
+  setWindowTitle(tr("VLF Chat with %1").arg(QString(chat->peerId().toHex())));
+  setMinimumWidth(200);
+
   _view = new QTextBrowser();
   _text = new QLineEdit();
 

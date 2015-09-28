@@ -9,6 +9,7 @@
 BuddyListView::BuddyListView(Application &application, BuddyList *buddies, QWidget *parent)
   : QWidget(parent), _application(application), _buddies(buddies)
 {
+  setWindowTitle(tr("VLF Contacts"));
   setMinimumWidth(300);
   setMinimumHeight(500);
 

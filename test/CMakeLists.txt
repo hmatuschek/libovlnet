@@ -1,2 +1,2 @@
-add_executable(test main.cpp)
-target_link_libraries(test ${libs} vlf)
+add_executable(vlftest main.cpp)
+target_link_libraries(vlftest ${libs} vlf)

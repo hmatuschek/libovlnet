@@ -8,6 +8,7 @@ find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Network REQUIRED)
 find_package(Opus REQUIRED)
+find_package(PortAudio REQUIRED)
 find_package(PkgConfig)
 pkg_check_modules(OPENSSL QUIET openssl)
 

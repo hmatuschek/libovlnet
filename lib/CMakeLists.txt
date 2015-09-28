@@ -8,6 +8,8 @@ set(vlf_HEADERS ${vlf_MOC_HEADERS}
 qt5_wrap_cpp(vlf_MOC_SOURCES ${vlf_MOC_HEADERS})
 
 add_library(vlf SHARED ${vlf_SOURCES} ${vlf_MOC_SOURCES} ${vlf_RCC_SOURCES})
+set_target_properties(vlf PROPERTIES MACOSX_RPATH "${CMAKE_INSTALL_RPATH}")
+set_target_properties(vlf PROPERTIES INSTALL_NAME_DIR ${CMAKE_INSTALL_FULL_LIBDIR})
 target_link_libraries(vlf ${LIBS})
 
 install(TARGETS vlf DESTINATION ${CMAKE_INSTALL_LIBDIR})
