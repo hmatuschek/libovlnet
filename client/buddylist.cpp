@@ -47,6 +47,13 @@ Buddy::NodeItem::update(const QHostAddress &addr, uint16_t port) {
   _port = port;
 }
 
+void
+Buddy::NodeItem::invalidate() {
+  _lastSeen = QDateTime();
+  _addr = QHostAddress();
+  _port = 0;
+}
+
 
 /* ********************************************************************************************* *
  * Implementation of Buddy
@@ -98,13 +105,19 @@ Buddy::fromJson(const QJsonObject &obj) {
  * Implementation of BuddyList
  * ********************************************************************************************* */
 BuddyList::BuddyList(Application &application, const QString path, QObject *parent)
-  : QObject(parent), _application(application), _file(path), _presenceTimer()
+  : QObject(parent), _application(application), _file(path), _presenceTimer(), _searchTimer()
 {
   // Setup timer to update presence of buddy nodes every 10 seconds
   _presenceTimer.setInterval(1000*10);
   _presenceTimer.setSingleShot(false);
   QObject::connect(&_presenceTimer, SIGNAL(timeout()), this, SLOT(_onUpdateNodes()));
   _presenceTimer.start();
+
+  // Setup timer to search for offline buddies every 2 minutes
+  _searchTimer.setInterval(1000*60*2);
+  _searchTimer.setSingleShot(false);
+  QObject::connect(&_searchTimer, SIGNAL(timeout()), this, SLOT(_onSearchNodes()));
+  _searchTimer.start();
 
   // Read buddy list from file
   if (! _file.open(QIODevice::ReadOnly)) {
@@ -289,7 +302,7 @@ void
 BuddyList::_onUpdateNodes() {
   QHash<Identifier, Buddy *>::iterator node = _nodes.begin();
   for (; node != _nodes.end(); node++) {
-    Buddy::NodeItem &nodeitem = node->node(node.key());
+    Buddy::NodeItem &nodeitem = (*node)->node(node.key());
     if (nodeitem.hasBeenSeen() && nodeitem.isOlderThan(60)) {
       // Lost contact to node
       nodeitem.invalidate();
@@ -297,6 +310,17 @@ BuddyList::_onUpdateNodes() {
     } else if (nodeitem.hasBeenSeen() && nodeitem.isOlderThan(30)) {
       // If last contact is older than 30 second -> ping node
       _application.dht().ping(nodeitem.addr(), nodeitem.port());
+    }
+  }
+}
+
+void
+BuddyList::_onSearchNodes() {
+  QHash<Identifier, Buddy *>::iterator node = _nodes.begin();
+  for (; node != _nodes.end(); node++) {
+    Buddy::NodeItem &nodeitem = (*node)->node(node.key());
+    if (! nodeitem.hasBeenSeen()) {
+      _application.dht().findNode(node.key());
     }
   }
 }

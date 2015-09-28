@@ -3,6 +3,7 @@
 #include <QFormLayout>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QCloseEvent>
 
 
 DHTStatusView::DHTStatusView(DHTStatus *status, QWidget *parent) :
@@ -84,4 +85,10 @@ DHTStatusView::_formatRate(double rate) {
     return QString("%1kb").arg(QString::number(rate/1000.));
   }
   return QString("%1Mb/s").arg(QString::number(rate/1e6));
+}
+
+void
+DHTStatusView::closeEvent(QCloseEvent *evt) {
+  evt->accept();
+  this->deleteLater();
 }

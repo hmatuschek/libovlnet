@@ -21,6 +21,7 @@ public:
     bool hasBeenSeen() const;
     bool isOlderThan(size_t seconds) const;
     void update(const QHostAddress &addr, uint16_t port);
+    void invalidate();
 
   protected:
     QDateTime _lastSeen;
@@ -92,6 +93,7 @@ protected slots:
   void _onNodeReacable(const NodeItem &node);
   void _onNodeFound(const NodeItem &node);
   void _onUpdateNodes();
+  void _onSearchNodes();
 
 protected:
   Application &_application;
@@ -99,6 +101,7 @@ protected:
   QHash<QString, Buddy *> _buddies;
   QHash<Identifier, Buddy *> _nodes;
   QTimer _presenceTimer;
+  QTimer _searchTimer;
 };
 
 

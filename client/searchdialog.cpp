@@ -9,6 +9,7 @@
 #include <QPushButton>
 #include <QInputDialog>
 #include <QTableWidgetItem>
+#include <QCloseEvent>
 
 
 SearchDialog::SearchDialog(DHT *dht, BuddyList *buddies, QWidget *parent)
@@ -107,4 +108,10 @@ SearchDialog::_onSearchFailed(const Identifier &id, const QList<NodeItem> &best)
     _result->setItem(idx, 1, new QTableWidgetItem(node->addr().toString()));
     _result->setItem(idx, 2, new QTableWidgetItem(QString::number(node->port())));
   }
+}
+
+void
+SearchDialog::closeEvent(QCloseEvent *evt) {
+  evt->accept();
+  this->deleteLater();
 }

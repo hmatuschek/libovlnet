@@ -3,6 +3,8 @@
 
 #include <QVBoxLayout>
 #include <QToolBar>
+#include <QCloseEvent>
+
 
 BuddyListView::BuddyListView(Application &application, BuddyList *buddies, QWidget *parent)
   : QWidget(parent), _application(application), _buddies(buddies)
@@ -105,4 +107,10 @@ BuddyListView::onChat() {
 void
 BuddyListView::onCall() {
   qDebug() << "Not implemented yet.";
+}
+
+void
+BuddyListView::closeEvent(QCloseEvent *evt) {
+  evt->accept();
+  this->deleteLater();
 }

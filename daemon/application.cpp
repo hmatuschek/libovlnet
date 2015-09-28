@@ -8,8 +8,12 @@ Application::Application(int argc, char *argv[]) :
   QCoreApplication(argc, argv)
 {
   // Try to load identity from file
-  QDir vlfDir = QDir::home();
-  if (! vlfDir.cd(".vlf")) { vlfDir.mkdir(".vlf"); vlfDir.cd(".vlf"); }
+  QDir vlfDir("/etc");
+  // if deamon directory does not exists -> create it
+  if (! vlfDir.cd("vlfdaemon")) {
+    vlfDir.mkdir("vlfdaemon"); vlfDir.cd("vlfdaemon");
+  }
+  // Create identity if not present
   QString idFile(vlfDir.canonicalPath()+"/identity.pem");
   if (!QFile::exists(idFile)) {
     qDebug() << "No identity found -> create one.";

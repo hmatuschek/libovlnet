@@ -20,6 +20,9 @@ protected slots:
   void _onMessageSend();
 
 protected:
+  void closeEvent(QCloseEvent *evt);
+
+protected:
   SecureChat *_chat;
   QTextBrowser *_view;
   QLineEdit *_text;

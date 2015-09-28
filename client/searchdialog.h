@@ -23,6 +23,9 @@ protected slots:
   void _onAddToBuddy();
 
 protected:
+  void closeEvent(QCloseEvent *evt);
+
+protected:
   DHT *_dht;
   BuddyList *_buddies;
   Identifier _currentSearch;

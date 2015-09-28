@@ -23,6 +23,9 @@ protected slots:
   void onCall();
 
 protected:
+  void closeEvent(QCloseEvent *evt);
+
+protected:
   Application &_application;
   BuddyList *_buddies;
   QTreeWidget *_tree;

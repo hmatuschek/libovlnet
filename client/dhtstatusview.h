@@ -21,6 +21,7 @@ protected slots:
 protected:
   QString _formatBytes(size_t bytes);
   QString _formatRate(double rate);
+  void closeEvent(QCloseEvent *evt);
 
 protected:
   DHTStatus *_status;

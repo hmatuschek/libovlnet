@@ -8,3 +8,10 @@ add_executable(vlfdaemon ${VLF_DAEMON_SOURCES} ${VLF_DAEMON_MOC_SOURCES} ${VLF_D
 target_link_libraries(vlfdaemon vlf ${LIBS})
 
 INSTALL(TARGETS vlfdaemon DESTINATION bin)
+
+# Install service script
+IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
+INSTALL(
+  FILES "${CMAKE_SOURCE_DIR}/shared/vlfdaemon.conf"
+  DESTINATION "/etc/init")
+ENDIF(CMAKE_SYSTEM_NAME MATCHES "Linux")

@@ -13,10 +13,12 @@
 #include <QDir>
 
 
-Application::Application(int argc, char *argv[])
+Application::Application(int &argc, char *argv[])
   : QApplication(argc, argv), _identity(0), _dht(0), _status(0)
 {
+  // Do not quit application if the last window is closed.
   setQuitOnLastWindowClosed(false);
+
   // Try to load identity from file
   QDir vlfDir = QDir::home();
   if (! vlfDir.cd(".vlf")) { vlfDir.mkdir(".vlf"); vlfDir.cd(".vlf"); }
@@ -29,11 +31,12 @@ Application::Application(int argc, char *argv[])
     _identity = Identity::load(idFile);
   }
 
-  if (_identity) {
-    _dht = new DHT(_identity->id(), this);
-  } else {
+  if (0 == _identity) {
     qDebug() << "Error while loading or creating my identity.";
+    return;
   }
+
+  _dht = new DHT(_identity->id(), this, QHostAddress::Any, 7742);
 
   _status = new DHTStatus(_dht);
   _buddies = new BuddyList(*this, vlfDir.canonicalPath()+"/buddies.json");

@@ -2,6 +2,8 @@
 #include <QTextCursor>
 #include <QVBoxLayout>
 #include <QTextBlockFormat>
+#include <QCloseEvent>
+
 
 ChatWindow::ChatWindow(SecureChat *chat, QWidget *parent)
   : QWidget(parent), _chat(chat)
@@ -54,4 +56,10 @@ ChatWindow::_onMessageSend() {
   cursor.insertText(msg);
   cursor.endEditBlock();
   _chat->sendMessage(msg);
+}
+
+void
+ChatWindow::closeEvent(QCloseEvent *evt) {
+  evt->accept();
+  this->deleteLater();
 }
