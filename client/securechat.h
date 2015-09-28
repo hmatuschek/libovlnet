@@ -19,12 +19,17 @@ public:
 
 public slots:
   void sendMessage(const QString &msg);
+  void keepAlive();
 
 signals:
   void messageReceived(const QString &msg);
 
+protected slots:
+  void _onKeepAlive();
+
 protected:
   Application &_application;
+  QTimer _keepAlive;
 };
 
 #endif // SECURECHAT_H

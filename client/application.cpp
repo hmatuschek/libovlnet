@@ -182,7 +182,10 @@ void
 Application::streamStarted(SecureStream *stream) {
   SecureChat *chat = 0;
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
+    // Remove stream ID from pending chats
     _pendingChats.remove(stream->peerId());
+    // start keep alive timer
+    chat->keepAlive();
     (new ChatWindow(chat))->show();
   } else {
     _dht->closeStream(stream->id()); delete stream;
