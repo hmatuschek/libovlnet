@@ -91,12 +91,14 @@ signals:
 protected slots:
   void _onNodeReacable(const NodeItem &node);
   void _onNodeFound(const NodeItem &node);
+  void _onUpdateNodes();
 
 protected:
   Application &_application;
   QFile _file;
   QHash<QString, Buddy *> _buddies;
   QHash<Identifier, Buddy *> _nodes;
+  QTimer _presenceTimer;
 };
 
 

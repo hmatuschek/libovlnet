@@ -98,8 +98,14 @@ Buddy::fromJson(const QJsonObject &obj) {
  * Implementation of BuddyList
  * ********************************************************************************************* */
 BuddyList::BuddyList(Application &application, const QString path, QObject *parent)
-  : QObject(parent), _application(application), _file(path)
+  : QObject(parent), _application(application), _file(path), _presenceTimer()
 {
+  // Setup timer to update presence of buddy nodes every 10 seconds
+  _presenceTimer.setInterval(1000*10);
+  _presenceTimer.setSingleShot(false);
+  QObject::connect(&_presenceTimer, SIGNAL(timeout()), this, SLOT(_onUpdateNodes()));
+  _presenceTimer.start();
+
   // Read buddy list from file
   if (! _file.open(QIODevice::ReadOnly)) {
     qDebug() << "Can not read buddy list from" << _file.fileName(); return;
@@ -277,4 +283,20 @@ BuddyList::_onNodeReacable(const NodeItem &node) {
   }
   // Update node
   _nodes[node.id()]->node(node.id()).update(node.addr(), node.port());
+}
+
+void
+BuddyList::_onUpdateNodes() {
+  QHash<Identifier, Buddy *>::iterator node = _nodes.begin();
+  for (; node != _nodes.end(); node++) {
+    Buddy::NodeItem &nodeitem = node->node(node.key());
+    if (nodeitem.hasBeenSeen() && nodeitem.isOlderThan(60)) {
+      // Lost contact to node
+      nodeitem.invalidate();
+      emit disappeared(node.key());
+    } else if (nodeitem.hasBeenSeen() && nodeitem.isOlderThan(30)) {
+      // If last contact is older than 30 second -> ping node
+      _application.dht().ping(nodeitem.addr(), nodeitem.port());
+    }
+  }
 }
