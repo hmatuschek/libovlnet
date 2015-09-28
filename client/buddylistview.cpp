@@ -16,19 +16,19 @@ BuddyListView::BuddyListView(Application &application, BuddyList *buddies, QWidg
   _tree->setHeaderHidden(true);
 
   QToolBar *box = new QToolBar();
-  box->addAction(QIcon("://message.png"), tr("Chat"), this, SLOT(onChat()));
-  box->addAction(QIcon("://phone.png"), tr("Call"), this, SLOT(onCall()));
+  box->addAction(QIcon("://icons/message.png"), tr("Chat"), this, SLOT(onChat()));
+  box->addAction(QIcon("://icons/phone.png"), tr("Call"), this, SLOT(onCall()));
 
   QHash<QString, Buddy *>::const_iterator buddy = _buddies->buddies().begin();
   for (; buddy!=_buddies->buddies().end(); buddy++) {
     QTreeWidgetItem *item = new QTreeWidgetItem(_tree);
     item->setText(0, buddy.key());
-    item->setIcon(0, QIcon("://person.png"));
+    item->setIcon(0, QIcon("://icons/person.png"));
     QHash<Identifier, Buddy::NodeItem>::const_iterator node = (*buddy)->nodes().begin();
     for (; node != (*buddy)->nodes().end(); node++) {
       QTreeWidgetItem *nodeitem = new QTreeWidgetItem(item);
       nodeitem->setText(0, QString(node.key().toHex()));
-      nodeitem->setIcon(0, QIcon("://icon.png"));
+      nodeitem->setIcon(0, QIcon("://icons/fork.png"));
     }
   }
 
@@ -45,12 +45,12 @@ BuddyListView::buddyAdded(const QString &name) {
   Buddy *buddy = _buddies->getBuddy(name);
   QTreeWidgetItem *item = new QTreeWidgetItem(_tree);
   item->setText(0, name);
-  item->setIcon(0, QIcon("://person.png"));
+  item->setIcon(0, QIcon("://icons/person.png"));
   QHash<Identifier, Buddy::NodeItem>::const_iterator node = buddy->nodes().begin();
   for (; node != buddy->nodes().end(); node++) {
     QTreeWidgetItem *nodeitem = new QTreeWidgetItem(item);
     nodeitem->setText(0, QString(node.key().toHex()));
-    nodeitem->setIcon(0, QIcon("://icon.png"));
+    nodeitem->setIcon(0, QIcon("://icons/fork.png"));
   }
 }
 
@@ -70,7 +70,7 @@ BuddyListView::nodeAdded(const QString &buddy, const Identifier &id) {
   for (; item != items.end(); item++) {
     QTreeWidgetItem *nodeitem = new QTreeWidgetItem(*item);
     nodeitem->setText(0, QString(id.toHex()));
-    nodeitem->setIcon(0, QIcon("://icon.png"));
+    nodeitem->setIcon(0, QIcon("://icons/fork.png"));
   }
 }
 

@@ -62,7 +62,7 @@ add_subdirectory(test)
 # Install logo and .desktop file under Linux:
 #
 IF(UNIX AND NOT APPLE)
- INSTALL(FILES shared/vlfclient.png
+ INSTALL(FILES shared/icons/vlfclient.png
          DESTINATION share/icons)
  INSTALL(FILES shared/vlfclient.desktop
          DESTINATION share/applications)

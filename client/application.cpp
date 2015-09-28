@@ -41,14 +41,14 @@ Application::Application(int &argc, char *argv[])
   _status = new DHTStatus(_dht);
   _buddies = new BuddyList(*this, vlfDir.canonicalPath()+"/buddies.json");
 
-  _search      = new QAction(QIcon("://search.png"),    tr("Search..."), this);
+  _search      = new QAction(QIcon("://icons/search.png"),    tr("Search..."), this);
   _searchWindow = 0;
-  _showBuddies = new QAction(QIcon("://people.png"),    tr("Contacts..."), this);
+  _showBuddies = new QAction(QIcon("://icons/people.png"),    tr("Contacts..."), this);
   _buddyListWindow = 0;
-  _bootstrap   = new QAction(QIcon("://bootstrap.png"), tr("Bootstrap..."), this);
-  _showStatus  = new QAction(QIcon("://settings.png"),  tr("Show status ..."), this);
+  _bootstrap   = new QAction(QIcon("://icons/bootstrap.png"), tr("Bootstrap..."), this);
+  _showStatus  = new QAction(QIcon("://icons/settings.png"),  tr("Show status ..."), this);
   _statusWindow = 0;
-  _quit        = new QAction(QIcon("://quit.png"),      tr("Quit"), this);
+  _quit        = new QAction(QIcon("://icons/quit.png"),      tr("Quit"), this);
 
   QMenu *ctx = new QMenu();
   ctx->addAction(_search);
@@ -60,7 +60,7 @@ Application::Application(int &argc, char *argv[])
   ctx->addAction(_quit);
 
   _trayIcon = new QSystemTrayIcon();
-  _trayIcon->setIcon(QIcon("://icon.png"));
+  _trayIcon->setIcon(QIcon("://icons/fork.png"));
   _trayIcon->setContextMenu(ctx);
   _trayIcon->show();
 
