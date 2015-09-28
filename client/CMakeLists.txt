@@ -9,3 +9,5 @@ qt5_add_resources(VLF_CLIENT_RCC_SOURCES ../shared/resources.qrc)
 
 add_executable(vlfclient ${VLF_CLIENT_SOURCES} ${VLF_CLIENT_MOC_SOURCES} ${VLF_CLIENT_RCC_SOURCES})
 target_link_libraries(vlfclient vlf ${LIBS})
+
+INSTALL(TARGETS vlfclient DESTINATION bin)

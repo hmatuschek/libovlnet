@@ -34,11 +34,37 @@ set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -O0 -ggdb")
 set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -O0 -ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ggdb")
 
+#
+# Get default install directories under Linux
+#
+IF(UNIX AND NOT APPLE)
+ INCLUDE(GNUInstallDirs)
+ELSE(UNIX AND NOT APPLE)
+ SET(CMAKE_INSTALL_LIBDIR "lib")
+ SET(CMAKE_INSTALL_FULL_LIBDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+ SET(CMAKE_INSTALL_INCLUDEDIR "include")
+ SET(CMAKE_INSTALL_FULL_INCLUDEDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}")
+ # Set RPATH under MacOS
+ SET(CMAKE_SKIP_BUILD_RPATH  FALSE)
+ SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+ SET(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+ENDIF(UNIX AND NOT APPLE)
+
 # application sources...
 add_subdirectory(lib)
 add_subdirectory(client)
 add_subdirectory(daemon)
 add_subdirectory(test)
+
+#
+# Install logo and .desktop file under Linux:
+#
+IF(UNIX AND NOT APPLE)
+ INSTALL(FILES shared/vlfclient.svg
+         DESTINATION share/icons)
+ INSTALL(FILES shared/vlfclient.desktop
+         DESTINATION share/applications)
+ENDIF(UNIX AND NOT APPLE)
 
 # Source distribution packages:
 set(CPACK_PACKAGE_VERSION_MAJOR "1")

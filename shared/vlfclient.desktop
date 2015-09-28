@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=VLF client	
+GenericName=VLF Network Client
+Comment=A client to the VLF observatory network.
+Exec=vlfclient
+Icon=/usr/share/icons/vlfclient.png
+Type=Application
+Categories=Education;Teaching;
+Terminal=false
+Encoding=UTF-8
