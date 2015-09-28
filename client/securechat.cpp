@@ -6,7 +6,7 @@ SecureChat::SecureChat(Application &application, QObject *parent)
   : QObject(parent), SecureStream(application.identity()), _application(application),
     _keepAlive()
 {
-  _keepAlive.setInterval(1000);
+  _keepAlive.setInterval(1000*10);
   _keepAlive.setSingleShot(false);
   QObject::connect(&_keepAlive, SIGNAL(timeout()), this, SLOT(_onKeepAlive()));
 }
@@ -19,10 +19,11 @@ void
 SecureChat::handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
   if ((0 == len) && (0 == seq)) {
     /// @todo Handle "keep-alive" packet.
+  } else {
+    qDebug() << "Received datagram" << seq << ": " << QByteArray((const char *)data, len);
+    emit messageReceived(
+          QString::fromUtf8(QByteArray((const char *)data, len)));
   }
-  qDebug() << "Received datagram" << seq << ": " << QByteArray((const char *)data, len);
-  emit messageReceived(
-        QString::fromUtf8(QByteArray((const char *)data, len)));
 }
 
 void
