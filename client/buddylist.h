@@ -63,7 +63,9 @@ public:
   /** Returns the specified buddy. */
   Buddy *getBuddy(const QString &name) const;
   /** Returns the budy associated with the given node. */
-  Buddy *getBuddy(const Identifier &name) const;
+  Buddy *getBuddy(const Identifier &id) const;
+  /** Returns the name of the buddy with the associated node. */
+  QString buddyName(const Identifier &id) const;
   /** Add a buddy to the list or the given node to the speicified buddy. */
   void addBuddy(const QString &name, const Identifier &node);
   /** Add a buddy to the list or the given nodes to the speicified buddy. */
@@ -90,7 +92,7 @@ signals:
   void disappeared(const Identifier &id);
 
 protected slots:
-  void _onNodeReacable(const NodeItem &node);
+  void _onNodeReachable(const NodeItem &node);
   void _onNodeFound(const NodeItem &node);
   void _onUpdateNodes();
   void _onSearchNodes();
@@ -99,7 +101,7 @@ protected:
   Application &_application;
   QFile _file;
   QHash<QString, Buddy *> _buddies;
-  QHash<Identifier, Buddy *> _nodes;
+  QHash<Identifier, QString> _nodes;
   QTimer _presenceTimer;
   QTimer _searchTimer;
 };

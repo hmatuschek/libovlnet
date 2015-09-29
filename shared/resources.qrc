@@ -11,5 +11,11 @@
         <file>icons/quit.png</file>
         <file>icons/search.png</file>
         <file>icons/settings.png</file>
+        <file>icons/data-transfer-upload.png</file>
+        <file>icons/circle-check.png</file>
+        <file>icons/circle-x.png</file>
+        <file>icons/bullhorn.png</file>
+        <file>icons/chat.png</file>
+        <file>icons/microphone.png</file>
     </qresource>
 </RCC>

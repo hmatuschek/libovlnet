@@ -138,7 +138,7 @@ BuddyList::BuddyList(Application &application, const QString path, QObject *pare
       // Add to node table
       QHash<Identifier, Buddy::NodeItem>::const_iterator node = buddy->nodes().begin();
       for (; node != buddy->nodes().end(); node++) {
-        _nodes.insert(node.key(), buddy);
+        _nodes.insert(node.key(), obj.key());
       }
     } else {
       qDebug() << "Malformed buddy" << obj.key() << "in list.";
@@ -170,8 +170,13 @@ BuddyList::getBuddy(const QString &name) const {
 }
 
 Buddy *
-BuddyList::getBuddy(const Identifier &name) const {
-  return _nodes[name];
+BuddyList::getBuddy(const Identifier &id) const {
+  return _buddies[_nodes[id]];
+}
+
+QString
+BuddyList::buddyName(const Identifier &id) const {
+  return _nodes[id];
 }
 
 void
@@ -180,11 +185,11 @@ BuddyList::addBuddy(const QString &name, const Identifier &node) {
     Buddy *buddy = new Buddy();
     buddy->_nodes.insert(node, Buddy::NodeItem());
     _buddies.insert(name, buddy);
-    _nodes.insert(node, buddy);
+    _nodes.insert(node, name);
     emit buddyAdded(name);
   } else {
     _buddies[name]->_nodes.insert(node, Buddy::NodeItem());
-    _nodes.insert(node, _buddies[name]);
+    _nodes.insert(node, name);
     emit nodeAdded(name, node);
   }
   save();
@@ -198,7 +203,7 @@ BuddyList::addBuddy(const QString &name, const QList<Identifier> &nodes) {
     QList<Identifier>::const_iterator item = nodes.begin();
     for (; item != nodes.end(); item++) {
       buddy->_nodes.insert(*item, Buddy::NodeItem());
-      _nodes.insert(*item, buddy);
+      _nodes.insert(*item, name);
     }
     emit buddyAdded(name);
   } else {
@@ -206,7 +211,7 @@ BuddyList::addBuddy(const QString &name, const QList<Identifier> &nodes) {
     QList<Identifier>::const_iterator item = nodes.begin();
     for (; item != nodes.end(); item++) {
       buddy->_nodes.insert(*item, Buddy::NodeItem());
-      _nodes.insert(*item, buddy);
+      _nodes.insert(*item, name);
       emit nodeAdded(name, *item);
     }
   }
@@ -221,7 +226,7 @@ BuddyList::addBuddy(const QString &name, const QSet<Identifier> &nodes) {
     QSet<Identifier>::const_iterator item = nodes.begin();
     for (; item != nodes.end(); item++) {
       buddy->_nodes.insert(*item, Buddy::NodeItem());
-      _nodes.insert(*item, buddy);
+      _nodes.insert(*item, name);
     }
     emit buddyAdded(name);
   } else {
@@ -229,7 +234,7 @@ BuddyList::addBuddy(const QString &name, const QSet<Identifier> &nodes) {
     QSet<Identifier>::const_iterator item = nodes.begin();
     for (; item != nodes.end(); item++) {
       buddy->_nodes.insert(*item, Buddy::NodeItem());
-      _nodes.insert(*item, buddy);
+      _nodes.insert(*item, name);
       emit nodeAdded(name, *item);
     }
   }
@@ -286,23 +291,23 @@ BuddyList::_onNodeFound(const NodeItem &node) {
 }
 
 void
-BuddyList::_onNodeReacable(const NodeItem &node) {
+BuddyList::_onNodeReachable(const NodeItem &node) {
   // check if node belongs to a buddy
   if (! _nodes.contains(node.id())) { return; }
-  if (! _nodes[node.id()]->node(node.id()).hasBeenSeen()) {
+  if (! _buddies[_nodes[node.id()]]->node(node.id()).hasBeenSeen()) {
     // Update node
-    _nodes[node.id()]->node(node.id()).update(node.addr(), node.port());
+    _buddies[_nodes[node.id()]]->node(node.id()).update(node.addr(), node.port());
     emit appeared(node.id());
   }
   // Update node
-  _nodes[node.id()]->node(node.id()).update(node.addr(), node.port());
+  _buddies[_nodes[node.id()]]->node(node.id()).update(node.addr(), node.port());
 }
 
 void
 BuddyList::_onUpdateNodes() {
-  QHash<Identifier, Buddy *>::iterator node = _nodes.begin();
+  QHash<Identifier, QString>::iterator node = _nodes.begin();
   for (; node != _nodes.end(); node++) {
-    Buddy::NodeItem &nodeitem = (*node)->node(node.key());
+    Buddy::NodeItem &nodeitem = _buddies[(*node)]->node(node.key());
     if (nodeitem.hasBeenSeen() && nodeitem.isOlderThan(60)) {
       // Lost contact to node
       nodeitem.invalidate();
@@ -316,9 +321,9 @@ BuddyList::_onUpdateNodes() {
 
 void
 BuddyList::_onSearchNodes() {
-  QHash<Identifier, Buddy *>::iterator node = _nodes.begin();
+  QHash<Identifier, QString>::iterator node = _nodes.begin();
   for (; node != _nodes.end(); node++) {
-    Buddy::NodeItem &nodeitem = (*node)->node(node.key());
+    Buddy::NodeItem &nodeitem = _buddies[(*node)]->node(node.key());
     if (! nodeitem.hasBeenSeen()) {
       _application.dht().findNode(node.key());
     }

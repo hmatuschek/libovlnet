@@ -4,12 +4,14 @@
 #include <QWidget>
 #include "securecall.h"
 
+class Application;
+
 class CallWindow : public QWidget
 {
   Q_OBJECT
 
 public:
-  explicit CallWindow(SecureCall *call, QWidget *parent = 0);
+  explicit CallWindow(Application &application, SecureCall *call, QWidget *parent = 0);
   virtual ~CallWindow();
 
 protected slots:
@@ -21,6 +23,7 @@ protected:
   void closeEvent(QCloseEvent *evt);
 
 protected:
+  Application &_application;
   SecureCall *_call;
 };
 

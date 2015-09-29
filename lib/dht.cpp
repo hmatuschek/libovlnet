@@ -1086,6 +1086,7 @@ DHT::_onReadyRead() {
           _processStartStreamRequest(msg, size, addr, port);
         } else {
           qDebug() << "Unknown request from " << addr << ":" << port;
+          qDebug() << " dropping" << (size-DHT_HASH_SIZE) << "bytes payload.";
         }
       }
     }

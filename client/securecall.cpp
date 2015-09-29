@@ -9,7 +9,7 @@ SecureCall::SecureCall(Application &application, QObject *parent)
   int err = 0;
   _encoder = opus_encoder_create(48000, 1, OPUS_APPLICATION_VOIP, &err);
   if (OPUS_OK != err) {
-    qDebug() << "Cannot setup opus encoder.";
+    qDebug() << "Cannot setup opus encoder:" << opus_strerror(err);
     return;
   }
   opus_encoder_ctl(_encoder, OPUS_SET_BANDWIDTH(OPUS_BANDWIDTH_WIDEBAND));
@@ -18,7 +18,7 @@ SecureCall::SecureCall(Application &application, QObject *parent)
   // Init decoder
   _decoder = opus_decoder_create(48000, 1, &err);
   if (OPUS_OK != err) {
-    qDebug() << "Cannot setup opus decoder.";
+    qDebug() << "Cannot setup opus decoder:" << opus_strerror(err);
     return;
   }
 

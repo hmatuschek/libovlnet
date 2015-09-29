@@ -19,8 +19,11 @@ protected slots:
   void buddyDeleted(const QString &buddy);
   void nodeAdded(const QString &buddy, const Identifier &id);
   void nodeRemoved(const QString &buddy, const Identifier &id);
+
   void onChat();
   void onCall();
+  void onSendFile();
+  void onDelete();
 
 protected:
   void closeEvent(QCloseEvent *evt);

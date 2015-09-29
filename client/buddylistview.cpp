@@ -17,8 +17,11 @@ BuddyListView::BuddyListView(Application &application, BuddyList *buddies, QWidg
   _tree->setHeaderHidden(true);
 
   QToolBar *box = new QToolBar();
-  box->addAction(QIcon("://icons/message.png"), tr("Chat"), this, SLOT(onChat()));
+  box->addAction(QIcon("://icons/chat.png"), tr("Chat"), this, SLOT(onChat()));
   box->addAction(QIcon("://icons/phone.png"), tr("Call"), this, SLOT(onCall()));
+  box->addAction(QIcon("://icons/data-transfer-upload.png"), tr("Send file..."), this, SLOT(onSendFile()));
+  box->addSeparator();
+  box->addAction(QIcon("://icons/circle-x.png"), tr("Delete"), this, SLOT(onDelete()));
 
   QHash<QString, Buddy *>::const_iterator buddy = _buddies->buddies().begin();
   for (; buddy!=_buddies->buddies().end(); buddy++) {
@@ -119,6 +122,16 @@ BuddyListView::onCall() {
     Identifier id(QByteArray::fromHex(items.first()->text(0).toLocal8Bit()));
     _application.call(id);
   }
+}
+
+void
+BuddyListView::onSendFile() {
+  qDebug() << "Not implemented yet.";
+}
+
+void
+BuddyListView::onDelete() {
+  qDebug() << "Not implemented yet.";
 }
 
 void

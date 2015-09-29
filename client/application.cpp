@@ -207,7 +207,7 @@ Application::streamStarted(SecureStream *stream) {
     _pendingCalls.remove(stream->peerId());
     // start streaming
     call->started();
-    (new CallWindow(call))->show();
+    (new CallWindow(*this, call))->show();
   } else {
     _dht->closeStream(stream->id());
     delete stream;
