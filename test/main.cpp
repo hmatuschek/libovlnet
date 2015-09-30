@@ -5,7 +5,7 @@
 
 class TempStream: public SecureStream {
 public:
-  TempStream(Identity &id) : SecureStream(id)
+  TempStream(bool incomming, Identity &id) : SecureStream(incomming, id)
   {
     uint8_t data[1024]; int datalen=1024;
     datalen = prepare(data, datalen);
@@ -29,6 +29,6 @@ int main() {
   sigLen = id->sign((uint8_t *)"abc", 3, sig, sigLen);
   qDebug() << "Success:" << id2->verify((uint8_t *)"abc", 3, sig, sigLen);
 
-  TempStream str(*id);
+  TempStream str(false, *id);
   return 0;
 }

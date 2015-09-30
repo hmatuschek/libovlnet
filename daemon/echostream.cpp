@@ -1,7 +1,7 @@
 #include "echostream.h"
 
-EchoStream::EchoStream(Identity &id)
-  : SecureStream(id)
+EchoStream::EchoStream(bool incomming, Identity &id)
+  : SecureStream(incomming, id)
 {
   // pass...
 }

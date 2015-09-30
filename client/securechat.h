@@ -12,7 +12,7 @@ class SecureChat : public QObject, public SecureStream
   Q_OBJECT
 
 public:
-  SecureChat(Application &application, QObject *parent=0);
+  SecureChat(bool incomming, Application &application, QObject *parent=0);
   virtual ~SecureChat();
 
   void handleDatagram(uint32_t seq, const uint8_t *data, size_t len);

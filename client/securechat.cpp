@@ -2,8 +2,8 @@
 #include "application.h"
 
 
-SecureChat::SecureChat(Application &application, QObject *parent)
-  : QObject(parent), SecureStream(application.identity()), _application(application),
+SecureChat::SecureChat(bool incomming, Application &application, QObject *parent)
+  : QObject(parent), SecureStream(incomming, application.identity()), _application(application),
     _keepAlive()
 {
   _keepAlive.setInterval(1000*10);

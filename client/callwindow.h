@@ -17,7 +17,10 @@ public:
 protected slots:
   void onMute();
   void onPause();
-  void onStop();
+  void onStartStop();
+
+  void onCallStarted();
+  void onCallEnd();
 
 protected:
   void closeEvent(QCloseEvent *evt);
@@ -25,6 +28,10 @@ protected:
 protected:
   Application &_application;
   SecureCall *_call;
+
+  QAction *_silent;
+  QAction *_mute;
+  QAction *_startStop;
 };
 
 #endif // CALLWINDOW_H

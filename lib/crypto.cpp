@@ -179,8 +179,8 @@ Identity::load(const QString &path)
     goto error;
   if (! (pkey = PEM_read_bio_PUBKEY(bio, 0, 0,0)))
     goto error;
-  if (! (pkey = PEM_read_bio_PrivateKey(bio, &pkey, 0,0)) ) {
-    // Ignore a missing private key^
+  if ( (pkey = PEM_read_bio_PrivateKey(bio, &pkey, 0,0)) ) {
+    qDebug() << "Read private key from" << path;
   }
   BIO_free_all(bio);
 
@@ -210,8 +210,8 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
 /* ******************************************************************************************** *
  * Implementation of SecureSession
  * ******************************************************************************************** */
-SecureStream::SecureStream(Identity &id)
-  : _identity(id), _sessionKeyPair(0), _peerPubKey(0)
+SecureStream::SecureStream(bool incomming, Identity &id)
+  : _incomming(incomming), _identity(id), _sessionKeyPair(0), _peerPubKey(0)
 {
   // pass...
 }
@@ -222,17 +222,17 @@ SecureStream::~SecureStream() {
 }
 
 int
-SecureStream::prepare(uint8_t *ptr, size_t len) {
-  memset(ptr, 0, len);
+SecureStream::prepare(uint8_t *msg, size_t len) {
+  memset(msg, 0, len);
   uint8_t *keyPtr = 0; int keyLen =0;
   EC_KEY *key = 0;
   size_t stored=0;
 
   // Store public key and its length into output buffer
-  if (0 > (keyLen = _identity.publicKey(ptr+2, len-2)) )
+  if (0 > (keyLen = _identity.publicKey(msg+2, len-2)) )
     goto error;
-  *((uint16_t *)ptr) = htons(uint16_t(keyLen));
-  stored += keyLen+2; ptr += keyLen+2; len -= keyLen+2;
+  *((uint16_t *)msg) = htons(uint16_t(keyLen));
+  stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
 
   // Generate session keys
   // Allocage and generate EC key
@@ -251,20 +251,20 @@ SecureStream::prepare(uint8_t *ptr, size_t len) {
     goto error;
   if (keyLen>(int(len)-2))
     goto error;
-  *((uint16_t *)ptr) = htons(uint16_t(keyLen));
-  keyPtr = ptr+2;
+  *((uint16_t *)msg) = htons(uint16_t(keyLen));
+  keyPtr = msg+2;
   if (0 > i2d_PUBKEY(_sessionKeyPair, &keyPtr) )
     goto error;
   // Save a pointer to the session public key
-  keyPtr = ptr+2;
+  keyPtr = msg+2;
   // update pointer
-  stored += keyLen+2; ptr += keyLen+2; len -= keyLen+2;
+  stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
 
   // Sign session key
-  if (0 > (keyLen = _identity.sign(keyPtr, keyLen, ptr+2, len-2)))
+  if (0 > (keyLen = _identity.sign(keyPtr, keyLen, msg+2, len-2)))
     goto error;
-  *((uint16_t *)ptr) = htons(uint16_t(keyLen));
-  stored += keyLen+2; ptr += keyLen+2; len -= keyLen+2;
+  *((uint16_t *)msg) = htons(uint16_t(keyLen));
+  stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
   return stored;
 
 error:
@@ -287,7 +287,13 @@ SecureStream::peerId() const {
 }
 
 bool
-SecureStream::verify(const uint8_t *ptr, size_t len)
+SecureStream::isIncomming() const {
+  return _incomming;
+}
+
+
+bool
+SecureStream::verify(const uint8_t *msg, size_t len)
 {
   Identity *peer = 0;
   int keyLen=0, sigLen=0;
@@ -295,31 +301,31 @@ SecureStream::verify(const uint8_t *ptr, size_t len)
 
   // Load peer public key
   // get length of key
-  keyLen = ntohs(*(uint16_t *)ptr);
+  keyLen = ntohs(*(uint16_t *)msg);
   // read peer public key
   if (keyLen>(int(len)-2)) {
     goto error;
   }
-  if (0 == (peer = Identity::fromPublicKey(ptr+2, keyLen))) {
+  if (0 == (peer = Identity::fromPublicKey(msg+2, keyLen))) {
     goto error;
   }
   _peerId = peer->id();
-  ptr += keyLen+2; len -= keyLen+2;
+  msg += keyLen+2; len -= keyLen+2;
 
   // read session public key
-  keyLen = ntohs(*(uint16_t *)ptr);
+  keyLen = ntohs(*(uint16_t *)msg);
   if (keyLen>(int(len)-2))
     goto error;
-  keyPtr = ptr+2;
+  keyPtr = msg+2;
   if (0 == (_peerPubKey = d2i_PUBKEY(&_peerPubKey, &keyPtr, len-2)))
     goto error;
   // Restore ptr to public session key
-  keyPtr = ptr+2;
-  ptr += keyLen+2; len -= keyLen+2;
+  keyPtr = msg+2;
+  msg += keyLen+2; len -= keyLen+2;
 
   // verify session key
-  sigLen = ntohs(*(uint16_t *)ptr);
-  if (! peer->verify(keyPtr, keyLen, ptr+2, sigLen))
+  sigLen = ntohs(*(uint16_t *)msg);
+  if (! peer->verify(keyPtr, keyLen, msg+2, sigLen))
     goto error;
 
   delete peer;

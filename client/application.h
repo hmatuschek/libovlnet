@@ -21,7 +21,7 @@ public:
   virtual ~Application();
 
   // Implementation of StreamHandler interface
-  SecureStream *newStream(uint16_t service);
+  SecureStream *newStream(bool incomming, uint16_t service);
   bool allowStream(uint16_t service, const NodeItem &peer);
   void streamStarted(SecureStream *stream);
 

@@ -890,7 +890,7 @@ bool
 DHT::startStream(uint16_t service, const NodeItem &node) {
   if (0 == _streamHandler) { return false; }
   qDebug() << "Send start stream to" << node.id() << "@" << node.addr() << ":" << node.port();
-  SecureStream *stream = _streamHandler->newStream(service);
+  SecureStream *stream = _streamHandler->newStream(false, service);
   if (! stream) { return false; }
   StartStreamRequest *req = new StartStreamRequest(service, node.id(), stream);
 
@@ -1378,7 +1378,7 @@ DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddr
   }
   // Request new stream from stream handler
   SecureStream *stream = 0;
-  if (0 == (stream =_streamHandler->newStream(ntohs(msg.payload.start_stream.service))) ) {
+  if (0 == (stream =_streamHandler->newStream(true, ntohs(msg.payload.start_stream.service))) ) {
     qDebug() << "Stream handler refuses to create a new stream.";
     return;
   }
