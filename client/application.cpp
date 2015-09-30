@@ -172,11 +172,11 @@ Application::onQuit() {
 
 SecureStream *
 Application::newStream(bool incomming, uint16_t service) {
-  if (0 == service) {
+  if (1 == service) {
     qDebug() << "Create new SecureCall instance.";
     // VoIP service
     return new SecureCall(incomming, *this);
-  } else if (1 == service) {
+  } else if (2 == service) {
     // Chat service
     return new SecureChat(incomming, *this);
   }
@@ -185,7 +185,7 @@ Application::newStream(bool incomming, uint16_t service) {
 
 bool
 Application::allowStream(uint16_t service, const NodeItem &peer) {
-  if ((0 == service) || (1 == service)) {
+  if ((1 == service) || (2 == service)) {
     // VoIP or Chat services: check if peer is buddy list
     return _buddies->hasNode(peer.id());
   }
@@ -249,10 +249,10 @@ void
 Application::onNodeFound(const NodeItem &node) {
   if (_pendingChats.contains(node.id())) {
     qDebug() << "Node" << node.id() << "found: Start chat...";
-    _dht->startStream(1, node);
+    _dht->startStream(2, node);
   } else if (_pendingCalls.contains(node.id())) {
     qDebug() << "Node" << node.id() << "found: Start call...";
-    _dht->startStream(0, node);
+    _dht->startStream(1, node);
   }
 }
 

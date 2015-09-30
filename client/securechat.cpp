@@ -3,8 +3,8 @@
 
 
 SecureChat::SecureChat(bool incomming, Application &application, QObject *parent)
-  : QObject(parent), SecureStream(incomming, application.identity()), _application(application),
-    _keepAlive()
+  : QObject(parent), SecureStream(incomming, application.identity()),
+    _application(application), _keepAlive()
 {
   _keepAlive.setInterval(1000*10);
   _keepAlive.setSingleShot(false);
@@ -17,7 +17,7 @@ SecureChat::~SecureChat() {
 
 void
 SecureChat::handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
-  if ((0 == len) && (0 == seq)) {
+  if ((0 == len) && (0 == seq) && (0 == data)) {
     /// @todo Handle "keep-alive" packet.
   } else {
     qDebug() << "Received datagram" << seq << ": " << QByteArray((const char *)data, len);
@@ -42,7 +42,7 @@ SecureChat::keepAlive() {
 void
 SecureChat::_onKeepAlive() {
   // Send an empty datagram
-  sendDatagram(0, 0);
+  sendNull();
 }
 
 

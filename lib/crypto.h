@@ -115,6 +115,7 @@ protected:
   /** The current sequence number (bytes send). */
   uint32_t _outSeq;
   uint8_t _inBuffer[DHT_MAX_MESSAGE_SIZE];
+
   Identifier _streamId;
   QUdpSocket *_socket;
 
