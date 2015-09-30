@@ -1,5 +1,6 @@
 #include "securecall.h"
 #include "application.h"
+#include <netinet/in.h>
 
 SecureCall::SecureCall(Application &application, QObject *parent)
   : QObject(parent), SecureStream(application.identity()), _application(application),
