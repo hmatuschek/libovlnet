@@ -202,7 +202,7 @@ Application::streamStarted(SecureStream *stream) {
     // start keep alive timer
     chat->keepAlive();
     (new ChatWindow(chat))->show();
-  } if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
+  } else if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
     // Remove stream ID from pending chats
     _pendingCalls.remove(stream->peerId());
     // start streaming
