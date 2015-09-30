@@ -7,26 +7,56 @@
 
 /** Specifies the number of frames per datagram. */
 #define VLF_CALL_NUM_FRAMES 960
+/** Specifies the maximum size of the datagram payload (encoded audio). */
 #define VLF_CALL_MAX_BUFFER_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-24)
 
 #include <QObject>
 
+// Forward declaration
 class Application;
 
-
-/** Target bit rate 12kb/s, mono, medium band and 20ms frame duration. At 48k sample rate,
+/** Target bit rate about 12kb/s, mono, wide band and 20ms frame duration. At 48k sample rate,
  * this implies 960 samples per buffer/frame. */
 class SecureCall : public QObject, public SecureStream
 {
   Q_OBJECT
 
 public:
-  explicit SecureCall(Application &application, QObject *parent = 0);
+  /** Possible states of the call. */
+  typedef enum {
+    INITIALIZED,   ///< Secure connection established, call not started yet.
+    RUNNING,       ///< Call started.
+    TERMINATED     ///< One side ended the call.
+  } State;
+
+public:
+  /** Constructor.
+   * @param incomming Indicates whether the call was initiated by the peer or this node.
+   * @param application A weak reference to the application instance.
+   * @param parent The optional QObject parent instance. */
+  explicit SecureCall(bool incomming, Application &application, QObject *parent = 0);
+  /** Destructor. */
   virtual ~SecureCall();
 
-  void started();
+  /** Retruns the state of the call. */
+  State state() const;
 
+  /** Gets called by the dispatcher to signal a successful initiation of the secure connection. */
+  void initialized();
+  /** Handles incomming datagrams. */
   void handleDatagram(uint32_t seq, const uint8_t *data, size_t len);
+
+public slots:
+  /** Accept an incomming call. (Does nothing if the call is not incomming). */
+  void accept();
+  /** Terminates a call. */
+  void hangUp();
+
+signals:
+  /** Gets emitted once the call starts. */
+  void started();
+  /** Gets emitted once the call ends. */
+  void ended();
 
 protected:
   /** PortAudio callback for audio stream IO. */
@@ -37,13 +67,23 @@ protected:
                            void *userData);
 
 protected:
+  /** A weak reference to the application instance. */
   Application &_application;
+  /** The opus audio encoder. */
   OpusEncoder *_encoder;
+  /** The opus audio decoder. */
   OpusDecoder *_decoder;
+  /** The PortAudio stream. */
   PaStream    *_paStream;
+  /** The current state of the call. */
+  State       _state;
+  /** The current framenumber of the input stream. */
   uint32_t    _inFrameNumber;
+  /** The amount of data held by the input buffer. */
   size_t      _inBufferSize;
+  /** Holds @c _inBufferSize bytes of encoded audio received from the peer. */
   uint8_t     *_inBuffer[VLF_CALL_MAX_BUFFER_SIZE];
+  /** The current output frame number. */
   uint32_t    _outFrameNumber;
 };
 

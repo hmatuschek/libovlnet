@@ -6,7 +6,7 @@
 class EchoStream : public SecureStream
 {
 public:
-  EchoStream(Identity &id);
+  EchoStream(bool incomming, Identity &id);
 
   void handleDatagram(uint32_t seq, const uint8_t *data, size_t len);
 };

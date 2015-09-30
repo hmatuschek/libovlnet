@@ -2,8 +2,8 @@
 #include "application.h"
 #include <netinet/in.h>
 
-SecureCall::SecureCall(Application &application, QObject *parent)
-  : QObject(parent), SecureStream(application.identity()), _application(application),
+SecureCall::SecureCall(bool incomming, Application &application, QObject *parent)
+  : QObject(parent), SecureStream(incomming, application.identity()), _application(application),
     _encoder(0), _decoder(0), _paStream(0)
 {
   // Init encoder
@@ -40,21 +40,63 @@ SecureCall::~SecureCall() {
   _application.dht().closeStream(_streamId);
 }
 
+SecureCall::State
+SecureCall::state() const {
+  return _state;
+}
+
 void
-SecureCall::started() {
+SecureCall::initialized() {
   qDebug() << "SecureCall stream started.";
-  if (_paStream) {
-    Pa_StartStream(_paStream);
-    qDebug() << "Audio stream started.";
+  _state = INITIALIZED;
+}
+
+void
+SecureCall::accept() {
+  // accept an incomming call
+  if (isIncomming() && (INITIALIZED == _state)) {
+    _state = RUNNING;
+    if (_paStream) {
+      Pa_StartStream(_paStream);
+      qDebug() << "Audio stream started.";
+    }
+    emit started();
   }
 }
 
 void
+SecureCall::hangUp() {
+  _state = TERMINATED;
+  Pa_StopStream(_paStream);
+  // Send empty data
+  sendDatagram(0,0);
+  emit ended();
+}
+
+void
 SecureCall::handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
-  if (len<4) { return; }
-  _inFrameNumber = ntohl(*(uint32_t *)data); data += 4; len -= 4;
-  _inBufferSize = len;
-  memcpy(_inBuffer, data, len);
+  if (len>=4) {
+    // If the first data arives and the outgoing stream has not started yet
+    //  -> start audio device
+    if ((INITIALIZED == _state) && (!isIncomming())) {
+      _state = RUNNING;
+      if (_paStream) {
+        Pa_StartStream(_paStream);
+        qDebug() << "Audio stream started.";
+      }
+      emit started();
+    }
+    _inFrameNumber = ntohl(*(uint32_t *)data); data += 4; len -= 4;
+    _inBufferSize = len;
+    memcpy(_inBuffer, data, len);
+  } else if (0 == len) {
+    // An empty packet indicates end of stream,
+    if (RUNNING == _state) {
+      _state = TERMINATED;
+      Pa_StopStream(_paStream);
+      emit ended();
+    }
+  }
 }
 
 int

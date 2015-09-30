@@ -171,14 +171,14 @@ Application::onQuit() {
 }
 
 SecureStream *
-Application::newStream(uint16_t service) {
+Application::newStream(bool incomming, uint16_t service) {
   if (0 == service) {
     qDebug() << "Create new SecureCall instance.";
     // VoIP service
-    return new SecureCall(*this);
+    return new SecureCall(incomming, *this);
   } else if (1 == service) {
     // Chat service
-    return new SecureChat(*this);
+    return new SecureChat(incomming, *this);
   }
   return 0;
 }
@@ -206,7 +206,7 @@ Application::streamStarted(SecureStream *stream) {
     // Remove stream ID from pending chats
     _pendingCalls.remove(stream->peerId());
     // start streaming
-    call->started();
+    call->initialized();
     (new CallWindow(*this, call))->show();
   } else {
     _dht->closeStream(stream->id());
