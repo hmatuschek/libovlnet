@@ -69,7 +69,8 @@ SecureCall::hangUp() {
   _state = TERMINATED;
   Pa_StopStream(_paStream);
   // Send empty data
-  sendDatagram(0,0);
+  sendNull();
+  // signal call has ended
   emit ended();
 }
 
