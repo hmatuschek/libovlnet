@@ -89,8 +89,8 @@ SecureCall::handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
     _inFrameNumber = ntohl(*(uint32_t *)data); data += 4; len -= 4;
     _inBufferSize = len;
     memcpy(_inBuffer, data, len);
-  } else if (0 == len) {
-    // An empty packet indicates end of stream,
+  } else if ((0 == len) && (0 == data) && (0 == seq)) {
+    // An null datagram indicates end of stream,
     if (RUNNING == _state) {
       _state = TERMINATED;
       Pa_StopStream(_paStream);

@@ -56,7 +56,8 @@ public:
   virtual void handleDatagram(uint32_t seq, const uint8_t *data, size_t len) = 0;
   /** Sends the given @c data as an encrypted datagram. */
   bool sendDatagram(const uint8_t *data, size_t len);
-
+  /** Sends a null datagram. */
+  bool sendNull();
 
 protected:
   /** Processes (decrypt) an incomming datagram. */

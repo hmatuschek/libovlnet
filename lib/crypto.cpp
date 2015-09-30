@@ -453,9 +453,9 @@ error:
 void
 SecureStream::handleData(const uint8_t *data, size_t len) {
   if (0 == len) {
-    this->handleDatagram(0, 0, 0);
-    return;
+    this->handleDatagram(0, 0, 0); return;
   } else if (len<4) {
+    // A valid encrypted message needs at least 4 bytes (the sequence int32_t).
     return;
   }
   // Get sequence number
@@ -487,11 +487,18 @@ SecureStream::sendDatagram(const uint8_t *data, size_t len) {
     txlen += 4 + enclen;
   }
   // Send datagram
-  if (0 > _socket->writeDatagram((char *)msg, txlen, _peer.addr(), _peer.port()))
+  if (txlen != _socket->writeDatagram((char *)msg, txlen, _peer.addr(), _peer.port()))
     return false;
   // Update seq
   _outSeq += len;
   return true;
+}
+
+bool
+SecureStream::sendNull() {
+  // send only stream id
+  return DHT_HASH_SIZE == _socket->writeDatagram((const char *)_streamId.data(), DHT_HASH_SIZE,
+                                                 _peer.addr(), _peer.port());
 }
 
 
