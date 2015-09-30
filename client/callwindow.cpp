@@ -67,7 +67,7 @@ void
 CallWindow::onStartStop() {
   if ((SecureCall::INITIALIZED == _call->state()) && _call->isIncomming()) {
     _call->accept();
-  } else {
+  } else if (SecureCall::RUNNING == _call->state()) {
     _call->hangUp();
   }
 }
@@ -76,7 +76,6 @@ void
 CallWindow::onCallStarted() {
   _startStop->setIcon(QIcon("://icons/circle-x.png"));
   _startStop->setText(tr("end call"));
-  _call->hangUp();
 }
 
 void
