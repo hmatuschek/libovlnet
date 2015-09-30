@@ -479,13 +479,11 @@ SecureStream::sendDatagram(const uint8_t *data, size_t len) {
   memcpy(ptr, _streamId.data(), DHT_HASH_SIZE);
   ptr += DHT_HASH_SIZE; txlen += DHT_HASH_SIZE;
   // store sequence number
-  *((uint32_t *)ptr) = htonl(_outSeq); ptr += 4;
+  *((uint32_t *)ptr) = htonl(_outSeq); txlen += 4; ptr += 4;
   // store encrypted data if there is any
-  if (len > 0) {
-    if(0 > (enclen = encrypt(_outSeq, data, len, ptr)))
-      return false;
-  }
-  txlen += 4 + enclen;
+  if ( (len > 0) && (0 > (enclen = encrypt(_outSeq, data, len, ptr))) )
+    return false;
+  txlen += enclen;
   // Send datagram
   if (txlen != _socket->writeDatagram((char *)msg, txlen, _peer.addr(), _peer.port()))
     return false;

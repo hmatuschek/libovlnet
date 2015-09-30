@@ -47,7 +47,7 @@ SecureCall::state() const {
 
 void
 SecureCall::initialized() {
-  qDebug() << "SecureCall stream started.";
+  qDebug() << "SecureCall stream initialized.";
   _state = INITIALIZED;
 }
 
@@ -79,7 +79,7 @@ SecureCall::handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
   if (len>=4) {
     // If the first data arives and the outgoing stream has not started yet
     //  -> start audio device
-    if ((INITIALIZED == _state) && (!isIncomming())) {
+    if ((INITIALIZED == _state) && (! isIncomming())) {
       _state = RUNNING;
       if (_paStream) {
         Pa_StartStream(_paStream);
@@ -93,6 +93,7 @@ SecureCall::handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
   } else if ((0 == len) && (0 == data) && (0 == seq)) {
     // An null datagram indicates end of stream,
     if (RUNNING == _state) {
+      qDebug() << "Null datagram received -> stop stream.";
       _state = TERMINATED;
       Pa_StopStream(_paStream);
       emit ended();
