@@ -6,9 +6,9 @@
 class EchoStream : public SecureStream
 {
 public:
-  EchoStream(bool incomming, Identity &id);
+  EchoStream(Identity &id);
 
-  void handleDatagram(uint32_t seq, const uint8_t *data, size_t len);
+  void handleDatagram(const uint8_t *data, size_t len);
 };
 
 #endif // ECHOSTREAM_H

@@ -210,8 +210,8 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
 /* ******************************************************************************************** *
  * Implementation of SecureSession
  * ******************************************************************************************** */
-SecureStream::SecureStream(bool incomming, Identity &id)
-  : _incomming(incomming), _identity(id), _sessionKeyPair(0), _peerPubKey(0),
+SecureStream::SecureStream(Identity &id)
+  : _identity(id), _sessionKeyPair(0), _peerPubKey(0),
     _streamId()
 {
   // pass...
@@ -286,12 +286,6 @@ const Identifier &
 SecureStream::peerId() const {
   return _peerId;
 }
-
-bool
-SecureStream::isIncomming() const {
-  return _incomming;
-}
-
 
 bool
 SecureStream::verify(const uint8_t *msg, size_t len)
@@ -454,7 +448,7 @@ error:
 void
 SecureStream::handleData(const uint8_t *data, size_t len) {
   if (0 == len) {
-    this->handleDatagram(0, 0, 0); return;
+    this->handleDatagram(0, 0); return;
   } else if (len<4) {
     // A valid encrypted message needs at least 4 bytes (the sequence int32_t).
     return;
@@ -467,7 +461,7 @@ SecureStream::handleData(const uint8_t *data, size_t len) {
     qDebug() << "Failed to decrypt message" << seq;
     return;
   }
-  this->handleDatagram(seq, _inBuffer, rxlen);
+  this->handleDatagram(_inBuffer, rxlen);
 }
 
 bool

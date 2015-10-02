@@ -4,12 +4,14 @@
 #include <QApplication>
 #include <QSystemTrayIcon>
 #include <QAction>
+#include <QStringList>
 
 #include "lib/crypto.h"
 #include "lib/dht.h"
 #include "dhtstatus.h"
 #include "buddylist.h"
 #include "securechat.h"
+#include "bootstrapnodelist.h"
 
 
 class Application : public QApplication, public StreamHandler
@@ -21,7 +23,7 @@ public:
   virtual ~Application();
 
   // Implementation of StreamHandler interface
-  SecureStream *newStream(bool incomming, uint16_t service);
+  SecureStream *newStream(uint16_t service);
   bool allowStream(uint16_t service, const NodeItem &peer);
   void streamStarted(SecureStream *stream);
 
@@ -29,6 +31,8 @@ public:
   void startChatWith(const Identifier &id);
   /** Initializes a voice call to the specified node. */
   void call(const Identifier &id);
+  /** Initializes a file transfer. */
+  void sendFile(const QString &path, size_t size, const Identifier &id);
 
   /** Returns a weak reference to the DHT instance. */
   DHT &dht();
@@ -67,6 +71,8 @@ protected:
   DHTStatus *_status;
   /** The buddy list. */
   BuddyList *_buddies;
+  /** The list of bootstap servers. */
+  BootstrapNodeList _bootstrapList;
 
   QAction *_showBuddies;
   QAction *_search;
@@ -78,10 +84,8 @@ protected:
   QWidget *_buddyListWindow;
   QWidget *_statusWindow;
 
-  /** Chat streams bing initialized. */
-  QSet<Identifier> _pendingChats;
-  /** Call streams bing initialized. */
-  QSet<Identifier> _pendingCalls;
+  /** Table of pending streams. */
+  QHash<Identifier, SecureStream *> _pendingStreams;
   /** The system tray icon. */
   QSystemTrayIcon *_trayIcon;
 };

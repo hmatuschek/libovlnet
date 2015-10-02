@@ -4,6 +4,7 @@
 #include "buddylistview.h"
 #include "chatwindow.h"
 #include "callwindow.h"
+#include "filetransferdialog.h"
 
 #include <portaudio.h>
 
@@ -14,10 +15,13 @@
 #include <QMessageBox>
 #include <QString>
 #include <QDir>
-
+#include <QStandardPaths>
+#include <QJsonDocument>
+#include <QJsonArray>
 
 Application::Application(int &argc, char *argv[])
-  : QApplication(argc, argv), _identity(0), _dht(0), _status(0)
+  : QApplication(argc, argv), _identity(0), _dht(0), _status(0), _buddies(0),
+    _bootstrapList()
 {
   // Init PortAudio
   Pa_Initialize();
@@ -25,9 +29,19 @@ Application::Application(int &argc, char *argv[])
   // Do not quit application if the last window is closed.
   setQuitOnLastWindowClosed(false);
 
+  // Set application name
+  setApplicationName("vlf");
+  setOrganizationName("com.github.hmatuschek");
+  setOrganizationDomain("com.github.hmatuschek");
+
   // Try to load identity from file
-  QDir vlfDir = QDir::home();
-  if (! vlfDir.cd(".vlf")) { vlfDir.mkdir(".vlf"); vlfDir.cd(".vlf"); }
+  QDir vlfDir = QStandardPaths::writableLocation(
+        QStandardPaths::DataLocation);
+  // check if VLF directory exists
+  if (! vlfDir.exists()) {
+    vlfDir.mkpath(vlfDir.absolutePath());
+  }
+  // Load or create identity
   QString idFile(vlfDir.canonicalPath()+"/identity.pem");
   if (!QFile::exists(idFile)) {
     qDebug() << "No identity found -> create one.";
@@ -43,6 +57,13 @@ Application::Application(int &argc, char *argv[])
   }
 
   _dht = new DHT(_identity->id(), this, QHostAddress::Any, 7742);
+
+  // load a list of bootstrap servers.
+  _bootstrapList = BootstrapNodeList(vlfDir.canonicalPath()+"/bootstrap.json");
+  QPair<QString, uint16_t> hostport;
+  foreach (hostport, _bootstrapList) {
+    _dht->ping(hostport.first, hostport.second);
+  }
 
   _status = new DHTStatus(_dht);
   _buddies = new BuddyList(*this, vlfDir.canonicalPath()+"/buddies.json");
@@ -103,14 +124,8 @@ Application::onBootstrap() {
       host = parts.front();
       port = parts.back().toUInt();
     }
-    QHostInfo host_info = QHostInfo::fromName(host);
-    if (QHostInfo::NoError != host_info.error()) {
-      QMessageBox::critical(0, tr("Can not resolve host name."),
-                            tr("Can not resolve host name: {1}").arg(host));
-      continue;
-    }
-
-    _dht->ping(host_info.addresses().front(), port);
+    _dht->ping(host, port);
+    _bootstrapList.insert(host, port);
     return;
   }
 }
@@ -171,14 +186,14 @@ Application::onQuit() {
 }
 
 SecureStream *
-Application::newStream(bool incomming, uint16_t service) {
+Application::newStream(uint16_t service) {
   if (1 == service) {
     qDebug() << "Create new SecureCall instance.";
     // VoIP service
-    return new SecureCall(incomming, *this);
+    return new SecureCall(true, *this);
   } else if (2 == service) {
     // Chat service
-    return new SecureChat(incomming, *this);
+    return new SecureChat(*this);
   }
   return 0;
 }
@@ -196,18 +211,18 @@ void
 Application::streamStarted(SecureStream *stream) {
   SecureChat *chat = 0;
   SecureCall *call = 0;
+  FileUpload *upload = 0;
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
-    // Remove stream ID from pending chats
-    _pendingChats.remove(stream->peerId());
     // start keep alive timer
     chat->keepAlive();
-    (new ChatWindow(chat))->show();
+    (new ChatWindow(*this, chat))->show();
   } else if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
-    // Remove stream ID from pending chats
-    _pendingCalls.remove(stream->peerId());
     // start streaming
     call->initialized();
     (new CallWindow(*this, call))->show();
+  } else if (0 != (upload = dynamic_cast<FileUpload *>(stream))) {
+    // Start upload
+    (new FileUploadDialog(upload, *this))->show();
   } else {
     _dht->closeStream(stream->id());
     delete stream;
@@ -217,7 +232,7 @@ Application::streamStarted(SecureStream *stream) {
 void
 Application::startChatWith(const Identifier &id) {
   // Add id to list of pending chats
-  _pendingChats.insert(id);
+  _pendingStreams.insert(id, new SecureChat(*this));
   // First search node
   _dht->findNode(id);
 }
@@ -225,8 +240,16 @@ Application::startChatWith(const Identifier &id) {
 void
 Application::call(const Identifier &id) {
   // Add id to list of pending calls
-  _pendingCalls.insert(id);
+  _pendingStreams.insert(id, new SecureCall(false, *this));
   // First, search node
+  _dht->findNode(id);
+}
+
+void
+Application::sendFile(const QString &path, size_t size, const Identifier &id) {
+  // Add id to list of pending file transfers
+  _pendingStreams.insert(id, new FileUpload(*this, path, size));
+  // First, search for the node id
   _dht->findNode(id);
 }
 
@@ -247,26 +270,34 @@ Application::buddies() {
 
 void
 Application::onNodeFound(const NodeItem &node) {
-  if (_pendingChats.contains(node.id())) {
+  if (! _pendingStreams.contains(node.id())) { return; }
+  SecureStream *stream = _pendingStreams[node.id()];
+  _pendingStreams.remove(node.id());
+
+  SecureChat *chat = 0;
+  SecureCall *call = 0;
+  FileUpload *upload = 0;
+
+  // Dispatch by type
+  if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     qDebug() << "Node" << node.id() << "found: Start chat...";
-    _dht->startStream(2, node);
-  } else if (_pendingCalls.contains(node.id())) {
+    _dht->startStream(2, node, stream);
+  } else if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
     qDebug() << "Node" << node.id() << "found: Start call...";
-    _dht->startStream(1, node);
+    _dht->startStream(1, node, stream);
+  } else if (0 != (upload = dynamic_cast<FileUpload *>(stream))) {
+    qDebug() << "Node" << node.id() << "found: Start uploaing" << upload->fileName();
+    _dht->startStream(4, node, stream);
   }
 }
 
 void
 Application::onNodeNotFound(const Identifier &id, const QList<NodeItem> &best) {
-  if (_pendingChats.contains(id)) {
-    QMessageBox::critical(
-          0, tr("Can not initialize chat"),
-          tr("Can not initialize chat with node %1: not reachable.").arg(QString(id.toHex())));
-    _pendingChats.remove(id);
-  } else if (_pendingCalls.contains(id)) {
-    QMessageBox::critical(
-          0, tr("Can not initialize call"),
-          tr("Can not initialize call to node %1: not reachable.").arg(QString(id.toHex())));
-    _pendingCalls.remove(id);
-  }
+  if (!_pendingStreams.contains(id)) { return; }
+  QMessageBox::critical(
+        0, tr("Can not initialize stream"),
+        tr("Can not initialize a secure connection to %1: not reachable.").arg(QString(id.toHex())));
+  // Free stream
+  delete _pendingStreams[id];
+  _pendingStreams.remove(id);
 }

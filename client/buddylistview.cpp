@@ -4,6 +4,9 @@
 #include <QVBoxLayout>
 #include <QToolBar>
 #include <QCloseEvent>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QMessageBox>
 
 
 BuddyListView::BuddyListView(Application &application, BuddyList *buddies, QWidget *parent)
@@ -126,7 +129,29 @@ BuddyListView::onCall() {
 
 void
 BuddyListView::onSendFile() {
-  qDebug() << "Not implemented yet.";
+  // Get file
+  QString filename = QFileDialog::getOpenFileName(0, tr("Select file"));
+  if (0 == filename.size()) { return; }
+  // check file
+  QFileInfo fileinfo(filename);
+  if (!fileinfo.isReadable()) {
+    QMessageBox::critical(0, tr("Can not open file."),
+                          tr("Can not open file %1").arg(fileinfo.absoluteFilePath()));
+  }
+  // Get selected items
+  QList<QTreeWidgetItem *> items = _tree->selectedItems();
+  if (0 == items.size()) { return; }
+  if (items.first()->childCount()) {
+    // If buddy is selected
+    Identifier id(QByteArray::fromHex(items.first()->child(0)->text(0).toLocal8Bit()));
+    _application.sendFile(fileinfo.absoluteFilePath(),
+                          fileinfo.size(), id);
+  } else {
+    // If node is selected
+    Identifier id(QByteArray::fromHex(items.first()->text(0).toLocal8Bit()));
+    _application.sendFile(fileinfo.absoluteFilePath(),
+                          fileinfo.size(), id);
+  }
 }
 
 void

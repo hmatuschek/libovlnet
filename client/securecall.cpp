@@ -2,9 +2,9 @@
 #include "application.h"
 #include <netinet/in.h>
 
-SecureCall::SecureCall(bool incomming, Application &application, QObject *parent)
-  : QObject(parent), SecureStream(incomming, application.identity()), _application(application),
-    _encoder(0), _decoder(0), _paStream(0)
+SecureCall::SecureCall(bool incomming, Application &application)
+  : QObject(0), SecureStream(application.identity()), _incomming(incomming),
+    _application(application), _encoder(0), _decoder(0), _paStream(0)
 {
   // Init encoder
   int err = 0;
@@ -45,6 +45,11 @@ SecureCall::state() const {
   return _state;
 }
 
+bool
+SecureCall::isIncomming() const {
+  return _incomming;
+}
+
 void
 SecureCall::initialized() {
   qDebug() << "SecureCall stream initialized.";
@@ -54,7 +59,7 @@ SecureCall::initialized() {
 void
 SecureCall::accept() {
   // accept an incomming call
-  if (isIncomming() && (INITIALIZED == _state)) {
+  if (_incomming && (INITIALIZED == _state)) {
     _state = RUNNING;
     if (_paStream) {
       Pa_StartStream(_paStream);
@@ -75,11 +80,11 @@ SecureCall::hangUp() {
 }
 
 void
-SecureCall::handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
+SecureCall::handleDatagram(const uint8_t *data, size_t len) {
   if (len>=4) {
     // If the first data arives and the outgoing stream has not started yet
     //  -> start audio device
-    if ((INITIALIZED == _state) && (! isIncomming())) {
+    if ((INITIALIZED == _state) && (! _incomming)) {
       _state = RUNNING;
       if (_paStream) {
         Pa_StartStream(_paStream);
@@ -87,10 +92,11 @@ SecureCall::handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
       }
       emit started();
     }
+    // Store payload in
     _inFrameNumber = ntohl(*(uint32_t *)data); data += 4; len -= 4;
     _inBufferSize = len;
     memcpy(_inBuffer, data, len);
-  } else if ((0 == len) && (0 == data) && (0 == seq)) {
+  } else if ((0 == len) && (0 == data)) {
     // An null datagram indicates end of stream,
     if (RUNNING == _state) {
       qDebug() << "Null datagram received -> stop stream.";

@@ -1,12 +1,16 @@
 #include "echostream.h"
 
-EchoStream::EchoStream(bool incomming, Identity &id)
-  : SecureStream(incomming, id)
+EchoStream::EchoStream(Identity &id)
+  : SecureStream(id)
 {
   // pass...
 }
 
 void
-EchoStream::handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
-  sendDatagram(data, len);
+EchoStream::handleDatagram(const uint8_t *data, size_t len) {
+  if ((0 == data) && (0 == len)) {
+    sendNull();
+  } else {
+    sendDatagram(data, len);
+  }
 }

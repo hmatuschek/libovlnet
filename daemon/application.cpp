@@ -31,8 +31,8 @@ Application::Application(int argc, char *argv[]) :
 }
 
 SecureStream *
-Application::newStream(bool incomming, uint16_t service) {
-  return new EchoStream(incomming, *_identity);
+Application::newStream(uint16_t service) {
+  return new EchoStream(*_identity);
 }
 
 bool

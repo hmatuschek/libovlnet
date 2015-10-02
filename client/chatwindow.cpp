@@ -1,14 +1,19 @@
 #include "chatwindow.h"
+#include "application.h"
 #include <QTextCursor>
 #include <QVBoxLayout>
 #include <QTextBlockFormat>
 #include <QCloseEvent>
 
 
-ChatWindow::ChatWindow(SecureChat *chat, QWidget *parent)
-  : QWidget(parent), _chat(chat)
+ChatWindow::ChatWindow(Application &app, SecureChat *chat, QWidget *parent)
+  : QWidget(parent), _application(app), _chat(chat)
 {
-  setWindowTitle(tr("VLF Chat with %1").arg(QString(chat->peerId().toHex())));
+  _peer = QString(chat->peerId().toHex());
+  if (_application.buddies().hasNode(chat->peerId())) {
+    _peer = _application.buddies().buddyName(chat->peerId());
+  }
+  setWindowTitle(tr("VLF Chat with %1").arg(_peer));
   setMinimumWidth(200);
 
   _view = new QTextBrowser();
@@ -39,7 +44,7 @@ ChatWindow::_onMessageReceived(const QString &msg) {
   cursor.insertText("(");
   cursor.insertText(QTime::currentTime().toString());
   cursor.insertText(") ");
-  cursor.insertText(_chat->peerId().toHex());
+  cursor.insertText(_peer);
   cursor.insertText(":\n");
   cursor.insertText(msg);
   cursor.endEditBlock();

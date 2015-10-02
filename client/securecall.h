@@ -32,19 +32,20 @@ public:
 public:
   /** Constructor.
    * @param incomming Indicates whether the call was initiated by the peer or this node.
-   * @param application A weak reference to the application instance.
-   * @param parent The optional QObject parent instance. */
-  explicit SecureCall(bool incomming, Application &application, QObject *parent = 0);
+   * @param application A weak reference to the application instance. */
+  explicit SecureCall(bool incomming, Application &application);
   /** Destructor. */
   virtual ~SecureCall();
 
   /** Retruns the state of the call. */
   State state() const;
+  /** Returns true if the call was initiated by the remote party. */
+  bool isIncomming() const;
 
   /** Gets called by the dispatcher to signal a successful initiation of the secure connection. */
   void initialized();
   /** Handles incomming datagrams. */
-  void handleDatagram(uint32_t seq, const uint8_t *data, size_t len);
+  void handleDatagram(const uint8_t *data, size_t len);
 
 public slots:
   /** Accept an incomming call. (Does nothing if the call is not incomming). */
@@ -67,6 +68,8 @@ protected:
                            void *userData);
 
 protected:
+  /** If @c true, this stream was initiated by the remote party. */
+  bool _incomming;
   /** A weak reference to the application instance. */
   Application &_application;
   /** The opus audio encoder. */

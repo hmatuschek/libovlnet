@@ -5,14 +5,14 @@
 
 class TempStream: public SecureStream {
 public:
-  TempStream(bool incomming, Identity &id) : SecureStream(incomming, id)
+  TempStream(Identity &id) : SecureStream(id)
   {
     uint8_t data[1024]; int datalen=1024;
     datalen = prepare(data, datalen);
     qDebug() << QByteArray((char *)data, datalen).toHex();
   }
 
-  void handleDatagram(uint32_t seq, const uint8_t *data, size_t len) {
+  void handleDatagram(const uint8_t *data, size_t len) {
     // pass...
   }
 };
@@ -29,6 +29,6 @@ int main() {
   sigLen = id->sign((uint8_t *)"abc", 3, sig, sigLen);
   qDebug() << "Success:" << id2->verify((uint8_t *)"abc", 3, sig, sigLen);
 
-  TempStream str(false, *id);
+  TempStream str(*id);
   return 0;
 }

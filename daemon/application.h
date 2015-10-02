@@ -13,7 +13,7 @@ class Application : public QCoreApplication, public StreamHandler
 public:
   explicit Application(int argc, char *argv[]);
 
-  SecureStream *newStream(bool incomming, uint16_t service);
+  SecureStream *newStream(uint16_t service);
   bool allowStream(uint16_t service, const NodeItem &peer);
   void streamStarted(SecureStream *stream);
 

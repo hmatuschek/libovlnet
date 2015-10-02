@@ -7,12 +7,15 @@
 #include "securechat.h"
 
 
+// Forward declarations
+class Application;
+
 class ChatWindow : public QWidget
 {
   Q_OBJECT
 
 public:
-  explicit ChatWindow(SecureChat *chat, QWidget *parent=0);
+  explicit ChatWindow(Application &app, SecureChat *chat, QWidget *parent=0);
   virtual ~ChatWindow();
 
 protected slots:
@@ -23,7 +26,9 @@ protected:
   void closeEvent(QCloseEvent *evt);
 
 protected:
+  Application &_application;
   SecureChat *_chat;
+  QString _peer;
   QTextBrowser *_view;
   QLineEdit *_text;
 };

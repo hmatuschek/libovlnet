@@ -9,6 +9,8 @@
 
 #include <openssl/evp.h>
 
+/** Maximum unencrypted payload per message. */
+#define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-20)
 
 class Identity
 {
@@ -42,18 +44,16 @@ protected:
 class SecureStream
 {
 public:
-  SecureStream(bool incomming, Identity &id);
+  SecureStream(Identity &id);
   virtual ~SecureStream();
 
   /** The stream ID. */
   const Identifier &id() const;
   /** Peer identifier derived from its pubkey. */
   const Identifier &peerId() const;
-  /** Returns @c true if the stream was initiated by the peer. */
-  bool isIncomming() const;
 
   /** Needs to be implemented by any specialization to handle received datagrams. */
-  virtual void handleDatagram(uint32_t seq, const uint8_t *data, size_t len) = 0;
+  virtual void handleDatagram(const uint8_t *data, size_t len) = 0;
   /** Sends the given @c data as an encrypted datagram. */
   bool sendDatagram(const uint8_t *data, size_t len);
   /** Sends a null datagram. */
@@ -64,9 +64,10 @@ protected:
   void handleData(const uint8_t *data, size_t len);
 
   /** Creates a session key pair and an initalization message. The message contains the public
-   * key of the node, a newly generated ECC public key to derive a session key from and the
-   * signature of the session key made from the nodes public key. This allows to verify the
-   * identity of the node and to establish an encrypted communication.
+   * key of the node, a newly generated ECC public key to derive a session key and the
+   * signature of the session key made with the public key of the node. This allows to prevent
+   * man-in-the-middle attacks on the secure communication. This does not ensure that the sender
+   * of a valid handshake package is actually the verified node.
    *
    * \code
    * struct {
@@ -85,7 +86,7 @@ protected:
    */
   int prepare(uint8_t *msg, size_t maxlen);
 
-  /** Verifies the peer from its initalization message (see @c prepare).
+  /** Verifies the initialization message (see @c prepare).
    * @param msg A pointer to the initialization message.
    * @param len The length of the initialization message.
    * @returns @c true if the peek could be verified and @c false if not or if an error ocurred.
@@ -99,7 +100,6 @@ protected:
   int decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out);
 
 protected:
-  bool _incomming;
   Identity &_identity;
   EVP_PKEY *_sessionKeyPair;
   /** Public session key provided by the peer. */
@@ -131,7 +131,7 @@ protected:
 public:
   virtual ~StreamHandler();
 
-  virtual SecureStream *newStream(bool incomming, uint16_t service) = 0;
+  virtual SecureStream *newStream(uint16_t service) = 0;
   virtual bool allowStream(uint16_t service, const NodeItem &peer) = 0;
   virtual void streamStarted(SecureStream *stream) = 0;
 };

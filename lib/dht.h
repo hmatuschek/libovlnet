@@ -289,8 +289,9 @@ public:
   /** Announces a value. */
   void announce(const Identifier &id);
 
-  /** Starts a secure stream connection. */
-  bool startStream(uint16_t service, const NodeItem &node);
+  /** Starts a secure stream connection.
+   * The ownership of the @c SecureStream instance is passed. */
+  bool startStream(uint16_t service, const NodeItem &node, SecureStream *stream);
   void closeStream(const Identifier &id);
 
 signals:
