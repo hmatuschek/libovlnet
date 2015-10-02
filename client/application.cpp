@@ -194,13 +194,16 @@ Application::newStream(uint16_t service) {
   } else if (2 == service) {
     // Chat service
     return new SecureChat(*this);
+  } else if (4 == service) {
+    // File download
+    return new FileDownload(*this);
   }
   return 0;
 }
 
 bool
 Application::allowStream(uint16_t service, const NodeItem &peer) {
-  if ((1 == service) || (2 == service)) {
+  if ((1 == service) || (2 == service) || (4 == service)) {
     // VoIP or Chat services: check if peer is buddy list
     return _buddies->hasNode(peer.id());
   }
@@ -227,6 +230,11 @@ Application::streamStarted(SecureStream *stream) {
     _dht->closeStream(stream->id());
     delete stream;
   }
+}
+
+void
+Application::streamFailed(SecureStream *stream) {
+  /// @todo Handle stream errors;
 }
 
 void

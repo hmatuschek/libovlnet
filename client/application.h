@@ -26,6 +26,7 @@ public:
   SecureStream *newStream(uint16_t service);
   bool allowStream(uint16_t service, const NodeItem &peer);
   void streamStarted(SecureStream *stream);
+  void streamFailed(SecureStream *stream);
 
   /** Initializes a chat with the specified node. */
   void startChatWith(const Identifier &id);

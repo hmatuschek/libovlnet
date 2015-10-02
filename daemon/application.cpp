@@ -44,3 +44,8 @@ void
 Application::streamStarted(SecureStream *stream) {
   qDebug() << "Stream service" << stream << "started";
 }
+
+void
+Application::streamFailed(SecureStream *stream) {
+  // mhh, don't care.
+}

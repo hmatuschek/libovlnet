@@ -1480,6 +1480,10 @@ DHT::_onCheckRequestTimeout() {
       sendFindValue(next, query); delete *req;
     } else if (MSG_START_STREAM == (*req)->type()) {
       qDebug() << "StartStream request timeout...";
+      if (_streamHandler) {
+        _streamHandler->streamFailed(
+              static_cast<StartStreamRequest *>(*req)->query());
+      }
       // delete stream
       delete static_cast<StartStreamRequest *>(*req)->query();
       delete *req;

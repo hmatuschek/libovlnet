@@ -134,6 +134,7 @@ public:
   virtual SecureStream *newStream(uint16_t service) = 0;
   virtual bool allowStream(uint16_t service, const NodeItem &peer) = 0;
   virtual void streamStarted(SecureStream *stream) = 0;
+  virtual void streamFailed(SecureStream *stream) = 0;
 };
 
 

@@ -16,6 +16,7 @@ public:
   SecureStream *newStream(uint16_t service);
   bool allowStream(uint16_t service, const NodeItem &peer);
   void streamStarted(SecureStream *stream);
+  void streamFailed(SecureStream *stream);
 
 protected:
   Identity *_identity;
