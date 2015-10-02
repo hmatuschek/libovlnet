@@ -130,7 +130,11 @@ FileUpload::write(const QByteArray &data) {
 
 size_t
 FileUpload::write(const uint8_t *buffer, size_t size) {
-  if (0 == (size = std::min(size, FILETRANSFER_MAX_DATA_LEN))) { return 0; }
+  if (0 == (size = std::min(size, FILETRANSFER_MAX_DATA_LEN))) {
+    qDebug() << "Skip empty data package, size" << size
+             << "max size" << FILETRANSFER_MAX_DATA_LEN;
+    return 0;
+  }
   // get current sequence number
   uint32_t sequence = _packetBuffer.sequence();
   // put into packet buffer
@@ -215,7 +219,6 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
   if ((STARTED == _state) && (DATA == msg->type)) {
     // check length
     if (len<5) { return; }
-    qDebug() << "Received" << len-5 << "bytes of file.";
     uint32_t seq = qFromBigEndian(msg->payload.data.seq);
     qDebug() << "Received" << (len-5) << "bytes data with seq" << seq;
     if (_packetBuffer.putPacket(seq, msg->payload.data.data, len-5)) {

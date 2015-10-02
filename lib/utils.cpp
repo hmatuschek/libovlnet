@@ -10,7 +10,7 @@ RingBuffer::RingBuffer()
 }
 
 RingBuffer::RingBuffer(size_t size)
-  : _buffer(0, size), _inptr(0), _outptr(0), _full(false)
+  : _buffer(size, 0), _inptr(0), _outptr(0), _full(false)
 {
   // pass...
 }
