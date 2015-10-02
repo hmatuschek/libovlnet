@@ -60,7 +60,9 @@ FileUpload::handleDatagram(const uint8_t *data, size_t len) {
 
   // If we have send a request -> handle ACKs
   if ((REQUEST_SEND == _state) && (ACK == msg->type)) {
-    _state = STARTED; emit accepted(); return;
+    _state = STARTED;
+    emit accepted();
+    return;
   }
 
   // Handle ACKs during tranmission
@@ -141,6 +143,7 @@ FileUpload::write(const uint8_t *buffer, size_t size) {
   size = _packetBuffer.write(buffer, size);
   // Assemble message
   FileTransferMessage msg;
+  msg.type = DATA;
   msg.payload.data.seq = qToBigEndian(quint32(sequence));
   memcpy(msg.payload.data.data, buffer, size);
   qDebug() << "Send" << size << "bytes data.";

@@ -58,7 +58,6 @@ FileUploadDialog::_onAccepted() {
   while (_upload->free() && (!_file.atEnd())) {
     int len = _file.read((char *) buffer, FILETRANSFER_MAX_DATA_LEN);
     len = _upload->write(buffer, len);
-
     offset += len; _file.seek(offset);
   }
 }
