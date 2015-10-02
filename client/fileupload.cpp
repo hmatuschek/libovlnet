@@ -136,10 +136,12 @@ FileUpload::sendRequest() {
 
 void
 FileUpload::stop() {
-  // (re-) send RESET message
-  FileTransferMessage msg;
-  msg.type = RESET;
-  sendDatagram((const uint8_t *) &msg, 1);
+  if (_socket) {
+    // (re-) send RESET message
+    FileTransferMessage msg;
+    msg.type = RESET;
+    sendDatagram((const uint8_t *) &msg, 1);
+  }
   // Emit "closed" only once.
   if (TERMINATED != _state) {
     _state = TERMINATED;
@@ -302,9 +304,11 @@ FileDownload::accept() {
 
 void
 FileDownload::stop() {
-  FileTransferMessage msg;
-  msg.type = RESET;
-  sendDatagram((uint8_t *) &msg, 1);
+  if (_socket) {
+    FileTransferMessage msg;
+    msg.type = RESET;
+    sendDatagram((uint8_t *) &msg, 1);
+  }
   // Emit "closed" only once.
   if (TERMINATED != _state) {
     _state = TERMINATED;

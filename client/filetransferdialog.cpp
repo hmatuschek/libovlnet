@@ -142,7 +142,7 @@ FileDownloadDialog::FileDownloadDialog(FileDownload *download, Application &app,
   _progress->setValue(0);
 
   QLabel *icon = new QLabel(); icon->setPixmap(
-        QPixmap::fromImage(QImage("://icons/data-transfer-upload.png")));
+        QPixmap::fromImage(QImage("://icons/data-transfer-download.png")));
 
   QHBoxLayout *layout = new QHBoxLayout();
   layout->addWidget(icon);

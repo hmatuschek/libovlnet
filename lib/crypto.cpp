@@ -212,7 +212,7 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
  * ******************************************************************************************** */
 SecureStream::SecureStream(Identity &id)
   : _identity(id), _sessionKeyPair(0), _peerPubKey(0),
-    _streamId()
+    _streamId(), _socket(0)
 {
   // pass...
 }
