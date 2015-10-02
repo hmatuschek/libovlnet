@@ -73,9 +73,9 @@ public:
   void handleDatagram(const uint8_t *data, size_t len);
 
   State state() const;
+  size_t fileSize() const;
 
   size_t available() const;
-
   size_t read(QByteArray &buffer);
   size_t read(uint8_t *buffer, size_t len);
 
@@ -93,7 +93,6 @@ protected:
   Application &_application;
   State _state;
   size_t _fileSize;
-  size_t _received;
   PacketInBuffer _packetBuffer;
 };
 
