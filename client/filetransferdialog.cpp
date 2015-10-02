@@ -10,7 +10,8 @@
  * Implementation of FileUploadDialog
  * ********************************************************************************************* */
 FileUploadDialog::FileUploadDialog(FileUpload *upload, Application &app, QWidget *parent)
-  : QWidget(parent), _application(app), _upload(upload), _file(upload->fileName())
+  : QWidget(parent), _application(app), _upload(upload), _file(upload->fileName()),
+    _bytesSend(0)
 {
   QFileInfo fileinfo(_file.fileName());
   _info = new QLabel(tr("Wait for transfer of file %1...").arg(fileinfo.baseName()));
