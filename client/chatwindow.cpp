@@ -13,7 +13,7 @@ ChatWindow::ChatWindow(Application &app, SecureChat *chat, QWidget *parent)
   if (_application.buddies().hasNode(chat->peerId())) {
     _peer = _application.buddies().buddyName(chat->peerId());
   }
-  setWindowTitle(tr("VLF Chat with %1").arg(_peer));
+  setWindowTitle(tr("Chat with %1").arg(_peer));
   setMinimumWidth(200);
 
   _view = new QTextBrowser();

@@ -18,9 +18,9 @@ typedef enum {
 /** Represents a triple of ID, IP address and port as transferred via UDP. */
 struct __attribute__((packed)) DHTTriple {
   /** The ID of a node. */
-  char     id[DHT_HASH_SIZE];
+  char      id[DHT_HASH_SIZE];
   /** The IP of the node. */
-  uint32_t  ip;
+  uint8_t   ip[16];
   /** The port of the node. */
   uint16_t  port;
 };
@@ -814,7 +814,9 @@ DHT::~DHT() {
 void
 DHT::ping(const QString &addr, uint16_t port) {
   QHostInfo info = QHostInfo::fromName(addr);
-  ping(info.addresses().front(), port);
+  if (info.addresses().size()) {
+    ping(info.addresses().front(), port);
+  }
 }
 
 void
@@ -1130,7 +1132,7 @@ DHT::_processFindNodeResponse(
     qDebug() << "Received" << Ntriple << "nodes from"  << addr << ":" << port;
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
-      NodeItem item(id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
+      NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip)),
                     ntohs(msg.payload.result.triples[i].port));
       qDebug() << " got: " << item.id() << "@" << item.addr() << ":" << ntohs(msg.payload.result.triples[i].port);
       // Add discovered node to buckets
@@ -1196,9 +1198,10 @@ DHT::_processFindValueResponse(
       // Get list of nodes providing the data
       QList<NodeItem> nodes; nodes.reserve(Ntriple);
       for (size_t i=0; i<Ntriple; i++) {
-        nodes.push_back(NodeItem(msg.payload.result.triples[i].id,
-                                 QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
-                                 ntohs(msg.payload.result.triples[i].port)));
+        nodes.push_back(
+              NodeItem(msg.payload.result.triples[i].id,
+                       QHostAddress((const Q_IPV6ADDR &) *(msg.payload.result.triples[i].ip)),
+                       ntohs(msg.payload.result.triples[i].port)));
       }
       // signal success
       emit valueFound(req->query()->id(), nodes);
@@ -1210,7 +1213,7 @@ DHT::_processFindValueResponse(
     // If value was not found -> proceed with returned nodes
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
-      NodeItem item(id, QHostAddress(ntohl(msg.payload.result.triples[i].ip)),
+      NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)* (msg.payload.result.triples[i].ip)),
                     ntohs(msg.payload.result.triples[i].port));
       // Add discovered node to buckets
       _buckets.add(id, item.addr(), item.port());
@@ -1297,7 +1300,7 @@ DHT::_processFindNodeRequest(
   QList<NodeItem>::iterator item = best.begin();
   for (int i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
     memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
-    resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
+    memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
     resp.payload.result.triples[i].port = htons(item->port());
     qDebug() << " add: " << item->id()
              << "@" << item->addr() << ":" << ntohs(resp.payload.result.triples[i].port);
@@ -1323,7 +1326,7 @@ DHT::_processFindValueRequest(
     QHash<Identifier, AnnouncementItem>::iterator item = owners.begin();
     for (int i = 0; (item!=owners.end()) && (i<DHT_MAX_TRIPLES); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item.key().data(), DHT_HASH_SIZE);
-      resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
+      memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
       resp.payload.result.triples[i].port = htons(item->port());
     }
     // Compute size and send reponse
@@ -1339,7 +1342,7 @@ DHT::_processFindValueRequest(
     QList<NodeItem>::iterator item = best.begin();
     for (int i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
-      resp.payload.result.triples[i].ip = htonl(item->addr().toIPv4Address());
+      memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
       resp.payload.result.triples[i].port = htons(item->port());
     }
     // Compute size and send reponse

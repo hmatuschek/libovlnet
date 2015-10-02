@@ -9,7 +9,7 @@
 #define DHT_MIN_MESSAGE_SIZE DHT_HASH_SIZE
 
 /** The size of the triple (hash, IPv4, port). */
-#define DHT_TRIPLE_SIZE (DHT_HASH_SIZE + 4 + 2)
+#define DHT_TRIPLE_SIZE (DHT_HASH_SIZE + 16 + 2)
 /** The max. number of triples in a response. */
 #define DHT_MAX_TRIPLES ((DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE)
 /** The max. data response. */

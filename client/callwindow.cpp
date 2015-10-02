@@ -10,6 +10,7 @@
 CallWindow::CallWindow(Application &application, SecureCall *call, QWidget *parent)
   : QWidget(parent), _application(application), _call(call)
 {
+  setWindowTitle("Call");
   QLabel *label = new QLabel();
   if (_application.buddies().hasNode(_call->peerId())) {
     label->setText(
