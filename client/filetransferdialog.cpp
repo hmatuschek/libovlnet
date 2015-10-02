@@ -33,7 +33,7 @@ FileUploadDialog::FileUploadDialog(FileUpload *upload, Application &app, QWidget
   QObject::connect(stop, SIGNAL(clicked()), this, SLOT(_onAbort()));
   QObject::connect(_upload, SIGNAL(accepted()), this, SLOT(_onAccepted()));
   QObject::connect(_upload, SIGNAL(closed()), this, SLOT(_onClosed()));
-  QObject::connect(_upload, SIGNAL(bytesWritten(uint64_t)), this, SLOT(_onBytesWritten(uint64_t)));
+  QObject::connect(_upload, SIGNAL(bytesWritten(size_t)), this, SLOT(_onBytesWritten(size_t)));
 }
 
 FileUploadDialog::~FileUploadDialog() {
@@ -49,8 +49,8 @@ FileUploadDialog::_onAbort() {
 void
 FileUploadDialog::_onAccepted() {
   QFileInfo fileinfo(_file.fileName());
-  _info->setText(tr("Transfer file %1...").arg(fileinfo.baseName()));
-
+  _info->setText(tr("Transfer file \"%1\" ...").arg(fileinfo.fileName()));
+  qDebug() << "Start transfer of file" << _file.fileName();
   _file.open(QIODevice::ReadOnly);
   size_t offset = 0;
   uint8_t buffer[FILETRANSFER_MAX_DATA_LEN];
@@ -63,15 +63,17 @@ FileUploadDialog::_onAccepted() {
 
 void
 FileUploadDialog::_onClosed() {
+  qDebug() << "Stop transfer of file" << _file.fileName();
   _file.close();
   QFileInfo fileinfo(_file.fileName());
-  _info->setText(tr("File transfer aborted %1...").arg(fileinfo.baseName()));
+  _info->setText(tr("File transfer aborted for \"%1\" ...").arg(fileinfo.fileName()));
   _progress->setValue(100);
 }
 
 void
 FileUploadDialog::_onBytesWritten(size_t bytes) {
   _bytesSend += bytes;
+  qDebug() << "Continue transfer of file" << _file.fileName() << "at byte" << _bytesSend;
   // Update progress bar
   _progress->setValue(100*double(_bytesSend)/_upload->fileSize());
   // if complete -> close stream etc.

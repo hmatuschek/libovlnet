@@ -226,6 +226,8 @@ Application::streamStarted(SecureStream *stream) {
     call->initialized();
     (new CallWindow(*this, call))->show();
   } else if (0 != (upload = dynamic_cast<FileUpload *>(stream))) {
+    // Send request
+    upload->sendRequest();
     // show upload dialog
     (new FileUploadDialog(upload, *this))->show();
   } else if (0 != (download = dynamic_cast<FileDownload *>(stream))) {

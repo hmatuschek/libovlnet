@@ -53,7 +53,7 @@ FileUpload::handleDatagram(const uint8_t *data, size_t len) {
    */
 
   // If we receive a "reset" message -> close upload
-  if (RESET == msg->type) { emit closed(); return; }
+  if (RESET == msg->type) { _state = TERMINATED; emit closed(); return; }
 
   // We do not expect any messages in the "initialized" or "terminated" state:
   if ((INITIALIZED == _state) || (TERMINATED == _state)) { return; }
