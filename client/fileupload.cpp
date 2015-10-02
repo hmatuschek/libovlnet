@@ -59,7 +59,14 @@ FileUpload::handleDatagram(const uint8_t *data, size_t len) {
    */
 
   // If we receive a "reset" message -> close upload
-  if (RESET == msg->type) { _state = TERMINATED; emit closed(); return; }
+  if (RESET == msg->type) {
+    if (TERMINATED != _state) {
+      _state = TERMINATED;
+      _application.dht().closeStream(_streamId);
+      emit closed();
+    }
+    return;
+  }
 
   // We do not expect any messages in the "initialized" or "terminated" state:
   if ((INITIALIZED == _state) || (TERMINATED == _state)) { return; }
@@ -214,6 +221,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
+      _application.dht().closeStream(_streamId);
       emit closed();
     }
     return;
@@ -294,9 +302,14 @@ FileDownload::accept() {
 
 void
 FileDownload::stop() {
-  _state = TERMINATED;
   FileTransferMessage msg;
   msg.type = RESET;
   sendDatagram((uint8_t *) &msg, 1);
-  emit closed();
+  // Emit "closed" only once.
+  if (TERMINATED != _state) {
+    _state = TERMINATED;
+    // signal DHT to close stream
+    _application.dht().closeStream(_streamId);
+    emit closed();
+  }
 }
