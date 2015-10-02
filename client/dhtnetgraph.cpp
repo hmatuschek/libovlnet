@@ -30,7 +30,8 @@ DHTNetGraph::paintEvent(QPaintEvent *evt) {
   // Draw axis
   painter.setPen(QPen(Qt::black, 3));
   painter.drawLine(margin, height()/2, width()-2*margin, height()/2);
-  painter.drawLine(margin, height()/2-5, margin, height()/2+5);
+  painter.setBrush(QBrush(Qt::black));
+  painter.drawEllipse(QPoint(margin,height()/2), 5,5);
 
   // Draw nodes
   painter.setPen(QPen(Qt::black, 2));
