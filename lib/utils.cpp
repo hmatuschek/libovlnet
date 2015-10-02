@@ -165,7 +165,7 @@ RingBuffer::put(size_t offset, uint8_t *buffer, size_t len) {
  * Implementation of PacketOutBuffer
  * ********************************************************************************************* */
 PacketOutBuffer::PacketOutBuffer(size_t bufferSize, size_t timeout)
-  : _buffer(bufferSize), _nextSequence(0)
+  : _buffer(bufferSize), _nextSequence(0), _packets()
 {
   // pass...
 }
@@ -235,7 +235,7 @@ PacketOutBuffer::resend(uint8_t *buffer, size_t &len, uint32_t &sequence) {
  * Implementation of PacketInBuffer
  * ********************************************************************************************* */
 PacketInBuffer::PacketInBuffer(size_t bufferSize)
-  : _buffer(bufferSize), _nextSequence(0), _available(0)
+  : _buffer(bufferSize), _nextSequence(0), _available(0), _packets()
 {
   // pass..
 }
@@ -253,6 +253,7 @@ PacketInBuffer::read(QByteArray &buffer) {
 size_t
 PacketInBuffer::read(uint8_t *buffer, size_t len) {
   len = std::min(_available, len);
+  if (0 == len) { return 0; }
   len = _buffer.read(buffer, len);
   _available -= len;
   return len;
@@ -280,17 +281,27 @@ PacketInBuffer::putPacket(uint32_t &seq, uint8_t *data, size_t len) {
   }
   // put packet
   _buffer.put(offset, data, len);
-  // insort package sequence number
-  uint32_t lastSeq = _nextSequence;
-  QList< QPair<uint32_t, size_t> >::iterator item = _packets.begin();
-  for (; item != _packets.end(); item++) {
-    if (__inBetweenSeq(seq, lastSeq, item->first)) { break; }
+  if (0 == _packets.size()) {
+    // Simply append
+    _packets.append(QPair<uint32_t, size_t>(seq, len));
+  } else {
+    // insort package sequence number
+    uint32_t lastSeq = _nextSequence;
+    QList< QPair<uint32_t, size_t> >::iterator item = _packets.begin();
+    for (; item != _packets.end(); item++) {
+      if (__inBetweenSeq(seq, lastSeq, item->first)) { break; }
+    }
+    _packets.insert(item, QPair<uint32_t, size_t>(seq, len));
   }
-  _packets.insert(item, QPair<uint32_t, size_t>(seq, len));
-  // ACK continous data
-  while ((_nextSequence == _packets.front().first) && (_packets.size())) {
+  // ACK continous data (there is at least one element in the list)
+  while ((_packets.size()) && (_nextSequence == _packets.front().first)) {
+    // Get sequence number of next expected packet
     seq = _packets.front().first;
+    // mark payload as available
+    _available += _packets.front().second;
+    // compute next expected sequence number
     _nextSequence += _packets.front().second;
+    // remove processed packet
     _packets.pop_front();
   }
   return true;

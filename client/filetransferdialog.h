@@ -52,6 +52,7 @@ protected:
    Application  &_application;
    FileDownload *_download;
    QFile        _file;
+   size_t       _bytesReceived;
 
    QLabel       *_info;
    QPushButton  *_acceptStop;

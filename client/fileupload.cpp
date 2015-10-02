@@ -165,6 +165,11 @@ FileDownload::state() const {
 }
 
 size_t
+FileDownload::fileSize() const {
+  return _fileSize;
+}
+
+size_t
 FileDownload::available() const {
   return _packetBuffer.available();
 }
@@ -173,6 +178,7 @@ void
 FileDownload::handleDatagram(const uint8_t *data, size_t len) {
   // ignore null & empty messages
   if ((0 == data) || (0 == len)) { return; }
+
   // Unpack message
   FileTransferMessage *msg = (FileTransferMessage *) data;
 
@@ -181,8 +187,12 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
    */
 
   // If we receive a "reset" message -> close upload
-  if ((RESET == msg->type) && (TERMINATED == _state)) {
-    _state = TERMINATED; emit closed(); return;
+  if (RESET == msg->type) {
+    if (TERMINATED != _state) {
+      _state = TERMINATED;
+      emit closed();
+    }
+    return;
   }
 
   // We do not expect any messages in the "terminated" state:
@@ -200,6 +210,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
     return;
   }
 
+  // If request was already accepted -> resend ACK.
   if ((ACCEPTED == _state) && (REQUEST == msg->type)) {
     // check length
     if (len<9) { return; }
@@ -210,13 +221,16 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
     return;
   }
 
+  // Just accepted request and received data -> switch to STARTED stage.
   if ((ACCEPTED == _state) && (DATA == msg->type)) {
+    qDebug() << "Received DATA in ACCEPTED state -> switch into STARTED state.";
     _state = STARTED;
     // pass through;
   }
 
   // If started, expect data
   if ((STARTED == _state) && (DATA == msg->type)) {
+    qDebug() << "Received DATA package in STARTED stage.";
     // check length
     if (len<5) { return; }
     uint32_t seq = qFromBigEndian(msg->payload.data.seq);
@@ -229,6 +243,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
       qDebug() << "Send ACK for seq" << seq;
       emit readyRead();
     }
+    return;
   }
 }
 
@@ -245,6 +260,7 @@ FileDownload::read(uint8_t *buffer, size_t len) {
 void
 FileDownload::accept() {
   if (REQUEST_RECEIVED == _state) {
+    qDebug() << "Send ACK to accept the file-transfer request.";
     _state = ACCEPTED;
     FileTransferMessage resp;
     resp.type = ACK; resp.payload.ack.seq = 0;

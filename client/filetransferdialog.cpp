@@ -141,9 +141,15 @@ FileDownloadDialog::_onAcceptStop() {
     if (0 == fname) { _download->stop(); return; }
     _file.setFileName(fname);
     _file.open(QIODevice::WriteOnly);
+    QFileInfo fileinfo(fname);
+    _info->setText(tr("Downloading file \"%1\" ...").arg(fileinfo.fileName()));
     _acceptStop->setIcon(QIcon("://icons/circle-x.png"));
     _acceptStop->setText(tr("stop"));
     _download->accept();
+  } else if ((FileDownload::TERMINATED == _download->state()) ||
+             (_bytesReceived == _download->fileSize())) {
+    // if transfer is terminated (or done) close window
+    this->close();
   }
 }
 
@@ -162,10 +168,25 @@ FileDownloadDialog::_onReadyRead() {
     qDebug() << " received" << len << "bytes.";
     /// @bug Check if data was written.
     _file.write((const char *) buffer, len);
+    _bytesReceived += len;
+  }
+  // Update progress
+  _progress->setValue(100*double(_bytesReceived)/_download->fileSize());
+  // Check download complete
+  if (_bytesReceived == _download->fileSize()) {
+    _file.close();
+    _info->setText(tr("Download complete."));
+    _acceptStop->setIcon(QIcon(":/icons/circle-check.png"));
+    _acceptStop->setText(tr("close"));
   }
 }
 
 void
 FileDownloadDialog::_onClosed() {
+  if (_bytesReceived != _download->fileSize()) {
+    _info->setText(tr("Download terminated..."));
+    _acceptStop->setIcon(QIcon(":/icons/circle-x.png"));
+    _acceptStop->setText(tr("close"));
+  }
   _file.close();
 }
