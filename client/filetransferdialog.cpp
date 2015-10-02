@@ -155,8 +155,13 @@ FileDownloadDialog::_onRequest(const QString &filename, uint64_t size) {
 void
 FileDownloadDialog::_onReadyRead() {
   uint8_t buffer[FILETRANSFER_MAX_DATA_LEN];
-  size_t len = _download->read(buffer, FILETRANSFER_MAX_DATA_LEN);
-  _file.write((const char *) buffer, len);
+  qDebug() << "In _onReadyRead:";
+  while (_download->available()) {
+    size_t len = _download->read(buffer, FILETRANSFER_MAX_DATA_LEN);
+    qDebug() << " received" << len << "bytes.";
+    /// @bug Check if data was written.
+    _file.write((const char *) buffer, len);
+  }
 }
 
 void
