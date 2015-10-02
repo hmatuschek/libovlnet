@@ -5,6 +5,7 @@
 #include <QJsonValue>
 #include <QStringList>
 
+
 BootstrapNodeList::BootstrapNodeList()
   : QList< QPair<QString, uint16_t> >(), _file()
 {

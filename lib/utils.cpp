@@ -53,7 +53,7 @@ RingBuffer::read(uint8_t *buffer, size_t len) {
   if (((_inptr == _outptr) && (!_full)) || (0 == len)) { return 0; }
   // Determine how many bytes to read
   size_t nread = std::min(available(), len);
-  if ((_outptr < _inptr) || ((_outptr+nread)<=_buffer.size())) {
+  if ((_outptr < _inptr) || (int(_outptr+nread)<=_buffer.size())) {
     // w/o wrap-around
     memcpy(buffer, _buffer.data()+_outptr, nread);
     _outptr = ( (_outptr + nread) % _buffer.size() );
@@ -74,7 +74,7 @@ RingBuffer::drop(size_t len) {
   if (((_inptr == _outptr) && (!_full)) || (0 == len)) { return 0; }
   // Determine how many bytes to read
   len = std::min(available(), len);
-  if ((_outptr < _inptr) || ((_outptr+len)<=_buffer.size())) {
+  if ((_outptr < _inptr) || (int(_outptr+len)<=_buffer.size())) {
     _outptr = ((_outptr + len) % _buffer.size());
     return len;
   }
@@ -115,7 +115,7 @@ RingBuffer::write(const uint8_t *buffer, size_t len) {
   // Determine number of bytes to write
   size_t nwrite = std::min(free(), len);
   if (0 == nwrite) { return 0; }
-  if ((_inptr+nwrite) <= _buffer.size()) {
+  if (int(_inptr+nwrite) <= _buffer.size()) {
     // no wrap around
     memcpy(_buffer.data(), buffer, nwrite);
     _inptr = (_inptr + nwrite) % _buffer.size();

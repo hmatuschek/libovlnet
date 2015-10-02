@@ -1,6 +1,5 @@
 #include "fileupload.h"
 #include "application.h"
-#include <qendian.h>
 #include <QtEndian>
 #include <QFileInfo>
 
@@ -189,7 +188,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
     // check length
     if (len<9) { return; }
     // verify filename length
-    _fileSize = qFromBigEndian(msg->payload.request.fileSize);
+    _fileSize = qFromBigEndian(quint64(msg->payload.request.fileSize));
     QString filename = QString::fromUtf8((char *)msg->payload.request.filename, len-9);
     _state = REQUEST_RECEIVED;
     emit request(filename, _fileSize);
