@@ -139,6 +139,7 @@ FileUpload::write(const uint8_t *buffer, size_t size) {
   FileTransferMessage msg;
   msg.payload.data.seq = qToBigEndian(quint32(sequence));
   memcpy(msg.payload.data.data, buffer, size);
+  qDebug() << "Send" << size << "bytes data.";
   sendDatagram((uint8_t *)&msg, size+5);
   return size;
 }
@@ -215,11 +216,13 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
     // check length
     if (len<5) { return; }
     uint32_t seq = qFromBigEndian(msg->payload.data.seq);
+    qDebug() << "Received" << (len-5) << "bytes data with seq" << seq;
     if (_packetBuffer.putPacket(seq, msg->payload.data.data, len-5)) {
       // Send ACK for returned seq number
       FileTransferMessage resp;
       resp.type = ACK; resp.payload.ack.seq = qToBigEndian(quint32(seq));
       sendDatagram((uint8_t *) &resp, 5);
+      qDebug() << "Send ACK for seq" << seq;
       emit readyRead();
     }
   }
