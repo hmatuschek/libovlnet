@@ -20,7 +20,7 @@ FileUploadDialog::FileUploadDialog(FileUpload *upload, Application &app, QWidget
   _progress->setMaximum(100);
   _progress->setValue(0);
 
-  QPushButton *stop = new QPushButton(QIcon("://icons/circle-x.png"), tr("abort"));
+  _button = new QPushButton(QIcon("://icons/circle-x.png"), tr("stop"));
 
   QHBoxLayout *layout = new QHBoxLayout();
   //layout->addWidget(QIcon("://icons/data-transfer-upload.png"));
@@ -28,10 +28,10 @@ FileUploadDialog::FileUploadDialog(FileUpload *upload, Application &app, QWidget
   box->addWidget(_info);
   box->addWidget(_progress);
   layout->addLayout(box);
-  layout->addWidget(stop);
+  layout->addWidget(_button);
   setLayout(layout);
 
-  QObject::connect(stop, SIGNAL(clicked()), this, SLOT(_onAbort()));
+  QObject::connect(_button, SIGNAL(clicked()), this, SLOT(_onClick()));
   QObject::connect(_upload, SIGNAL(accepted()), this, SLOT(_onAccepted()));
   QObject::connect(_upload, SIGNAL(closed()), this, SLOT(_onClosed()));
   QObject::connect(_upload, SIGNAL(bytesWritten(size_t)), this, SLOT(_onBytesWritten(size_t)));
@@ -42,9 +42,14 @@ FileUploadDialog::~FileUploadDialog() {
 }
 
 void
-FileUploadDialog::_onAbort() {
-  _upload->stop();
-  _file.close();
+FileUploadDialog::_onClick() {
+  // If transfer is terminated or done
+  if ( (FileUpload::TERMINATED == _upload->state()) ||
+       (_bytesSend == _upload->fileSize()) ) {
+    this->close();
+  } else {
+    _upload->stop();
+  }
 }
 
 void
@@ -66,8 +71,16 @@ void
 FileUploadDialog::_onClosed() {
   qDebug() << "Stop transfer of file" << _file.fileName();
   _file.close();
+
   QFileInfo fileinfo(_file.fileName());
-  _info->setText(tr("File transfer aborted for \"%1\" ...").arg(fileinfo.fileName()));
+  if (_bytesSend == _upload->fileSize()) {
+    _info->setText(tr("Transfer of file \"%1\" completed.").arg(fileinfo.fileName()));
+    _button->setIcon(QIcon("://icons/circle-check.png"));
+  } else {
+    _info->setText(tr("Transfer of file \"%1\" aborted.").arg(fileinfo.fileName()));
+    _button->setIcon(QIcon("://icons/circle-x.png"));
+  }
+  _button->setText(tr("close"));
   _progress->setValue(100);
 }
 
@@ -79,10 +92,7 @@ FileUploadDialog::_onBytesWritten(size_t bytes) {
   _progress->setValue(100*double(_bytesSend)/_upload->fileSize());
   // if complete -> close stream etc.
   if (_upload->fileSize() == bytes) {
-    QFileInfo fileinfo(_file.fileName());
-    _info->setText(tr("File transfer completed.").arg(fileinfo.baseName()));
-    _upload->stop(); _file.close();
-    return;
+    _upload->stop(); _file.close(); return;
   }
   // If not complete -> continue
   size_t offset = _file.pos();

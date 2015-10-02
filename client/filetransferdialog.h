@@ -18,7 +18,7 @@ public:
   virtual ~FileUploadDialog();
 
 protected slots:
-  void _onAbort();
+  void _onClick();
   void _onAccepted();
   void _onClosed();
   void _onBytesWritten(size_t bytes);
@@ -30,6 +30,7 @@ protected:
   size_t       _bytesSend;
 
   QLabel       *_info;
+  QPushButton  *_button;
   QProgressBar *_progress;
 };
 

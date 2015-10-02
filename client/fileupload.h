@@ -25,6 +25,7 @@ public:
 
   void handleDatagram(const uint8_t *data, size_t len);
 
+  State state() const;
   size_t free() const;
 
   size_t write(const QByteArray &data);

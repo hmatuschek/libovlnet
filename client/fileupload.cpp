@@ -89,6 +89,11 @@ FileUpload::fileSize() const {
   return _fileSize;
 }
 
+FileUpload::State
+FileUpload::state() const {
+  return _state;
+}
+
 size_t
 FileUpload::free() const {
   return _packetBuffer.free();
