@@ -214,6 +214,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
   if ((STARTED == _state) && (DATA == msg->type)) {
     // check length
     if (len<5) { return; }
+    qDebug() << "Received" << len-5 << "bytes of file.";
     uint32_t seq = qFromBigEndian(msg->payload.data.seq);
     if (_packetBuffer.putPacket(seq, msg->payload.data.data, len-5)) {
       // Send ACK for returned seq number
