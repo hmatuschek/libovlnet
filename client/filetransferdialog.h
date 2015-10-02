@@ -44,7 +44,7 @@ public:
 
 protected slots:
    void _onAcceptStop();
-   void _onRequest(const QString &filename, size_t size);
+   void _onRequest(const QString &filename, uint64_t size);
    void _onReadyRead();
    void _onClosed();
 

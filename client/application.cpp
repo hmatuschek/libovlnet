@@ -215,6 +215,8 @@ Application::streamStarted(SecureStream *stream) {
   SecureChat *chat = 0;
   SecureCall *call = 0;
   FileUpload *upload = 0;
+  FileDownload *download = 0;
+
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     // start keep alive timer
     chat->keepAlive();
@@ -224,8 +226,11 @@ Application::streamStarted(SecureStream *stream) {
     call->initialized();
     (new CallWindow(*this, call))->show();
   } else if (0 != (upload = dynamic_cast<FileUpload *>(stream))) {
-    // Start upload
+    // show upload dialog
     (new FileUploadDialog(upload, *this))->show();
+  } else if (0 != (download = dynamic_cast<FileDownload *>(stream))) {
+    // show download dialog
+    (new FileDownloadDialog(download, *this))->show();
   } else {
     _dht->closeStream(stream->id());
     delete stream;

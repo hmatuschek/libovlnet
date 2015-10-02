@@ -108,9 +108,18 @@ FileDownloadDialog::FileDownloadDialog(FileDownload *download, Application &app,
   _progress->setMaximum(100);
   _progress->setValue(0);
 
+  QHBoxLayout *layout = new QHBoxLayout();
+  //layout->addWidget(QIcon(":/icons/data-transfer-download.png"));
+  QVBoxLayout *box = new QVBoxLayout();
+  box->addWidget(_info);
+  box->addWidget(_progress);
+  layout->addLayout(box);
+  layout->addWidget(_acceptStop);
+  setLayout(layout);
+
   connect(_acceptStop, SIGNAL(clicked()), this, SLOT(_onAcceptStop()));
   connect(_download, SIGNAL(request(QString,uint64_t)),
-          this, SLOT(_onRequest(QString,size_t)));
+          this, SLOT(_onRequest(QString,uint64_t)));
   connect(_download, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
   connect(_download, SIGNAL(closed()), this, SLOT(_onClosed()));
 }
@@ -132,7 +141,7 @@ FileDownloadDialog::_onAcceptStop() {
 }
 
 void
-FileDownloadDialog::_onRequest(const QString &filename, size_t size) {
+FileDownloadDialog::_onRequest(const QString &filename, uint64_t size) {
   _info->setText(tr("Accept file %1 (%2)?").arg(filename).arg(size));
   _acceptStop->setEnabled(true);
   QString fname = QFileDialog::getSaveFileName(0, tr("Save file as"));
