@@ -133,6 +133,9 @@ FileDownloadDialog::_onAcceptStop() {
   if (FileDownload::STARTED == _download->state()) {
     _file.close(); _download->stop(); this->close();
   } else if (FileDownload::REQUEST_RECEIVED == _download->state()) {
+    QString fname = QFileDialog::getSaveFileName(0, tr("Save file as"));
+    if (0 == fname) { _download->stop(); return; }
+    _file.setFileName(fname);
     _file.open(QIODevice::WriteOnly);
     _acceptStop->setIcon(QIcon("://icons/circle-x.png"));
     _acceptStop->setText(tr("stop"));
@@ -144,8 +147,6 @@ void
 FileDownloadDialog::_onRequest(const QString &filename, uint64_t size) {
   _info->setText(tr("Accept file %1 (%2)?").arg(filename).arg(size));
   _acceptStop->setEnabled(true);
-  QString fname = QFileDialog::getSaveFileName(0, tr("Save file as"));
-  _file.setFileName(fname);
 }
 
 void
