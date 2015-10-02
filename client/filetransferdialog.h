@@ -24,6 +24,9 @@ protected slots:
   void _onBytesWritten(size_t bytes);
 
 protected:
+  void closeEvent(QCloseEvent *evt);
+
+protected:
   Application  &_application;
   FileUpload   *_upload;
   QFile        _file;
@@ -48,6 +51,9 @@ protected slots:
    void _onRequest(const QString &filename, uint64_t size);
    void _onReadyRead();
    void _onClosed();
+
+protected:
+   void closeEvent(QCloseEvent *evt);
 
 protected:
    Application  &_application;

@@ -22,6 +22,7 @@ public:
 
 public:
   explicit FileUpload(Application &app, const QString &filename, size_t fileSize, QObject *parent = 0);
+  virtual ~FileUpload();
 
   void handleDatagram(const uint8_t *data, size_t len);
 
@@ -70,6 +71,7 @@ public:
 
 public:
   explicit FileDownload(Application &app, QObject *parent = 0);
+  virtual ~FileDownload();
 
   void handleDatagram(const uint8_t *data, size_t len);
 

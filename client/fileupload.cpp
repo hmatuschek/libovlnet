@@ -41,6 +41,12 @@ FileUpload::FileUpload(Application &app, const QString &filename, size_t fileSiz
   // pass...
 }
 
+FileUpload::~FileUpload() {
+  if (TERMINATED != _state) {
+    stop();
+  }
+}
+
 void
 FileUpload::handleDatagram(const uint8_t *data, size_t len) {
   // ignore null & empty messages
@@ -123,11 +129,17 @@ FileUpload::sendRequest() {
 
 void
 FileUpload::stop() {
-  _state = TERMINATED;
+  // (re-) send RESET message
   FileTransferMessage msg;
   msg.type = RESET;
   sendDatagram((const uint8_t *) &msg, 1);
-  emit closed();
+  // Emit "closed" only once.
+  if (TERMINATED != _state) {
+    _state = TERMINATED;
+    emit closed();
+    // signal DHT to close stream
+    _application.dht().closeStream(_streamId);
+  }
 }
 
 size_t
@@ -165,6 +177,10 @@ FileDownload::FileDownload(Application &app, QObject *parent)
     _state(INITIALIZED), _fileSize(0), _packetBuffer(1<<16)
 {
 
+}
+
+FileDownload::~FileDownload() {
+  if (TERMINATED != _state) { stop(); }
 }
 
 FileDownload::State

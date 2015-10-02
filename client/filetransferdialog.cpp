@@ -5,6 +5,8 @@
 #include <QFileInfo>
 #include <QIcon>
 #include <QFileDialog>
+#include <QCloseEvent>
+
 
 /* ********************************************************************************************* *
  * Implementation of FileUploadDialog
@@ -86,14 +88,20 @@ FileUploadDialog::_onClosed() {
 
 void
 FileUploadDialog::_onBytesWritten(size_t bytes) {
+  // Update bytecount & progress bar
   _bytesSend += bytes;
-  qDebug() << "Continue transfer of file" << _file.fileName() << "at byte" << _bytesSend;
-  // Update progress bar
   _progress->setValue(100*double(_bytesSend)/_upload->fileSize());
+
   // if complete -> close stream etc.
-  if (_upload->fileSize() == bytes) {
-    _upload->stop(); _file.close(); return;
+  if (_upload->fileSize() == _bytesSend) {
+    qDebug() << "Transmission complete.";
+    _upload->stop();
+    _file.close();
+    return;
   }
+
+  qDebug() << "Continue transfer of file" << _file.fileName() << "at byte" << _bytesSend;
+
   // If not complete -> continue
   size_t offset = _file.pos();
   uint8_t buffer[FILETRANSFER_MAX_DATA_LEN];
@@ -104,6 +112,10 @@ FileUploadDialog::_onBytesWritten(size_t bytes) {
   }
 }
 
+void
+FileUploadDialog::closeEvent(QCloseEvent *evt) {
+  evt->accept(); this->deleteLater();
+}
 
 
 /* ********************************************************************************************* *
@@ -198,4 +210,10 @@ FileDownloadDialog::_onClosed() {
     _acceptStop->setText(tr("close"));
   }
   _file.close();
+}
+
+void
+FileDownloadDialog::closeEvent(QCloseEvent *evt) {
+  evt->accept();
+  this->deleteLater();
 }
