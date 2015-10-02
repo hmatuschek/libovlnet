@@ -6,6 +6,8 @@
 #include <QIcon>
 #include <QFileDialog>
 #include <QCloseEvent>
+#include <QPixmap>
+#include <QImage>
 
 
 /* ********************************************************************************************* *
@@ -15,6 +17,8 @@ FileUploadDialog::FileUploadDialog(FileUpload *upload, Application &app, QWidget
   : QWidget(parent), _application(app), _upload(upload), _file(upload->fileName()),
     _bytesSend(0)
 {
+  setWindowTitle(tr("File upload"));
+
   QFileInfo fileinfo(_file.fileName());
   _info = new QLabel(tr("Wait for transfer of file %1...").arg(fileinfo.baseName()));
 
@@ -23,9 +27,11 @@ FileUploadDialog::FileUploadDialog(FileUpload *upload, Application &app, QWidget
   _progress->setValue(0);
 
   _button = new QPushButton(QIcon("://icons/circle-x.png"), tr("stop"));
+  QLabel *icon = new QLabel(); icon->setPixmap(
+        QPixmap::fromImage(QImage("://icons/data-transfer-upload.png")));
 
   QHBoxLayout *layout = new QHBoxLayout();
-  //layout->addWidget(QIcon("://icons/data-transfer-upload.png"));
+  layout->addWidget(icon);
   QVBoxLayout *box = new QVBoxLayout();
   box->addWidget(_info);
   box->addWidget(_progress);
@@ -124,6 +130,8 @@ FileUploadDialog::closeEvent(QCloseEvent *evt) {
 FileDownloadDialog::FileDownloadDialog(FileDownload *download, Application &app, QWidget *parent)
   : QWidget(parent), _application(app), _download(download)
 {
+  setWindowTitle(tr("File download"));
+
   _info = new QLabel(tr("Incomming file transfer..."));
 
   _acceptStop = new QPushButton(QIcon("://icons/circle-check.png"), tr("accept"));
@@ -133,8 +141,11 @@ FileDownloadDialog::FileDownloadDialog(FileDownload *download, Application &app,
   _progress->setMaximum(100);
   _progress->setValue(0);
 
+  QLabel *icon = new QLabel(); icon->setPixmap(
+        QPixmap::fromImage(QImage("://icons/data-transfer-upload.png")));
+
   QHBoxLayout *layout = new QHBoxLayout();
-  //layout->addWidget(QIcon(":/icons/data-transfer-download.png"));
+  layout->addWidget(icon);
   QVBoxLayout *box = new QVBoxLayout();
   box->addWidget(_info);
   box->addWidget(_progress);
