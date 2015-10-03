@@ -238,6 +238,7 @@ class FindNodeRequest;
 class FindValueRequest;
 class StartStreamRequest;
 
+class Identity;
 class SocketHandler;
 class SecureSocket;
 
@@ -248,17 +249,21 @@ class DHT: public QObject
 
 public:
   /** Constructor.
-   * @param id Specifies the identifier of the node.
+   * @param id Specifies the identity of the node.
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
-  explicit DHT(const Identifier &id, SocketHandler *streamHandler=0,
+  explicit DHT(Identity &id, SocketHandler *streamHandler=0,
                const QHostAddress &addr=QHostAddress::Any, quint16 port=7741, QObject *parent=0);
+
   /** Destructor. */
   virtual ~DHT();
 
   /** Returns the identifier of the DHT node. */
   const Identifier &id() const;
+  /** Returns a weak reference it the identity of the node. */
+  Identity &identity();
+  const Identity &identity() const;
   /** Returns the number of nodes in the buckets. */
   size_t numNodes() const;
   /** Returns the list of all nodes in the buckets. */
@@ -365,7 +370,7 @@ private slots:
 
 protected:
   /** The identifier of the node. */
-  Identifier _self;
+  Identity &_self;
   /** The network socket. */
   QUdpSocket _socket;
 

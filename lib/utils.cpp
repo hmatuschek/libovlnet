@@ -140,7 +140,7 @@ RingBuffer::allocate(size_t len) {
 }
 
 size_t
-RingBuffer::put(size_t offset, uint8_t *buffer, size_t len) {
+RingBuffer::put(size_t offset, const uint8_t *buffer, size_t len) {
   // If empty or no byte requested -> done
   if (((_inptr == _outptr) && (!_full)) || (0 == len)) { return 0; }
   // If offset is larger than available data -> done
@@ -268,7 +268,7 @@ __inBetweenSeq(uint32_t x, uint32_t a, uint32_t b) {
 }
 
 bool
-PacketInBuffer::putPacket(uint32_t &seq, uint8_t *data, size_t len) {
+PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len) {
   // Compute the offset of where the packet should be stored in the buffer
   size_t offset = (seq >= _nextSequence) ?
         (seq - _nextSequence) :

@@ -3,7 +3,7 @@
 
 
 SecureChat::SecureChat(Application &application)
-  : QObject(0), SecureSocket(application.identity()),
+  : QObject(0), SecureSocket(application.dht()),
     _application(application), _keepAlive()
 {
   _keepAlive.setInterval(1000*10);
@@ -12,7 +12,7 @@ SecureChat::SecureChat(Application &application)
 }
 
 SecureChat::~SecureChat() {
-  _application.dht().closeStream(_streamId);
+  // pass...
 }
 
 void

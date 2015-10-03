@@ -26,7 +26,7 @@ public:
   size_t allocate(size_t len);
   size_t write(const QByteArray &buffer);
   size_t write(const uint8_t *buffer, size_t len);
-  size_t put(size_t offset, uint8_t *buffer, size_t len);
+  size_t put(size_t offset, const uint8_t *buffer, size_t len);
 
 protected:
   /** The buffer. */
@@ -108,7 +108,7 @@ public:
   size_t read(QByteArray &buffer);
   size_t read(uint8_t *buffer, size_t len);
 
-  bool putPacket(uint32_t &seq, uint8_t *data, size_t len);
+  bool putPacket(uint32_t &seq, const uint8_t *data, size_t len);
 
 protected:
   /** The buffer of received packages. */

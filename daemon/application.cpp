@@ -24,7 +24,7 @@ Application::Application(int argc, char *argv[]) :
   }
 
   if (_identity) {
-    _dht = new DHT(_identity->id(), this);
+    _dht = new DHT(*_identity, this);
   } else {
     qDebug() << "Error while loading or creating my identity.";
   }
@@ -32,7 +32,7 @@ Application::Application(int argc, char *argv[]) :
 
 SecureSocket *
 Application::newStream(uint16_t service) {
-  return new EchoStream(*_identity);
+  return new EchoStream(*_dht);
 }
 
 bool

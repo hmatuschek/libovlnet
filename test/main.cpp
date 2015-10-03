@@ -3,19 +3,6 @@
 #include <QDebug>
 #include <QDir>
 
-class TempStream: public SecureSocket {
-public:
-  TempStream(Identity &id) : SecureSocket(id)
-  {
-    uint8_t data[1024]; int datalen=1024;
-    datalen = prepare(data, datalen);
-    qDebug() << QByteArray((char *)data, datalen).toHex();
-  }
-
-  void handleDatagram(const uint8_t *data, size_t len) {
-    // pass...
-  }
-};
 
 int main() {
   Identity *id = Identity::load(QDir::home().path()+"/.vlf/identity.pem");
@@ -29,6 +16,5 @@ int main() {
   sigLen = id->sign((uint8_t *)"abc", 3, sig, sigLen);
   qDebug() << "Success:" << id2->verify((uint8_t *)"abc", 3, sig, sigLen);
 
-  TempStream str(*id);
   return 0;
 }

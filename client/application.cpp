@@ -56,7 +56,7 @@ Application::Application(int &argc, char *argv[])
     return;
   }
 
-  _dht = new DHT(_identity->id(), this, QHostAddress::Any, 7742);
+  _dht = new DHT(*_identity, this, QHostAddress::Any, 7742);
 
   // load a list of bootstrap servers.
   _bootstrapList = BootstrapNodeList(vlfDir.canonicalPath()+"/bootstrap.json");
