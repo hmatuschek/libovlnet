@@ -1,7 +1,7 @@
 #include "echostream.h"
 
 EchoStream::EchoStream(Identity &id)
-  : SecureStream(id)
+  : SecureSocket(id)
 {
   // pass...
 }

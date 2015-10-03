@@ -6,17 +6,17 @@
 #include "lib/dht.h"
 
 
-class Application : public QCoreApplication, public StreamHandler
+class Application : public QCoreApplication, public SocketHandler
 {
   Q_OBJECT
 
 public:
   explicit Application(int argc, char *argv[]);
 
-  SecureStream *newStream(uint16_t service);
+  SecureSocket *newStream(uint16_t service);
   bool allowStream(uint16_t service, const NodeItem &peer);
-  void streamStarted(SecureStream *stream);
-  void streamFailed(SecureStream *stream);
+  void streamStarted(SecureSocket *stream);
+  void streamFailed(SecureSocket *stream);
 
 protected:
   Identity *_identity;

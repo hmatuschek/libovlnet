@@ -116,7 +116,9 @@ class Bucket
 {
 public:
   /** An element of the @c Bucket. */
-  struct Item {
+  class Item
+  {
+  public:
     /** Empty constructor. */
     Item();
     /** Constructor from identifier, address, port and prefix. */
@@ -236,8 +238,8 @@ class FindNodeRequest;
 class FindValueRequest;
 class StartStreamRequest;
 
-class StreamHandler;
-class SecureStream;
+class SocketHandler;
+class SecureSocket;
 
 /** Implements a node in the DHT. */
 class DHT: public QObject
@@ -250,7 +252,7 @@ public:
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
-  explicit DHT(const Identifier &id, StreamHandler *streamHandler=0,
+  explicit DHT(const Identifier &id, SocketHandler *streamHandler=0,
                const QHostAddress &addr=QHostAddress::Any, quint16 port=7741, QObject *parent=0);
   /** Destructor. */
   virtual ~DHT();
@@ -289,9 +291,9 @@ public:
   /** Announces a value. */
   void announce(const Identifier &id);
 
-  /** Starts a secure stream connection.
+  /** Starts a secure connection.
    * The ownership of the @c SecureStream instance is passed. */
-  bool startStream(uint16_t service, const NodeItem &node, SecureStream *stream);
+  bool startStream(uint16_t service, const NodeItem &node, SecureSocket *stream);
   void closeStream(const Identifier &id);
 
 signals:
@@ -364,7 +366,6 @@ private slots:
 protected:
   /** The identifier of the node. */
   Identifier _self;
-
   /** The network socket. */
   QUdpSocket _socket;
 
@@ -383,7 +384,7 @@ protected:
   double _outRate;
 
   /** The routing table. */
-  Buckets    _buckets;
+  Buckets _buckets;
   /** A list of candidate peers to join the buckets. */
   QList<PeerItem> _candidates;
 
@@ -394,9 +395,9 @@ protected:
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
   /** Stream handler instance. */
-  StreamHandler *_streamHandler;
-  /** The list of open streams. */
-  QHash<Identifier, SecureStream *> _streams;
+  SocketHandler *_streamHandler;
+  /** The list of open connection. */
+  QHash<Identifier, SecureSocket *> _streams;
 
   /** Timer to check timeouts of requests. */
   QTimer _requestTimer;

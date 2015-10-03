@@ -12,17 +12,28 @@
 /** Maximum unencrypted payload per message. */
 #define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-20)
 
+
+/** Represents the identity of a node. A node is unquely identified by its keypair. The private key
+ * of that key is only known to the node. Its public key is used to verify its identity. */
 class Identity
 {
 protected:
+  /** "Hidden" constructor.
+   * @param key Key pair or only the public key of a node.
+   * @param parent The optional parent of the QObject. */
   explicit Identity(EVP_PKEY *key, QObject *parent = 0);
 
 public:
+  /** Destructor. */
   virtual ~Identity();
 
+  /** Returns the identifier of the identity (RMD160 of the public key). */
   const Identifier &id() const;
+  /** Retruns @c true if the public key of the identity is present. */
   bool hasPublicKey() const;
+  /** Retruns @c true if the private key of the identity is present. */
   bool hasPrivateKey() const;
+  /** Copyies the public key in a binary format into the given buffer. */
   int publicKey(uint8_t *key, size_t len) const;
 
   /** Requires the private key. */
@@ -31,21 +42,27 @@ public:
   bool verify(const uint8_t *data, size_t datalen, const uint8_t *sig, size_t siglen) const;
 
 public:
+  /** Creates a new identity and stores the key pair in the specified file. */
   static Identity *newIdentity(const QString &path);
+  /** Loads the identity (key pair or public key) from the specified file. */
   static Identity *load(const QString &path);
+  /** Constructs an Identity from the given public key (e.g. received via network). */
   static Identity *fromPublicKey(const uint8_t *key, size_t len);
 
 protected:
+  /** Key pair or public key. */
   EVP_PKEY *_keyPair;
+  /** The fingerprint of the public key, the identifier of the node. */
   Identifier _fingerprint;
 };
 
 
-class SecureStream
+/** Represents a simple encrypted datagram socket between two nodes. */
+class SecureSocket
 {
 public:
-  SecureStream(Identity &id);
-  virtual ~SecureStream();
+  SecureSocket(Identity &id);
+  virtual ~SecureSocket();
 
   /** The stream ID. */
   const Identifier &id() const;
@@ -100,7 +117,9 @@ protected:
   int decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out);
 
 protected:
+  /** Identity of this node. */
   Identity &_identity;
+  /** The ECDH key pair of this node for the session. */
   EVP_PKEY *_sessionKeyPair;
   /** Public session key provided by the peer. */
   EVP_PKEY *_peerPubKey;
@@ -114,27 +133,29 @@ protected:
   uint8_t _sharedIV[20];
   /** The current sequence number (bytes send). */
   uint32_t _outSeq;
+  /** Buffer holding the decrypted message. */
   uint8_t _inBuffer[DHT_MAX_MESSAGE_SIZE];
-
+  /** Identifier of the stream. */
   Identifier _streamId;
+  /** The UDP socket. */
   QUdpSocket *_socket;
-
+  // DHT may access some of the protected methods
   friend class DHT;
 };
 
 
-class StreamHandler
+class SocketHandler
 {
 protected:
-  StreamHandler();
+  SocketHandler();
 
 public:
-  virtual ~StreamHandler();
+  virtual ~SocketHandler();
 
-  virtual SecureStream *newStream(uint16_t service) = 0;
+  virtual SecureSocket *newStream(uint16_t service) = 0;
   virtual bool allowStream(uint16_t service, const NodeItem &peer) = 0;
-  virtual void streamStarted(SecureStream *stream) = 0;
-  virtual void streamFailed(SecureStream *stream) = 0;
+  virtual void streamStarted(SecureSocket *stream) = 0;
+  virtual void streamFailed(SecureSocket *stream) = 0;
 };
 
 

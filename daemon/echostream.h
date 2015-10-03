@@ -3,7 +3,7 @@
 
 #include "lib/crypto.h"
 
-class EchoStream : public SecureStream
+class EchoStream : public SecureSocket
 {
 public:
   EchoStream(Identity &id);

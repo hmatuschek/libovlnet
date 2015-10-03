@@ -30,7 +30,7 @@ Application::Application(int argc, char *argv[]) :
   }
 }
 
-SecureStream *
+SecureSocket *
 Application::newStream(uint16_t service) {
   return new EchoStream(*_identity);
 }
@@ -41,11 +41,11 @@ Application::allowStream(uint16_t service, const NodeItem &peer) {
 }
 
 void
-Application::streamStarted(SecureStream *stream) {
+Application::streamStarted(SecureSocket *stream) {
   qDebug() << "Stream service" << stream << "started";
 }
 
 void
-Application::streamFailed(SecureStream *stream) {
+Application::streamFailed(SecureSocket *stream) {
   // mhh, don't care.
 }

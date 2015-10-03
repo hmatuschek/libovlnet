@@ -3,9 +3,9 @@
 #include <QDebug>
 #include <QDir>
 
-class TempStream: public SecureStream {
+class TempStream: public SecureSocket {
 public:
-  TempStream(Identity &id) : SecureStream(id)
+  TempStream(Identity &id) : SecureSocket(id)
   {
     uint8_t data[1024]; int datalen=1024;
     datalen = prepare(data, datalen);

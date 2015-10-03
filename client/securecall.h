@@ -17,7 +17,7 @@ class Application;
 
 /** Target bit rate about 12kb/s, mono, wide band and 20ms frame duration. At 48k sample rate,
  * this implies 960 samples per buffer/frame. */
-class SecureCall : public QObject, public SecureStream
+class SecureCall : public QObject, public SecureSocket
 {
   Q_OBJECT
 

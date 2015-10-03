@@ -3,7 +3,7 @@
 #include <netinet/in.h>
 
 SecureCall::SecureCall(bool incomming, Application &application)
-  : QObject(0), SecureStream(application.identity()), _incomming(incomming),
+  : QObject(0), SecureSocket(application.identity()), _incomming(incomming),
     _application(application), _encoder(0), _decoder(0), _paStream(0)
 {
   // Init encoder

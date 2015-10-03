@@ -185,7 +185,7 @@ Application::onQuit() {
   quit();
 }
 
-SecureStream *
+SecureSocket *
 Application::newStream(uint16_t service) {
   if (1 == service) {
     qDebug() << "Create new SecureCall instance.";
@@ -211,7 +211,7 @@ Application::allowStream(uint16_t service, const NodeItem &peer) {
 }
 
 void
-Application::streamStarted(SecureStream *stream) {
+Application::streamStarted(SecureSocket *stream) {
   SecureChat *chat = 0;
   SecureCall *call = 0;
   FileUpload *upload = 0;
@@ -240,7 +240,7 @@ Application::streamStarted(SecureStream *stream) {
 }
 
 void
-Application::streamFailed(SecureStream *stream) {
+Application::streamFailed(SecureSocket *stream) {
   /// @todo Handle stream errors;
 }
 
@@ -286,7 +286,7 @@ Application::buddies() {
 void
 Application::onNodeFound(const NodeItem &node) {
   if (! _pendingStreams.contains(node.id())) { return; }
-  SecureStream *stream = _pendingStreams[node.id()];
+  SecureSocket *stream = _pendingStreams[node.id()];
   _pendingStreams.remove(node.id());
 
   SecureChat *chat = 0;

@@ -3,7 +3,7 @@
 
 
 SecureChat::SecureChat(Application &application)
-  : QObject(0), SecureStream(application.identity()),
+  : QObject(0), SecureSocket(application.identity()),
     _application(application), _keepAlive()
 {
   _keepAlive.setInterval(1000*10);
