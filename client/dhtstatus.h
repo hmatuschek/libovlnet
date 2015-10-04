@@ -5,6 +5,8 @@
 #include <QList>
 #include "lib/dht.h"
 
+// forward declarations
+class Application;
 
 /** Simple object to collect and compute some information about the status of the DHT node. */
 class DHTStatus : public QObject
@@ -13,7 +15,7 @@ class DHTStatus : public QObject
 
 public:
   /** Constructor. */
-  explicit DHTStatus(DHT *dht, QObject *parent = 0);
+  explicit DHTStatus(Application &app, QObject *parent = 0);
 
   const Identifier &identifier() const;
 
@@ -36,10 +38,10 @@ public:
 
   /** Stores the neighbors of DHT node into the list with their distance on a logarithmic
    * scale (0,1]. */
-  void neighbors(QList< QPair<double, NodeItem> > &nodes) const;
+  void neighbors(QList< QPair<double, bool> > &nodes) const;
 
 protected:
-  DHT *_dht;
+  Application &_application;
 };
 
 #endif // DHTSTATUS_H

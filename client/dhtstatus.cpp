@@ -1,69 +1,72 @@
 #include "dhtstatus.h"
 #include "lib/dht_config.h"
+#include "application.h"
 
 #include <cmath>
 
 
-DHTStatus::DHTStatus(DHT *dht, QObject *parent)
-  : QObject(parent), _dht(dht)
+DHTStatus::DHTStatus(Application &app, QObject *parent)
+  : QObject(parent), _application(app)
 {
   // pass...
 }
 
 const Identifier &
 DHTStatus::identifier() const {
-  return _dht->id();
+  return _application.dht().id();
 }
 
 size_t
 DHTStatus::numNeighbors() const {
-  return _dht->numNodes();
+  return _application.dht().numNodes();
 }
 
 size_t
 DHTStatus::numMappings() const {
-  return _dht->numKeys();
+  return _application.dht().numKeys();
 }
 
 size_t
 DHTStatus::numDataItems() const {
-  return _dht->numData();
+  return _application.dht().numData();
 }
 
 size_t
 DHTStatus::numStreams() const {
-  return _dht->numStreams();
+  return _application.dht().numStreams();
 }
 
 size_t
 DHTStatus::bytesReceived() const {
-  return _dht->bytesReceived();
+  return _application.dht().bytesReceived();
 }
 
 size_t
 DHTStatus::bytesSend() const {
-  return _dht->bytesSend();
+  return _application.dht().bytesSend();
 }
 
 double
 DHTStatus::inRate() const {
-  return _dht->inRate();
+  return _application.dht().inRate();
 }
 
 double
 DHTStatus::outRate() const {
-  return _dht->outRate();
+  return _application.dht().outRate();
 }
 
 void
-DHTStatus::neighbors(QList< QPair<double, NodeItem> > &nodes) const {
+DHTStatus::neighbors(QList<QPair<double, bool> > &nodes) const {
   // Collect all nodes
-  QList<NodeItem> nodeitems; _dht->nodes(nodeitems);
+  QList<NodeItem> nodeitems; _application.dht().nodes(nodeitems);
   QList<NodeItem>::iterator item = nodeitems.begin();
   for (; item != nodeitems.end(); item++) {
     // Compute log distance to self
-    Distance d = _dht->id() - item->id();
+    Distance d = _application.dht().id() - item->id();
     nodes.push_back(
-          QPair<double, NodeItem>(double(d.leadingBit())/(8*DHT_HASH_SIZE),*item));
+          QPair<double, bool>(
+            double(d.leadingBit())/(8*DHT_HASH_SIZE),
+            _application.buddies().hasNode(item->id())));
   }
 }

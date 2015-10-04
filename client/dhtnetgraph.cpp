@@ -10,11 +10,11 @@ DHTNetGraph::DHTNetGraph(QWidget *parent)
   setMinimumWidth(300);
   setMinimumHeight(75);
 
-  update(QList< QPair<double, NodeItem> >());
+  update(QList< QPair<double, bool> >());
 }
 
 void
-DHTNetGraph::update(const QList<QPair<double, NodeItem> > &nodes) {
+DHTNetGraph::update(const QList<QPair<double, bool> > &nodes) {
   _nodes = nodes;
   QWidget::update();
 }
@@ -35,9 +35,13 @@ DHTNetGraph::paintEvent(QPaintEvent *evt) {
 
   // Draw nodes
   painter.setPen(QPen(Qt::black, 2));
-  painter.setBrush(QBrush(Qt::blue));
-  QList< QPair<double, NodeItem> >::iterator item = _nodes.begin();
+  QList< QPair<double, bool> >::iterator item = _nodes.begin();
   for (; item != _nodes.end(); item++) {
+    if (item->second) {
+      painter.setBrush(QBrush(Qt::blue));
+    } else {
+      painter.setBrush(QBrush(Qt::gray));
+    }
     int x = margin+(width()-2*margin)*item->first;
     painter.drawEllipse(QPoint(x,height()/2), 5,5);
   }

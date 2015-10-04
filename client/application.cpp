@@ -65,7 +65,7 @@ Application::Application(int &argc, char *argv[])
     _dht->ping(hostport.first, hostport.second);
   }
 
-  _status = new DHTStatus(_dht);
+  _status = new DHTStatus(*this);
   _buddies = new BuddyList(*this, vlfDir.canonicalPath()+"/buddies.json");
 
   _search      = new QAction(QIcon("://icons/search.png"),    tr("Search..."), this);

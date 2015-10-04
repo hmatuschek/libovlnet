@@ -11,13 +11,13 @@ class DHTNetGraph : public QWidget
 public:
   explicit DHTNetGraph(QWidget *parent = 0);
 
-  void update(const QList< QPair<double, NodeItem> > &nodes);
+  void update(const QList< QPair<double, bool> > &nodes);
 
 protected:
   virtual void paintEvent(QPaintEvent *evt);
 
 protected:
-  QList< QPair<double, NodeItem> > _nodes;
+  QList< QPair<double, bool> > _nodes;
 };
 
 #endif // DHTNETGRAPH_H

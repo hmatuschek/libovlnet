@@ -26,7 +26,7 @@ DHTStatusView::DHTStatusView(DHTStatus *status, QWidget *parent) :
   _outRate = new QLabel(_formatRate(_status->outRate()));
 
   _dhtNet   = new DHTNetGraph();
-  QList<QPair<double, NodeItem> > nodes; _status->neighbors(nodes);
+  QList<QPair<double, bool> > nodes; _status->neighbors(nodes);
   _dhtNet->update(nodes);
 
   QVBoxLayout *layout= new QVBoxLayout();
@@ -62,7 +62,7 @@ DHTStatusView::_onUpdate() {
   _bytesSend->setText(_formatBytes(_status->bytesSend()));
   _inRate->setText(_formatRate(_status->inRate()));
   _outRate->setText(_formatRate(_status->outRate()));
-  QList<QPair<double, NodeItem> > nodes; _status->neighbors(nodes);
+  QList<QPair<double, bool> > nodes; _status->neighbors(nodes);
   _dhtNet->update(nodes);
 }
 
