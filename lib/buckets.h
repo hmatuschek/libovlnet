@@ -10,6 +10,8 @@
 #include <QHostAddress>
 #include <QDateTime>
 
+#include <inttypes.h>
+
 
 // Forward declaration
 class Identifier;
