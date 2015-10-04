@@ -104,6 +104,7 @@ public:
   PacketInBuffer(size_t bufferSize);
 
   size_t available() const;
+  size_t free() const;
 
   size_t read(QByteArray &buffer);
   size_t read(uint8_t *buffer, size_t len);

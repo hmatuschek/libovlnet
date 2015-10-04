@@ -62,7 +62,7 @@ FileUpload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _application.dht().closeStream(_streamId);
+      _application.dht().streamClosed(_streamId);
       emit closed();
     }
     return;
@@ -147,7 +147,7 @@ FileUpload::stop() {
     _state = TERMINATED;
     emit closed();
     // signal DHT to close stream
-    _application.dht().closeStream(_streamId);
+    _application.dht().streamClosed(_streamId);
   }
 }
 
@@ -223,7 +223,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _application.dht().closeStream(_streamId);
+      _application.dht().streamClosed(_streamId);
       emit closed();
     }
     return;
@@ -313,7 +313,7 @@ FileDownload::stop() {
   if (TERMINATED != _state) {
     _state = TERMINATED;
     // signal DHT to close stream
-    _application.dht().closeStream(_streamId);
+    _application.dht().streamClosed(_streamId);
     emit closed();
   }
 }

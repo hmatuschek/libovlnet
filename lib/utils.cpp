@@ -246,6 +246,11 @@ PacketInBuffer::available() const {
 }
 
 size_t
+PacketInBuffer::free() const {
+  return _buffer.free();
+}
+
+size_t
 PacketInBuffer::read(QByteArray &buffer) {
   return read((uint8_t *)buffer.data(), buffer.size());
 }

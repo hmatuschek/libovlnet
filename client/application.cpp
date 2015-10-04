@@ -234,7 +234,7 @@ Application::streamStarted(SecureSocket *stream) {
     // show download dialog
     (new FileDownloadDialog(download, *this))->show();
   } else {
-    _dht->closeStream(stream->id());
+    _dht->streamClosed(stream->id());
     delete stream;
   }
 }

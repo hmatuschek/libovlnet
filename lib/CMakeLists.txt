@@ -1,7 +1,7 @@
 set(vlf_SOURCES 
-    ntp.cpp dht.cpp pcp.cpp natpmp.cpp crypto.cpp utils.cpp)
+    ntp.cpp dht.cpp pcp.cpp natpmp.cpp crypto.cpp utils.cpp stream.cpp socks.cpp)
 set(vlf_MOC_HEADERS 
-    ntp.h dht.h pcp.h natpmp.h crypto.h)
+    ntp.h dht.h pcp.h natpmp.h crypto.h stream.h socks.h)
 set(vlf_HEADERS ${vlf_MOC_HEADERS}
     utils.h)
 

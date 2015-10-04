@@ -918,7 +918,7 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
 }
 
 void
-DHT::closeStream(const Identifier &id) {
+DHT::streamClosed(const Identifier &id) {
   qDebug() << "Close stream" << id;
   _streams.remove(id);
 }

@@ -242,6 +242,7 @@ class Identity;
 class SocketHandler;
 class SecureSocket;
 
+
 /** Implements a node in the DHT. */
 class DHT: public QObject
 {
@@ -259,11 +260,12 @@ public:
   /** Destructor. */
   virtual ~DHT();
 
-  /** Returns the identifier of the DHT node. */
-  const Identifier &id() const;
   /** Returns a weak reference it the identity of the node. */
   Identity &identity();
+  /** Returns a weak reference it the identity of the node. */
   const Identity &identity() const;
+  /** Returns the identifier of the DHT node. */
+  const Identifier &id() const;
   /** Returns the number of nodes in the buckets. */
   size_t numNodes() const;
   /** Returns the list of all nodes in the buckets. */
@@ -299,7 +301,8 @@ public:
   /** Starts a secure connection.
    * The ownership of the @c SecureStream instance is passed. */
   bool startStream(uint16_t service, const NodeItem &node, SecureSocket *stream);
-  void closeStream(const Identifier &id);
+  /** Unregister the stream with the DHT instance. */
+  void streamClosed(const Identifier &id);
 
 signals:
   /** Gets emitted if a ping was replied. */
@@ -399,6 +402,7 @@ protected:
   QHash<Identifier, QDateTime> _announcedData;
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
+
   /** Stream handler instance. */
   SocketHandler *_streamHandler;
   /** The list of open connection. */
