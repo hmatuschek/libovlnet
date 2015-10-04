@@ -27,6 +27,8 @@
 #include <QStringList>
 #include <QIODevice>
 
+#include <inttypes.h>
+
 
 /** A N-gram tree. */
 class QHalTree
