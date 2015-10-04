@@ -11,7 +11,7 @@ class Application;
 #define FILETRANSFER_MAX_DATA_LEN     (DHT_SEC_MAX_DATA_SIZE-5UL)
 
 /** Implements the file transfer sender side. */
-class FileUpload : public QObject, public SecureStream
+class FileUpload : public QObject, public SecureSocket
 {
   Q_OBJECT
 
@@ -60,7 +60,7 @@ protected:
 
 
 /** Implements the file transfer receiver side. */
-class FileDownload : public QObject, public SecureStream
+class FileDownload : public QObject, public SecureSocket
 {
   Q_OBJECT
 

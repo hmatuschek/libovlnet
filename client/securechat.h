@@ -7,7 +7,7 @@
 class Application;
 
 
-class SecureChat : public QObject, public SecureStream
+class SecureChat : public QObject, public SecureSocket
 {
   Q_OBJECT
 

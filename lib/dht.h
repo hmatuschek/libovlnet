@@ -116,7 +116,9 @@ class Bucket
 {
 public:
   /** An element of the @c Bucket. */
-  struct Item {
+  class Item
+  {
+  public:
     /** Empty constructor. */
     Item();
     /** Constructor from identifier, address, port and prefix. */
@@ -236,8 +238,10 @@ class FindNodeRequest;
 class FindValueRequest;
 class StartStreamRequest;
 
-class StreamHandler;
-class SecureStream;
+class Identity;
+class SocketHandler;
+class SecureSocket;
+
 
 /** Implements a node in the DHT. */
 class DHT: public QObject
@@ -246,15 +250,20 @@ class DHT: public QObject
 
 public:
   /** Constructor.
-   * @param id Specifies the identifier of the node.
+   * @param id Specifies the identity of the node.
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
-  explicit DHT(const Identifier &id, StreamHandler *streamHandler=0,
+  explicit DHT(Identity &id, SocketHandler *streamHandler=0,
                const QHostAddress &addr=QHostAddress::Any, quint16 port=7741, QObject *parent=0);
+
   /** Destructor. */
   virtual ~DHT();
 
+  /** Returns a weak reference it the identity of the node. */
+  Identity &identity();
+  /** Returns a weak reference it the identity of the node. */
+  const Identity &identity() const;
   /** Returns the identifier of the DHT node. */
   const Identifier &id() const;
   /** Returns the number of nodes in the buckets. */
@@ -289,10 +298,11 @@ public:
   /** Announces a value. */
   void announce(const Identifier &id);
 
-  /** Starts a secure stream connection.
+  /** Starts a secure connection.
    * The ownership of the @c SecureStream instance is passed. */
-  bool startStream(uint16_t service, const NodeItem &node, SecureStream *stream);
-  void closeStream(const Identifier &id);
+  bool startStream(uint16_t service, const NodeItem &node, SecureSocket *stream);
+  /** Unregister the stream with the DHT instance. */
+  void streamClosed(const Identifier &id);
 
 signals:
   /** Gets emitted if a ping was replied. */
@@ -363,8 +373,7 @@ private slots:
 
 protected:
   /** The identifier of the node. */
-  Identifier _self;
-
+  Identity &_self;
   /** The network socket. */
   QUdpSocket _socket;
 
@@ -383,7 +392,7 @@ protected:
   double _outRate;
 
   /** The routing table. */
-  Buckets    _buckets;
+  Buckets _buckets;
   /** A list of candidate peers to join the buckets. */
   QList<PeerItem> _candidates;
 
@@ -393,10 +402,11 @@ protected:
   QHash<Identifier, QDateTime> _announcedData;
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
+
   /** Stream handler instance. */
-  StreamHandler *_streamHandler;
-  /** The list of open streams. */
-  QHash<Identifier, SecureStream *> _streams;
+  SocketHandler *_streamHandler;
+  /** The list of open connection. */
+  QHash<Identifier, SecureSocket *> _streams;
 
   /** Timer to check timeouts of requests. */
   QTimer _requestTimer;

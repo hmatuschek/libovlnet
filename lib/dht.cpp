@@ -166,16 +166,16 @@ protected:
 class StartStreamRequest: public Request
 {
 public:
-  StartStreamRequest(uint16_t service, const Identifier &peer, SecureStream *stream);
+  StartStreamRequest(uint16_t service, const Identifier &peer, SecureSocket *stream);
 
-  inline SecureStream *query() const { return _stream; }
+  inline SecureSocket *query() const { return _stream; }
   inline uint16_t service() const { return _service; }
   inline const Identifier &peedId() const { return _peer; }
 
 protected:
   uint16_t _service;
   Identifier _peer;
-  SecureStream *_stream;
+  SecureSocket *_stream;
 };
 
 
@@ -757,7 +757,7 @@ FindValueRequest::FindValueRequest(FindValueQuery *query)
   // pass...
 }
 
-StartStreamRequest::StartStreamRequest(uint16_t service, const Identifier &peer, SecureStream *stream)
+StartStreamRequest::StartStreamRequest(uint16_t service, const Identifier &peer, SecureSocket *stream)
   : Request(MSG_START_STREAM), _service(service), _peer(peer), _stream(stream)
 {
   // pass...
@@ -767,14 +767,14 @@ StartStreamRequest::StartStreamRequest(uint16_t service, const Identifier &peer,
 /* ******************************************************************************************** *
  * Implementation of DHT
  * ******************************************************************************************** */
-DHT::DHT(const Identifier &id, StreamHandler *streamHandler,
+DHT::DHT(Identity &id, SocketHandler *streamHandler,
          const QHostAddress &addr, quint16 port, QObject *parent)
   : QObject(parent), _self(id), _socket(), _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
-    _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self),
+    _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),
     _streamHandler(streamHandler), _streams(),
     _requestTimer(), _nodeTimer(), _announcementTimer(), _statisticsTimer()
 {
-  qDebug() << "Start node #" << id << "at" << addr << ":" << port;
+  qDebug() << "Start node #" << id.id() << "at" << addr << ":" << port;
 
   if (!_socket.bind(addr, port)) {
     qDebug() << "Cannot bind to port" << addr << ":" << port;
@@ -833,7 +833,7 @@ DHT::ping(const QHostAddress &addr, uint16_t port) {
   // Assemble message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
-  memcpy(msg.payload.ping.id, _self.data(), DHT_HASH_SIZE);
+  memcpy(msg.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
   msg.payload.ping.type = MSG_PING;
   qDebug() << "Send ping to" << addr << ":" << port;
   // send it
@@ -889,7 +889,7 @@ DHT::announce(const Identifier &id) {
 }
 
 bool
-DHT::startStream(uint16_t service, const NodeItem &node, SecureStream *stream) {
+DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
   if (0 == _streamHandler) { delete stream; return false; }
   qDebug() << "Send start stream to" << node.id() << "@" << node.addr() << ":" << node.port();
   if (! stream) { delete stream; return false; }
@@ -918,14 +918,24 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureStream *stream) {
 }
 
 void
-DHT::closeStream(const Identifier &id) {
+DHT::streamClosed(const Identifier &id) {
   qDebug() << "Close stream" << id;
   _streams.remove(id);
 }
 
+Identity &
+DHT::identity() {
+  return _self;
+}
+
+const Identity &
+DHT::identity() const {
+  return _self;
+}
+
 const Identifier &
 DHT::id() const {
-  return _self;
+  return _self.id();
 }
 
 size_t
@@ -1028,7 +1038,7 @@ DHT::sendAnnouncement(const NodeItem &to, const Identifier &what) {
   struct Message msg;
   memcpy(msg.cookie, Identifier().data(), DHT_HASH_SIZE);
   memcpy(msg.payload.announce.what, what.data(), DHT_HASH_SIZE);
-  memcpy(msg.payload.announce.who, _self.data(), DHT_HASH_SIZE);
+  memcpy(msg.payload.announce.who, _self.id().data(), DHT_HASH_SIZE);
   msg.payload.announce.type = MSG_ANNOUNCE;
   if (0 > _socket.writeDatagram((char *)&msg, 3*DHT_HASH_SIZE+1, to.addr(), to.port())) {
     qDebug() << "Failed to send Announce request to" << to.id()
@@ -1113,7 +1123,7 @@ DHT::_processPingResponse(
   _buckets.add(msg.payload.ping.id, addr, port);
   if (bootstrapping) {
     qDebug() << "Still boot strapping: Search for myself.";
-    findNode(_self);
+    findNode(_self.id());
   }
 }
 
@@ -1270,7 +1280,7 @@ DHT::_processPingRequest(
   // simply assemble a pong response including my own ID
   struct Message resp;
   memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
-  memcpy(resp.payload.ping.id, _self.data(), DHT_HASH_SIZE);
+  memcpy(resp.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
   resp.payload.ping.type = MSG_PING;
   // send
   qDebug() << "Send Ping response to" << addr << ":" << port;
@@ -1360,7 +1370,7 @@ DHT::_processAnnounceRequest(
   // Check if I am closer to the value than any of my nodes in the bucket
   QList<NodeItem> best;
   _buckets.getNearest(value, best);
-  if ((best.last().id()-value)>(_self-value)) {
+  if ((best.last().id()-value)>(_self.id()-value)) {
     if (!_announcements.contains(value)) {
       _announcements.insert(value, QHash<Identifier, AnnouncementItem>());
     }
@@ -1379,7 +1389,7 @@ DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddr
     return;
   }
   // Request new stream from stream handler
-  SecureStream *stream = 0;
+  SecureSocket *stream = 0;
   if (0 == (stream =_streamHandler->newStream(ntohs(msg.payload.start_stream.service))) ) {
     qDebug() << "Stream handler refuses to create a new stream.";
     return;
@@ -1508,7 +1518,8 @@ DHT::_onCheckNodeTimeout() {
   _buckets.removeOlderThan(20*60);
   // Send pings to candidates
   while (_candidates.size()) {
-    ping(_candidates.first()); _candidates.pop_front();
+    ping(_candidates.first());
+    _candidates.pop_front();
   }
 }
 

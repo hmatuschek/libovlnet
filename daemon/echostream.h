@@ -3,10 +3,10 @@
 
 #include "lib/crypto.h"
 
-class EchoStream : public SecureStream
+class EchoStream : public SecureSocket
 {
 public:
-  EchoStream(Identity &id);
+  EchoStream(DHT &dht);
 
   void handleDatagram(const uint8_t *data, size_t len);
 };

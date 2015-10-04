@@ -35,7 +35,7 @@ typedef enum {
  * Implementation of FileUpload
  * ********************************************************************************************* */
 FileUpload::FileUpload(Application &app, const QString &filename, size_t fileSize, QObject *parent)
-  : QObject(parent), SecureStream(app.identity()), _application(app), _state(INITIALIZED),
+  : QObject(parent), SecureSocket(app.dht()), _application(app), _state(INITIALIZED),
     _packetBuffer(1<<16, 2000), _fileName(filename), _fileSize(fileSize)
 {
   // pass...
@@ -62,7 +62,7 @@ FileUpload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _application.dht().closeStream(_streamId);
+      _application.dht().streamClosed(_streamId);
       emit closed();
     }
     return;
@@ -147,7 +147,7 @@ FileUpload::stop() {
     _state = TERMINATED;
     emit closed();
     // signal DHT to close stream
-    _application.dht().closeStream(_streamId);
+    _application.dht().streamClosed(_streamId);
   }
 }
 
@@ -182,7 +182,7 @@ FileUpload::write(const uint8_t *buffer, size_t size) {
  * Implementation of FileDownload
  * ********************************************************************************************* */
 FileDownload::FileDownload(Application &app, QObject *parent)
-  : QObject(parent), SecureStream(app.identity()), _application(app),
+  : QObject(parent), SecureSocket(app.dht()), _application(app),
     _state(INITIALIZED), _fileSize(0), _packetBuffer(1<<16)
 {
 
@@ -223,7 +223,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _application.dht().closeStream(_streamId);
+      _application.dht().streamClosed(_streamId);
       emit closed();
     }
     return;
@@ -313,7 +313,7 @@ FileDownload::stop() {
   if (TERMINATED != _state) {
     _state = TERMINATED;
     // signal DHT to close stream
-    _application.dht().closeStream(_streamId);
+    _application.dht().streamClosed(_streamId);
     emit closed();
   }
 }

@@ -14,7 +14,7 @@
 #include "bootstrapnodelist.h"
 
 
-class Application : public QApplication, public StreamHandler
+class Application : public QApplication, public SocketHandler
 {
   Q_OBJECT
 
@@ -23,10 +23,10 @@ public:
   virtual ~Application();
 
   // Implementation of StreamHandler interface
-  SecureStream *newStream(uint16_t service);
+  SecureSocket *newStream(uint16_t service);
   bool allowStream(uint16_t service, const NodeItem &peer);
-  void streamStarted(SecureStream *stream);
-  void streamFailed(SecureStream *stream);
+  void streamStarted(SecureSocket *stream);
+  void streamFailed(SecureSocket *stream);
 
   /** Initializes a chat with the specified node. */
   void startChatWith(const Identifier &id);
@@ -86,7 +86,7 @@ protected:
   QWidget *_statusWindow;
 
   /** Table of pending streams. */
-  QHash<Identifier, SecureStream *> _pendingStreams;
+  QHash<Identifier, SecureSocket *> _pendingStreams;
   /** The system tray icon. */
   QSystemTrayIcon *_trayIcon;
 };

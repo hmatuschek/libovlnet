@@ -56,7 +56,7 @@ Application::Application(int &argc, char *argv[])
     return;
   }
 
-  _dht = new DHT(_identity->id(), this, QHostAddress::Any, 7742);
+  _dht = new DHT(*_identity, this, QHostAddress::Any, 7742);
 
   // load a list of bootstrap servers.
   _bootstrapList = BootstrapNodeList(vlfDir.canonicalPath()+"/bootstrap.json");
@@ -185,7 +185,7 @@ Application::onQuit() {
   quit();
 }
 
-SecureStream *
+SecureSocket *
 Application::newStream(uint16_t service) {
   if (1 == service) {
     qDebug() << "Create new SecureCall instance.";
@@ -211,7 +211,7 @@ Application::allowStream(uint16_t service, const NodeItem &peer) {
 }
 
 void
-Application::streamStarted(SecureStream *stream) {
+Application::streamStarted(SecureSocket *stream) {
   SecureChat *chat = 0;
   SecureCall *call = 0;
   FileUpload *upload = 0;
@@ -234,13 +234,13 @@ Application::streamStarted(SecureStream *stream) {
     // show download dialog
     (new FileDownloadDialog(download, *this))->show();
   } else {
-    _dht->closeStream(stream->id());
+    _dht->streamClosed(stream->id());
     delete stream;
   }
 }
 
 void
-Application::streamFailed(SecureStream *stream) {
+Application::streamFailed(SecureSocket *stream) {
   /// @todo Handle stream errors;
 }
 
@@ -286,7 +286,7 @@ Application::buddies() {
 void
 Application::onNodeFound(const NodeItem &node) {
   if (! _pendingStreams.contains(node.id())) { return; }
-  SecureStream *stream = _pendingStreams[node.id()];
+  SecureSocket *stream = _pendingStreams[node.id()];
   _pendingStreams.remove(node.id());
 
   SecureChat *chat = 0;

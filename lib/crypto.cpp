@@ -13,6 +13,9 @@
 #include "netinet/in.h"
 
 
+/* ******************************************************************************************** *
+ * Implementation of Identity
+ * ******************************************************************************************** */
 Identity::Identity(EVP_PKEY *key, QObject *parent)
   : _keyPair(key)
 {
@@ -21,7 +24,7 @@ Identity::Identity(EVP_PKEY *key, QObject *parent)
   unsigned char fingerprint[20];
 
   // Get get public key in DER format (binary)
-  if ( 0 >= (keylen = i2d_PublicKey(_keyPair, &keydata)) )
+  if ( 0 >= (keylen = i2d_PUBKEY(_keyPair, &keydata)) )
     goto error;
 
   // Compute RIPEMD160
@@ -207,30 +210,31 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
 }
 
 
+
 /* ******************************************************************************************** *
- * Implementation of SecureSession
+ * Implementation of SecureSocket
  * ******************************************************************************************** */
-SecureStream::SecureStream(Identity &id)
-  : _identity(id), _sessionKeyPair(0), _peerPubKey(0),
-    _streamId(), _socket(0)
+SecureSocket::SecureSocket(DHT &dht)
+  : _dht(dht), _sessionKeyPair(0), _peerPubKey(0), _streamId(), _socket(0)
 {
   // pass...
 }
 
-SecureStream::~SecureStream() {
+SecureSocket::~SecureSocket() {
   if (_sessionKeyPair) { EVP_PKEY_free(_sessionKeyPair); }
   if (_peerPubKey) { EVP_PKEY_free(_peerPubKey); }
+  _dht.streamClosed(_streamId);
 }
 
 int
-SecureStream::prepare(uint8_t *msg, size_t len) {
+SecureSocket::prepare(uint8_t *msg, size_t len) {
   memset(msg, 0, len);
   uint8_t *keyPtr = 0; int keyLen =0;
   EC_KEY *key = 0;
   size_t stored=0;
 
   // Store public key and its length into output buffer
-  if (0 > (keyLen = _identity.publicKey(msg+2, len-2)) )
+  if (0 > (keyLen = _dht.identity().publicKey(msg+2, len-2)) )
     goto error;
   *((uint16_t *)msg) = htons(uint16_t(keyLen));
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
@@ -262,7 +266,7 @@ SecureStream::prepare(uint8_t *msg, size_t len) {
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
 
   // Sign session key
-  if (0 > (keyLen = _identity.sign(keyPtr, keyLen, msg+2, len-2)))
+  if (0 > (keyLen = _dht.identity().sign(keyPtr, keyLen, msg+2, len-2)))
     goto error;
   *((uint16_t *)msg) = htons(uint16_t(keyLen));
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
@@ -278,17 +282,17 @@ error:
 }
 
 const Identifier &
-SecureStream::id() const {
+SecureSocket::id() const {
   return _streamId;
 }
 
 const Identifier &
-SecureStream::peerId() const {
+SecureSocket::peerId() const {
   return _peerId;
 }
 
 bool
-SecureStream::verify(const uint8_t *msg, size_t len)
+SecureSocket::verify(const uint8_t *msg, size_t len)
 {
   Identity *peer = 0;
   int keyLen=0, sigLen=0;
@@ -297,20 +301,20 @@ SecureStream::verify(const uint8_t *msg, size_t len)
   // Load peer public key
   // get length of key
   keyLen = ntohs(*(uint16_t *)msg);
+  // check length
+  if (keyLen>(int(len)-2)) { goto error; }
   // read peer public key
-  if (keyLen>(int(len)-2)) {
-    goto error;
-  }
   if (0 == (peer = Identity::fromPublicKey(msg+2, keyLen))) {
     goto error;
   }
+  // get peer ID as fingerprint of its pubkey
   _peerId = peer->id();
+  // update pointer & length
   msg += keyLen+2; len -= keyLen+2;
 
   // read session public key
   keyLen = ntohs(*(uint16_t *)msg);
-  if (keyLen>(int(len)-2))
-    goto error;
+  if (keyLen>(int(len)-2)) { goto error; }
   keyPtr = msg+2;
   if (0 == (_peerPubKey = d2i_PUBKEY(&_peerPubKey, &keyPtr, len-2)))
     goto error;
@@ -320,6 +324,7 @@ SecureStream::verify(const uint8_t *msg, size_t len)
 
   // verify session key
   sigLen = ntohs(*(uint16_t *)msg);
+  if (sigLen>(int(len)-2)) { goto error; }
   if (! peer->verify(keyPtr, keyLen, msg+2, sigLen))
     goto error;
 
@@ -333,7 +338,7 @@ error:
 }
 
 bool
-SecureStream::start(const Identifier &streamId, const PeerItem &peer, QUdpSocket *socket) {
+SecureSocket::start(const Identifier &streamId, const PeerItem &peer, QUdpSocket *socket) {
   // Check if everything is present
   if (! _peerPubKey) { return false; }
   if (! _sessionKeyPair) { return false; }
@@ -383,7 +388,7 @@ error:
 }
 
 int
-SecureStream::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out)
+SecureSocket::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out)
 {
   // Check arguments
   if ((!in) || (!out)) { return -1; }
@@ -415,16 +420,16 @@ error:
 }
 
 int
-SecureStream::decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out)
+SecureSocket::decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out)
 {
   // Check arguments
   if ((!in) || (!out)) { return -1; }
-
   // Derive IV from shared IV and sq
   uint8_t iv[32];
   int len1=0, len2=0;
   // Append seq to shared IV
   *((uint32_t *)(_sharedIV+16)) = seq;
+  // Compute SHA256 and use first half as IV
   SHA256(_sharedIV, 20, iv);
   // Init encryption
   EVP_CIPHER_CTX ctx;
@@ -446,8 +451,9 @@ error:
 }
 
 void
-SecureStream::handleData(const uint8_t *data, size_t len) {
+SecureSocket::handleData(const uint8_t *data, size_t len) {
   if (0 == len) {
+    // process null datagram
     this->handleDatagram(0, 0); return;
   } else if (len<4) {
     // A valid encrypted message needs at least 4 bytes (the sequence int32_t).
@@ -461,11 +467,12 @@ SecureStream::handleData(const uint8_t *data, size_t len) {
     qDebug() << "Failed to decrypt message" << seq;
     return;
   }
+  // Forward decrypted data
   this->handleDatagram(_inBuffer, rxlen);
 }
 
 bool
-SecureStream::sendDatagram(const uint8_t *data, size_t len) {
+SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   uint8_t msg[DHT_MAX_MESSAGE_SIZE];
   uint8_t *ptr = msg;
   int txlen = 0, enclen=0;
@@ -474,7 +481,8 @@ SecureStream::sendDatagram(const uint8_t *data, size_t len) {
   memcpy(ptr, _streamId.data(), DHT_HASH_SIZE);
   ptr += DHT_HASH_SIZE; txlen += DHT_HASH_SIZE;
   // store sequence number
-  *((uint32_t *)ptr) = htonl(_outSeq); txlen += 4; ptr += 4;
+  *((uint32_t *)ptr) = htonl(_outSeq);
+  txlen += 4; ptr += 4;
   // store encrypted data if there is any
   if ( (len > 0) && (0 > (enclen = encrypt(_outSeq, data, len, ptr))) )
     return false;
@@ -483,30 +491,29 @@ SecureStream::sendDatagram(const uint8_t *data, size_t len) {
   if (txlen != _socket->writeDatagram((char *)msg, txlen, _peer.addr(), _peer.port()))
     return false;
   // Update seq
-  _outSeq += len;
+  _outSeq += txlen;
   return true;
 }
 
 bool
-SecureStream::sendNull() {
+SecureSocket::sendNull() {
   // send only stream id
-  return DHT_HASH_SIZE == _socket->writeDatagram((const char *)_streamId.data(), DHT_HASH_SIZE,
-                                                 _peer.addr(), _peer.port());
+  return DHT_HASH_SIZE == _socket->writeDatagram(
+        (const char *)_streamId.data(), DHT_HASH_SIZE, _peer.addr(), _peer.port());
 }
 
 
-
-
 /* ******************************************************************************************** *
- * Implementation of StreamHandler
+ * Implementation of SocketHandler
  * ******************************************************************************************** */
-StreamHandler::StreamHandler()
+SocketHandler::SocketHandler()
 {
   // pass...
 }
 
-StreamHandler::~StreamHandler() {
+SocketHandler::~SocketHandler() {
   // pass...
 }
+
 
 

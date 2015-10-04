@@ -3,7 +3,7 @@
 #include <netinet/in.h>
 
 SecureCall::SecureCall(bool incomming, Application &application)
-  : QObject(0), SecureStream(application.identity()), _incomming(incomming),
+  : QObject(0), SecureSocket(application.dht()), _incomming(incomming),
     _application(application), _encoder(0), _decoder(0), _paStream(0)
 {
   // Init encoder
@@ -37,7 +37,6 @@ SecureCall::~SecureCall() {
   if (_paStream) { Pa_CloseStream(_paStream); }
   if (_encoder) { opus_encoder_destroy(_encoder); }
   if (_decoder) { opus_decoder_destroy(_decoder); }
-  _application.dht().closeStream(_streamId);
 }
 
 SecureCall::State
