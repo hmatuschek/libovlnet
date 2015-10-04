@@ -36,6 +36,7 @@ Application::newSocket(uint16_t service) {
   if (0 == service) {
     return new HalChat(*_dht, _model);
   }
+  return 0;
 }
 
 bool
