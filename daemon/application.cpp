@@ -1,11 +1,12 @@
 #include "application.h"
 #include "echostream.h"
+#include "halchat.h"
 
 #include <QDir>
 #include <QFile>
 
 Application::Application(int argc, char *argv[]) :
-  QCoreApplication(argc, argv)
+  QCoreApplication(argc, argv), _model()
 {
   // Try to load identity from file
   QDir vlfDir("/etc");
@@ -31,21 +32,23 @@ Application::Application(int argc, char *argv[]) :
 }
 
 SecureSocket *
-Application::newStream(uint16_t service) {
-  return new EchoStream(*_dht);
+Application::newSocket(uint16_t service) {
+  if (0 == service) {
+    return new HalChat(*_dht, _model);
+  }
 }
 
 bool
-Application::allowStream(uint16_t service, const NodeItem &peer) {
+Application::allowConnection(uint16_t service, const NodeItem &peer) {
   return true;
 }
 
 void
-Application::streamStarted(SecureSocket *stream) {
+Application::connectionStarted(SecureSocket *stream) {
   qDebug() << "Stream service" << stream << "started";
 }
 
 void
-Application::streamFailed(SecureSocket *stream) {
+Application::connectionFailed(SecureSocket *stream) {
   // mhh, don't care.
 }

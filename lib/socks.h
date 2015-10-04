@@ -4,6 +4,8 @@
 #include "crypto.h"
 #include "stream.h"
 
+#include <QTcpSocket>
+
 
 /** Implements a local enpoint of a SOCKS v4 or v5 connection that will be relayed to another
  * node which acts as the exit point. This class is simple, once the connection to the node is

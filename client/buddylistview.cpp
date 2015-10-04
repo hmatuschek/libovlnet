@@ -22,8 +22,11 @@ BuddyListView::BuddyListView(Application &application, BuddyList *buddies, QWidg
   QToolBar *box = new QToolBar();
   box->addAction(QIcon("://icons/chat.png"), tr("Chat"), this, SLOT(onChat()));
   box->addAction(QIcon("://icons/phone.png"), tr("Call"), this, SLOT(onCall()));
-  box->addAction(QIcon("://icons/data-transfer-upload.png"), tr("Send file..."), this, SLOT(onSendFile()));
+  box->addAction(QIcon("://icons/data-transfer-upload.png"), tr("Send file..."),
+                 this, SLOT(onSendFile()));
+  box->addAction(QIcon("://icons/globe.png"), tr("Start tunnel"), this, SLOT(onStartProxy()));
   box->addSeparator();
+  box->addAction(QIcon("://icons/search.png"), tr("Search"), this, SLOT(onSearch()));
   box->addAction(QIcon("://icons/circle-x.png"), tr("Delete"), this, SLOT(onDelete()));
 
   QHash<QString, Buddy *>::const_iterator buddy = _buddies->buddies().begin();
@@ -152,6 +155,16 @@ BuddyListView::onSendFile() {
     _application.sendFile(fileinfo.absoluteFilePath(),
                           fileinfo.size(), id);
   }
+}
+
+void
+BuddyListView::onStartProxy() {
+  qDebug() << "Not implemented yet.";
+}
+
+void
+BuddyListView::onSearch() {
+  qDebug() << "Not implemented yet.";
 }
 
 void

@@ -18,5 +18,6 @@
         <file>icons/chat.png</file>
         <file>icons/microphone.png</file>
         <file>icons/data-transfer-download.png</file>
+        <file>icons/globe.png</file>
     </qresource>
 </RCC>

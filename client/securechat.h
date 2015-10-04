@@ -2,7 +2,9 @@
 #define SECURECHAT_H
 
 #include "lib/crypto.h"
+
 #include <QObject>
+#include <QTimer>
 
 class Application;
 

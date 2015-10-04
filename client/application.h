@@ -23,10 +23,10 @@ public:
   virtual ~Application();
 
   // Implementation of StreamHandler interface
-  SecureSocket *newStream(uint16_t service);
-  bool allowStream(uint16_t service, const NodeItem &peer);
-  void streamStarted(SecureSocket *stream);
-  void streamFailed(SecureSocket *stream);
+  SecureSocket *newSocket(uint16_t service);
+  bool allowConnection(uint16_t service, const NodeItem &peer);
+  void connectionStarted(SecureSocket *stream);
+  void connectionFailed(SecureSocket *stream);
 
   /** Initializes a chat with the specified node. */
   void startChatWith(const Identifier &id);

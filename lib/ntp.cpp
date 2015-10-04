@@ -2,6 +2,7 @@
 #include <QtEndian>
 #include <QDebug>
 #include <QHostInfo>
+#include <QEventLoop>
 
 /* ********************************************************************************************* *
  * Non-public declaraions
@@ -134,10 +135,19 @@ NTPFullPacket::NTPFullPacket()
  * Implementation of NTPClient
  * ********************************************************************************************* */
 NTPClient::NTPClient(QObject *parent)
-  : QObject(parent), _socket()
+  : QObject(parent), _socket(), _timer(), _offset(0)
 {
   _socket.bind(QHostAddress::Any);
+  _timer.setInterval(2000);
+  _timer.setSingleShot(true);
+
   connect(&_socket, SIGNAL(readyRead()), this, SLOT(onDatagramReceived()));
+  connect(&_timer, SIGNAL(timeout()), this, SIGNAL(timeout()));
+}
+
+qint64
+NTPClient::offset() const {
+  return _offset;
 }
 
 bool
@@ -156,6 +166,7 @@ NTPClient::request(const QHostAddress &addr, uint16_t port) {
   if (sizeof(NTPPacket) != _socket.writeDatagram((char *) &packet, sizeof(NTPPacket), addr, port)) {
     return false;
   }
+  _timer.start();
   return true;
 }
 
@@ -171,11 +182,29 @@ NTPClient::onDatagramReceived() {
       continue;
     }
 
+    _timer.stop();
+
     QDateTime now = QDateTime::currentDateTime();
-    int64_t offset =
+    _offset =
         (packet.basic.originateTimestamp.toDateTime().msecsTo(packet.basic.receiveTimestamp.toDateTime())
          + now.msecsTo(packet.basic.transmitTimestamp.toDateTime())) / 2;
-    qDebug() << "Got NTP local offset:" << offset << "ms.";
-    emit received(offset);
+    qDebug() << "Got NTP local offset:" << _offset << "ms.";
+    emit received(_offset);
   }
+}
+
+qint64
+NTPClient::getOffset(const QString &name, uint16_t port) {
+  NTPClient client;
+
+  QEventLoop loop;
+  // Exit loop on response or timeout
+  QObject::connect(&client, SIGNAL(received(int64_t)), &loop, SLOT(quit()));
+  QObject::connect(&client, SIGNAL(timeout()), &loop, SLOT(quit()));
+  // send request
+  if (! client.request(name, port)) { return 0; }
+  // Wait for response or timeout
+  loop.exec();
+  // done.
+  return client.offset();
 }

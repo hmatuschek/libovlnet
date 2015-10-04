@@ -1,6 +1,10 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include "ntp.h"
+#include "pcp.h"
+#include "natpmp.h"
+
 #include <inttypes.h>
 #include <QByteArray>
 #include <QDateTime>

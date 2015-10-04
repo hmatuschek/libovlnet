@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QSet>
 
+
 /** Represents a buddy, a collection of nodes which you trust. */
 class Buddy
 {

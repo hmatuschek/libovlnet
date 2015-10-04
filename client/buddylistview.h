@@ -23,6 +23,8 @@ protected slots:
   void onChat();
   void onCall();
   void onSendFile();
+  void onStartProxy();
+  void onSearch();
   void onDelete();
 
 protected:

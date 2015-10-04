@@ -1,9 +1,9 @@
 set(vlf_SOURCES 
-    ntp.cpp dht.cpp pcp.cpp natpmp.cpp crypto.cpp utils.cpp stream.cpp socks.cpp)
+    ntp.cpp dht.cpp pcp.cpp natpmp.cpp crypto.cpp utils.cpp stream.cpp socks.cpp buckets.cpp)
 set(vlf_MOC_HEADERS 
-    ntp.h dht.h pcp.h natpmp.h crypto.h stream.h socks.h)
+    ntp.h dht.h pcp.h natpmp.h stream.h socks.h)
 set(vlf_HEADERS ${vlf_MOC_HEADERS}
-    utils.h)
+    buckets.h utils.h crypto.h)
 
 qt5_wrap_cpp(vlf_MOC_SOURCES ${vlf_MOC_HEADERS})
 

@@ -186,7 +186,7 @@ Application::onQuit() {
 }
 
 SecureSocket *
-Application::newStream(uint16_t service) {
+Application::newSocket(uint16_t service) {
   if (1 == service) {
     qDebug() << "Create new SecureCall instance.";
     // VoIP service
@@ -202,7 +202,7 @@ Application::newStream(uint16_t service) {
 }
 
 bool
-Application::allowStream(uint16_t service, const NodeItem &peer) {
+Application::allowConnection(uint16_t service, const NodeItem &peer) {
   if ((1 == service) || (2 == service) || (4 == service)) {
     // VoIP or Chat services: check if peer is buddy list
     return _buddies->hasNode(peer.id());
@@ -211,7 +211,7 @@ Application::allowStream(uint16_t service, const NodeItem &peer) {
 }
 
 void
-Application::streamStarted(SecureSocket *stream) {
+Application::connectionStarted(SecureSocket *stream) {
   SecureChat *chat = 0;
   SecureCall *call = 0;
   FileUpload *upload = 0;
@@ -240,7 +240,7 @@ Application::streamStarted(SecureSocket *stream) {
 }
 
 void
-Application::streamFailed(SecureSocket *stream) {
+Application::connectionFailed(SecureSocket *stream) {
   /// @todo Handle stream errors;
 }
 

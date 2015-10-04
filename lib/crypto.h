@@ -3,11 +3,11 @@
 
 #include <QObject>
 #include <QIODevice>
-#include <QTcpSocket>
+#include <QUdpSocket>
 #include <QAbstractSocket>
 #include <QFile>
 
-#include "dht.h"
+#include "buckets.h"
 #include "dht_config.h"
 
 #include <openssl/evp.h>
@@ -59,6 +59,7 @@ protected:
   Identifier _fingerprint;
 };
 
+class DHT;
 
 /** Represents a simple encrypted datagram socket between two nodes. */
 class SecureSocket
@@ -155,18 +156,41 @@ protected:
 };
 
 
+/** Interface of a @c SecureSocket handler.
+ * Such a handler acts as a gate keeper and dispatcher for incomming and established
+ * secure connections.
+ *
+ * On an incomming connection, first @c newSocket gets called. This method should create the
+ * matching @c SecureSocket instance for the given service. Then the @c DHT instance will initiate
+ * a secure connection. In that step, the identity of the peer will be verified. Once the connection
+ * is initiated, @c allowConnection will be called. If it returns @c true, the connection is
+ * considered as established and @c connectionStarted gets called passing the ownership of the
+ * socket. If @c allowConnection fails (returns @c false) or the identity of the node can not be
+ * verified, @c connectionFailed gets called also passing the ownership of the socket.
+ *
+ * On an outgoing connection, e.g. by calling @c DHT::startStream, the DHT will try to establish
+ * a secure connection. On success, @c connectionStarted will be called and @c connectionFailed
+ * on error. Again, both methods transfer the ownership of the socket. */
 class SocketHandler
 {
 protected:
+  /** Hidden constructor. */
   SocketHandler();
 
 public:
+  /** Destructor. */
   virtual ~SocketHandler();
 
-  virtual SecureSocket *newStream(uint16_t service) = 0;
-  virtual bool allowStream(uint16_t service, const NodeItem &peer) = 0;
-  virtual void streamStarted(SecureSocket *stream) = 0;
-  virtual void streamFailed(SecureSocket *stream) = 0;
+  /** Needs to be implemented to construct a socket for the incomming connection to the given
+   * service. */
+  virtual SecureSocket *newSocket(uint16_t service) = 0;
+  /** Needs to be implemented to allow or deny connections from the given peer to the given
+   * service. */
+  virtual bool allowConnection(uint16_t service, const NodeItem &peer) = 0;
+  /** Gets called if a connection is established. */
+  virtual void connectionStarted(SecureSocket *stream) = 0;
+  /** Gets called if a connection failed. */
+  virtual void connectionFailed(SecureSocket *stream) = 0;
 };
 
 

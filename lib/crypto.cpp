@@ -1,5 +1,8 @@
 #include "crypto.h"
+
+#include "dht.h"
 #include "dht_config.h"
+
 #include <QFile>
 #include <QByteArray>
 
