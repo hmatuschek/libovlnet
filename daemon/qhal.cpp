@@ -124,7 +124,7 @@ QHalTree::read(QIODevice &device) {
 
   // Read branches
   size_t n=0; device.read((char *)&n, sizeof(size_t));
-  for (int i=0; i<n; i++) {
+  for (size_t i=0; i<n; i++) {
     QHalTree *node = new QHalTree(device);
     _branches.push_back(node);
     _symbols[node->symbol()] = i;
@@ -144,7 +144,7 @@ QHalTree::serialize(QIODevice &device) {
   size_t n = _branches.size();
   device.write((char *)&n, sizeof(size_t));
   // serialize branches
-  for (int i=0; i<n; i++) {
+  for (size_t i=0; i<n; i++) {
     _branches[i]->serialize(device);
   }
 }
@@ -152,7 +152,7 @@ QHalTree::serialize(QIODevice &device) {
 void
 QHalTree::clear() {
   // Free all branches
-  for (int i=0; i<_branches.size(); i++) {
+  for (size_t i=0; i<_branches.size(); i++) {
     delete _branches[i];
   }
   // clear data structures
@@ -199,7 +199,7 @@ QHalDict::contains(const QString &word) const {
 
 bool
 QHalDict::contains(size_t symbol) const {
-  return _symbols.size() < symbol;
+  return _symbols.size() < int(symbol);
 }
 
 size_t
@@ -219,7 +219,7 @@ QHalDict::read(QIODevice &device) {
   // Read number of elements
   size_t n=0; device.read((char *)&n, sizeof(size_t));
   // Read elements
-  for (int symbol=0; symbol<n; symbol++) {
+  for (size_t symbol=0; symbol<n; symbol++) {
     // Read string size
     size_t s=0; device.read((char *)&s, sizeof(size_t));
     // Read encoded string
@@ -467,7 +467,7 @@ QHalModel::seed(const QStringList &keywords) {
   }
 
   if (keywords.size()) {
-    int i = rand()%keywords.size();
+    size_t i = rand()%keywords.size();
     stop=i;
     while (true) {
       if( _dictionary.contains(keywords[i]) ) {

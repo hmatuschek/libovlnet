@@ -33,7 +33,7 @@ Application::Application(int argc, char *argv[]) :
 
 SecureSocket *
 Application::newSocket(uint16_t service) {
-  if (0 == service) {
+  if (2 == service) {
     return new HalChat(*_dht, _model);
   }
   return 0;
