@@ -1,4 +1,5 @@
 #include "socks.h"
+#include <netinet/in.h>
 #include <QHostInfo>
 
 
