@@ -4,6 +4,7 @@
 
 #include <QHostInfo>
 #include <netinet/in.h>
+#include <inttypes.h>
 
 
 /** Possible message types. */
