@@ -1,5 +1,5 @@
 #include "stream.h"
-
+#include <netinet/in.h>
 
 /** The format of the stream messages. */
 struct __attribute__((packed)) Message {
