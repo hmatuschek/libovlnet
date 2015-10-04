@@ -6,6 +6,8 @@
 #include <QBuffer>
 #include <QIODevice>
 
+#include <limits>
+
 
 /* ******************************************************************************************** *
  * Implementation some helper functions
