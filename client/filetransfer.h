@@ -1,5 +1,5 @@
-#ifndef FILEUPLOAD_H
-#define FILEUPLOAD_H
+#ifndef FILETRANSFER_H
+#define FILETRANSFER_H
 
 #include <QObject>
 #include "lib/crypto.h"
@@ -99,4 +99,4 @@ protected:
   PacketInBuffer _packetBuffer;
 };
 
-#endif // FILEUPLOAD_H
+#endif // FILETRANSFER_H

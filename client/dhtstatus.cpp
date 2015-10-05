@@ -11,9 +11,9 @@ DHTStatus::DHTStatus(Application &app, QObject *parent)
   // pass...
 }
 
-const Identifier &
+QString
 DHTStatus::identifier() const {
-  return _application.dht().id();
+  return _application.dht().id().toHex();
 }
 
 size_t

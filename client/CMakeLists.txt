@@ -1,8 +1,8 @@
 set(VLF_CLIENT_SOURCES main.cpp application.cpp dhtstatus.cpp dhtstatusview.cpp dhtnetgraph.cpp
     searchdialog.cpp buddylist.cpp buddylistview.cpp securechat.cpp chatwindow.cpp securecall.cpp
-    callwindow.cpp fileupload.cpp bootstrapnodelist.cpp filetransferdialog.cpp)
+    callwindow.cpp filetransfer.cpp bootstrapnodelist.cpp filetransferdialog.cpp)
 set(VLF_CLIENT_MOC_HEADERS application.h dhtstatus.h dhtstatusview.h dhtnetgraph.h searchdialog.h
-    buddylist.h buddylistview.h securechat.h chatwindow.h securecall.h callwindow.h fileupload.h
+    buddylist.h buddylistview.h securechat.h chatwindow.h securecall.h callwindow.h filetransfer.h
     filetransferdialog.h)
 set(VLF_CLIENT_HEADERS ${VLF_CLIENT_MOC_HEADERS}
     bootstrapnodelist.h)

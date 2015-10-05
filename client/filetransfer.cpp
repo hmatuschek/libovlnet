@@ -1,4 +1,4 @@
-#include "fileupload.h"
+#include "filetransfer.h"
 #include "application.h"
 #include <QtEndian>
 #include <QFileInfo>

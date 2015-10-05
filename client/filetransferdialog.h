@@ -1,7 +1,7 @@
 #ifndef FILETRANSFERDIALOG_H
 #define FILETRANSFERDIALOG_H
 
-#include "fileupload.h"
+#include "filetransfer.h"
 
 #include <QWidget>
 #include <QLabel>

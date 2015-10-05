@@ -1,5 +1,6 @@
 #include "buddylistview.h"
 #include "application.h"
+#include "searchdialog.h"
 
 #include <QVBoxLayout>
 #include <QToolBar>
@@ -164,7 +165,7 @@ BuddyListView::onStartProxy() {
 
 void
 BuddyListView::onSearch() {
-  qDebug() << "Not implemented yet.";
+  _application.search();
 }
 
 void

@@ -42,9 +42,11 @@ public:
   /** Returns a weak reference to the buddy list. */
   BuddyList &buddies();
 
+public slots:
+  /** Shows the search dialog. */
+  void search();
+
 protected slots:
-  /** Callback for the "search" action. */
-  void onSearch();
   /** Callback for the "show buddy list" action. */
   void onShowBuddies();
   /** Callback for the "bootstrap" action. */

@@ -30,6 +30,7 @@ DHTStatusView::DHTStatusView(DHTStatus *status, QWidget *parent) :
   _dhtNet->update(nodes);
 
   QVBoxLayout *layout= new QVBoxLayout();
+  layout->addWidget(new QLabel(tr("Id: %1").arg(_status->identifier())));
   QHBoxLayout *row = new QHBoxLayout();
   QFormLayout *form = new QFormLayout();
   form->addRow(tr("Peers:"), _numPeers);

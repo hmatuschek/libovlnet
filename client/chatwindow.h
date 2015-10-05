@@ -21,6 +21,7 @@ public:
 protected slots:
   void _onMessageReceived(const QString &msg);
   void _onMessageSend();
+  void _onConnectionLost();
 
 protected:
   void closeEvent(QCloseEvent *evt);

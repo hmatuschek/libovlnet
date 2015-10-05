@@ -97,7 +97,7 @@ Application::Application(int &argc, char *argv[])
 
   QObject::connect(_bootstrap, SIGNAL(triggered()), this, SLOT(onBootstrap()));
   QObject::connect(_showBuddies, SIGNAL(triggered()), this, SLOT(onShowBuddies()));
-  QObject::connect(_search, SIGNAL(triggered()), this, SLOT(onSearch()));
+  QObject::connect(_search, SIGNAL(triggered()), this, SLOT(search()));
   QObject::connect(_showStatus, SIGNAL(triggered()), this, SLOT(onShowStatus()));
   QObject::connect(_quit, SIGNAL(triggered()), this, SLOT(onQuit()));
 }
@@ -131,7 +131,7 @@ Application::onBootstrap() {
 }
 
 void
-Application::onSearch() {
+Application::search() {
   if (_searchWindow) {
     _searchWindow->activateWindow();
   } else {
@@ -219,7 +219,7 @@ Application::connectionStarted(SecureSocket *stream) {
 
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     // start keep alive timer
-    chat->keepAlive();
+    chat->started();
     (new ChatWindow(*this, chat))->show();
   } else if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
     // start streaming

@@ -60,17 +60,17 @@ class SOCKSOutStream: public SecureStream
 public:
   /** Connection and SOCKS request parser state. */
   typedef enum {
-    RX_VERSION,
-    RX_AUTHENTICATION,
-    RX_REQUEST,
-    RX_REQUEST_ADDR_IP4,
-    RX_REQUEST_ADDR_NAME_LEN,
-    RX_REQUEST_ADDR_NAME,
-    RX_REQUEST_ADDR_IP6,
-    RX_REQUEST_PORT,
-    CONNECTING,
-    STARTED,
-    CLOSED
+    RX_VERSION,                ///< Initial state, parse SOCKS version number.
+    RX_AUTHENTICATION,         ///< Parse authentication methods.
+    RX_REQUEST,                ///< Parse request header.
+    RX_REQUEST_ADDR_IP4,       ///< Parse remote address as IPv4 address.
+    RX_REQUEST_ADDR_NAME_LEN,  ///< Parse remote host name length.
+    RX_REQUEST_ADDR_NAME,      ///< Parse remote host name.
+    RX_REQUEST_ADDR_IP6,       ///< Parse remote address as IPv6 address.
+    RX_REQUEST_PORT,           ///< Parse remote port.
+    CONNECTING,                ///< Connecting to the remote host & port.
+    STARTED,                   ///< Connection established.
+    CLOSED                     ///< Connection closed.
   } State;
 
 public:

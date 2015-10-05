@@ -9,7 +9,7 @@
 #include <QSet>
 
 
-/** Represents a buddy, a collection of nodes which you trust. */
+/** Represents a buddy, a collection of nodes you trust. */
 class Buddy
 {
 public:

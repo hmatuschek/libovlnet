@@ -26,8 +26,9 @@ ChatWindow::ChatWindow(Application &app, SecureChat *chat, QWidget *parent)
   layout->addWidget(_text);
   setLayout(layout);
 
-  QObject::connect(_chat, SIGNAL(messageReceived(QString)), this, SLOT(_onMessageReceived(QString)));
-  QObject::connect(_text, SIGNAL(returnPressed()), this, SLOT(_onMessageSend()));
+  connect(_chat, SIGNAL(messageReceived(QString)), this, SLOT(_onMessageReceived(QString)));
+  connect(_chat, SIGNAL(closed()), this, SLOT(_onConnectionLost()));
+  connect(_text, SIGNAL(returnPressed()), this, SLOT(_onMessageSend()));
 }
 
 ChatWindow::~ChatWindow() {
@@ -64,6 +65,21 @@ ChatWindow::_onMessageSend() {
   cursor.insertText(msg);
   cursor.endEditBlock();
   _chat->sendMessage(msg);
+}
+
+void
+ChatWindow::_onConnectionLost() {
+  QTextCursor cursor = _view->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  if (!cursor.atStart())
+    cursor.insertBlock();
+  cursor.beginEditBlock();
+  cursor.insertText("[connection lost]");
+  cursor.endEditBlock();
+
+  _view->setEnabled(false);
+  _text->setEnabled(false);
+  disconnect(_chat, SIGNAL(messageReceived(QString)), this, SLOT(_onMessageReceived(QString)));
 }
 
 void
