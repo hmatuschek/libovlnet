@@ -6,6 +6,7 @@
 #include "lib/dht.h"
 #include "qhal.h"
 
+
 class Application : public QCoreApplication, public SocketHandler
 {
   Q_OBJECT
@@ -13,6 +14,9 @@ class Application : public QCoreApplication, public SocketHandler
 public:
   explicit Application(int argc, char *argv[]);
 
+  DHT &dht();
+
+protected:
   SecureSocket *newSocket(uint16_t service);
   bool allowConnection(uint16_t service, const NodeItem &peer);
   void connectionStarted(SecureSocket *stream);
@@ -22,6 +26,7 @@ protected:
   Identity *_identity;
   DHT *_dht;
   QHalModel _model;
+  QSet<Identifier> _socksWhiteList;
 };
 
 #endif // APPLICATION_H

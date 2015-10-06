@@ -5,6 +5,7 @@
 #include "chatwindow.h"
 #include "callwindow.h"
 #include "filetransferdialog.h"
+#include "socksservice.h"
 
 #include <portaudio.h>
 
@@ -197,6 +198,9 @@ Application::newSocket(uint16_t service) {
   } else if (4 == service) {
     // File download
     return new FileDownload(*this);
+  } else if (5 == service) {
+    // SOCKS proxy service not implemented yet
+    return 0;
   }
   return 0;
 }
@@ -204,8 +208,11 @@ Application::newSocket(uint16_t service) {
 bool
 Application::allowConnection(uint16_t service, const NodeItem &peer) {
   if ((1 == service) || (2 == service) || (4 == service)) {
-    // VoIP or Chat services: check if peer is buddy list
+    // File upload, VoIP or Chat services:
+    //  check if peer is buddy list
     return _buddies->hasNode(peer.id());
+  } else if (5 == service) {
+    // SOCKS proxy service not implemented yet
   }
   return false;
 }
@@ -216,6 +223,7 @@ Application::connectionStarted(SecureSocket *stream) {
   SecureCall *call = 0;
   FileUpload *upload = 0;
   FileDownload *download = 0;
+  SocksConnection *socks = 0;
 
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     // start keep alive timer
@@ -233,6 +241,9 @@ Application::connectionStarted(SecureSocket *stream) {
   } else if (0 != (download = dynamic_cast<FileDownload *>(stream))) {
     // show download dialog
     (new FileDownloadDialog(download, *this))->show();
+  } else if (0 != (socks = dynamic_cast<SocksConnection *>(stream))) {
+    // Simply open the stream
+    socks->open(QIODevice::ReadWrite);
   } else {
     _dht->streamClosed(stream->id());
     delete stream;
@@ -310,7 +321,7 @@ void
 Application::onNodeNotFound(const Identifier &id, const QList<NodeItem> &best) {
   if (!_pendingStreams.contains(id)) { return; }
   QMessageBox::critical(
-        0, tr("Can not initialize stream"),
+        0, tr("Can not initialize connection"),
         tr("Can not initialize a secure connection to %1: not reachable.").arg(QString(id.toHex())));
   // Free stream
   delete _pendingStreams[id];

@@ -1,12 +1,14 @@
 #include "application.h"
 #include "echostream.h"
 #include "halchat.h"
+#include "lib/socks.h"
+#include "socksconnection.h"
 
 #include <QDir>
 #include <QFile>
 
-Application::Application(int argc, char *argv[]) :
-  QCoreApplication(argc, argv), _model()
+Application::Application(int argc, char *argv[])
+  : QCoreApplication(argc, argv), _model(), _socksWhiteList()
 {
   // Try to load identity from file
   QDir vlfDir("/etc");
@@ -31,22 +33,49 @@ Application::Application(int argc, char *argv[]) :
   }
 }
 
+DHT &
+Application::dht() {
+  return *_dht;
+}
+
 SecureSocket *
 Application::newSocket(uint16_t service) {
   if (2 == service) {
+    // neat public chat service
     return new HalChat(*_dht, _model);
+  } else if (5 == service) {
+    // SOCKS service
+    if (0 == _socksWhiteList.size()) { return 0; }
+    // create handler
+    return new SOCKSConnection(*this);
   }
   return 0;
 }
 
 bool
 Application::allowConnection(uint16_t service, const NodeItem &peer) {
+  if (2 == service) {
+    // HalChat is public
+    return true;
+  } else if (5 == service) {
+    // Check if node is allowed to use the SOCKS service
+    return _socksWhiteList.contains(peer.id());
+  }
   return true;
 }
 
 void
 Application::connectionStarted(SecureSocket *stream) {
   qDebug() << "Stream service" << stream << "started";
+  HalChat *chat = 0;
+  SOCKSConnection *socks = 0;
+  if (0 != (chat = dynamic_cast<HalChat *>(stream))) {
+    // start chat (keep alive messages etc. )
+    chat->started();
+  } else if (0 != (socks = dynamic_cast<SOCKSConnection *>(stream))) {
+    // start SOCKS service.
+    socks->open(QIODevice::ReadWrite);
+  }
 }
 
 void

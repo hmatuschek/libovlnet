@@ -7,6 +7,7 @@
 #include <QFile>
 #include <inttypes.h>
 
+
 class BootstrapNodeList : public QList< QPair<QString, uint16_t> >
 {
 public:

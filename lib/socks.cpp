@@ -12,8 +12,12 @@ SOCKSInStream::SOCKSInStream(DHT &dht, QTcpSocket *instream, QObject *parent)
 }
 
 SOCKSInStream::~SOCKSInStream() {
-  _inStream->close();
-  this->close();
+  if (_inStream->isOpen())
+    _inStream->close();
+  if (_inStream)
+    delete _inStream;
+  if (this->isOpen())
+    this->close();
 }
 
 bool
