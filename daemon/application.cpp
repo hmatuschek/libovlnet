@@ -8,7 +8,7 @@
 #include <QFile>
 
 Application::Application(int argc, char *argv[])
-  : QCoreApplication(argc, argv), _model(), _socksWhiteList()
+  : QCoreApplication(argc, argv), _model(), _socksWhiteList("/etc/vlfdaemon/sockswhitelist.json")
 {
   // Try to load identity from file
   QDir vlfDir("/etc");
@@ -44,8 +44,7 @@ Application::newSocket(uint16_t service) {
     // neat public chat service
     return new HalChat(*_dht, _model);
   } else if (5 == service) {
-    // SOCKS service
-    if (0 == _socksWhiteList.size()) { return 0; }
+    if (_socksWhiteList.empty()) { return 0; }
     // create handler
     return new SOCKSConnection(*this);
   }
@@ -59,7 +58,7 @@ Application::allowConnection(uint16_t service, const NodeItem &peer) {
     return true;
   } else if (5 == service) {
     // Check if node is allowed to use the SOCKS service
-    return _socksWhiteList.contains(peer.id());
+    return _socksWhiteList.allowed(peer.id());
   }
   return true;
 }

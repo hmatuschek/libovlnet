@@ -5,6 +5,7 @@
 #include "lib/crypto.h"
 #include "lib/dht.h"
 #include "qhal.h"
+#include "socksconnection.h"
 
 
 class Application : public QCoreApplication, public SocketHandler
@@ -26,7 +27,7 @@ protected:
   Identity *_identity;
   DHT *_dht;
   QHalModel _model;
-  QSet<Identifier> _socksWhiteList;
+  SOCKSWhitelist _socksWhiteList;
 };
 
 #endif // APPLICATION_H
