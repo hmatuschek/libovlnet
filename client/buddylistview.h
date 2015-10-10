@@ -2,7 +2,7 @@
 #define BUDDYLISTVIEW_H
 
 #include <QWidget>
-#include <QTreeWidget>
+#include <QTreeView>
 #include "buddylist.h"
 
 class Application;
@@ -15,11 +15,6 @@ public:
   explicit BuddyListView(Application &application, BuddyList *buddies, QWidget *parent=0);
 
 protected slots:
-  void buddyAdded(const QString &buddy);
-  void buddyDeleted(const QString &buddy);
-  void nodeAdded(const QString &buddy, const Identifier &id);
-  void nodeRemoved(const QString &buddy, const Identifier &id);
-
   void onChat();
   void onCall();
   void onSendFile();
@@ -33,7 +28,7 @@ protected:
 protected:
   Application &_application;
   BuddyList *_buddies;
-  QTreeWidget *_tree;
+  QTreeView *_tree;
 };
 
 #endif // BUDDYLISTVIEW_H

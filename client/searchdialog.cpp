@@ -69,11 +69,12 @@ SearchDialog::_onAddAsNewBuddy() {
           QByteArray::fromHex(_result->item((*item)->row(), 0)->text().toLocal8Bit()));
   }
   if (0 == nodes.size()) { return; }
+  Identifier node = *(nodes.begin());
 
   // Get buddy name
   QString name = QInputDialog::getText(0, tr("Contact name"), tr("Select a name for the contact."));
   if (0 == name.size()) { return; }
-  _buddies->addBuddy(name, nodes);
+  _buddies->addBuddy(name, node);
 }
 
 void

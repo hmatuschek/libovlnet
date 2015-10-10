@@ -8,96 +8,162 @@
 #include <QJsonArray>
 #include <QJsonValue>
 
+// Number of seconds before a node is considered as lost
+#define NODE_LOSS_TIMEOUT 60
+
 
 /* ********************************************************************************************* *
- * Implementation of Buddy::NodeItem
+ * Implementation of BuddyList::Item
  * ********************************************************************************************* */
-Buddy::NodeItem::NodeItem()
-  : PeerItem(), _lastSeen()
+BuddyList::Item::Item(Item *parent)
+  : _parent(parent)
 {
   // pass...
 }
 
-Buddy::NodeItem::NodeItem(const QHostAddress &addr, uint16_t port)
-  : PeerItem(addr, port), _lastSeen(QDateTime::currentDateTime())
+BuddyList::Item::~Item() {
+  // pass...
+}
+
+BuddyList::Item *
+BuddyList::Item::parent() const {
+  return _parent;
+}
+
+/* ********************************************************************************************* *
+ * Implementation of BuddyList::NodeItem
+ * ********************************************************************************************* */
+BuddyList::Node::Node(const Identifier &id, BuddyList::Buddy *buddy)
+  : Item(buddy), ::NodeItem(id, QHostAddress(), 0), _lastSeen()
 {
   // pass...
 }
 
-Buddy::NodeItem::NodeItem(const NodeItem &other)
-  : PeerItem(other), _lastSeen(other._lastSeen)
+BuddyList::Node::Node(const Identifier &id, const QHostAddress &addr, uint16_t port, Buddy *parent)
+  : Item(parent), ::NodeItem(id, addr, port), _lastSeen(QDateTime::currentDateTime())
 {
   // pass...
 }
 
 bool
-Buddy::NodeItem::hasBeenSeen() const {
+BuddyList::Node::hasBeenSeen() const {
   return _lastSeen.isValid() && (!_addr.isNull());
 }
 
 bool
-Buddy::NodeItem::isOlderThan(size_t seconds) const {
+BuddyList::Node::isOlderThan(size_t seconds) const {
   return (_lastSeen.addSecs(seconds) < QDateTime::currentDateTime());
 }
 
 void
-Buddy::NodeItem::update(const QHostAddress &addr, uint16_t port) {
+BuddyList::Node::update(const QHostAddress &addr, uint16_t port) {
   _lastSeen = QDateTime::currentDateTime();
   _addr = addr;
   _port = port;
 }
 
 void
-Buddy::NodeItem::invalidate() {
+BuddyList::Node::invalidate() {
   _lastSeen = QDateTime();
   _addr = QHostAddress();
   _port = 0;
+}
+
+bool
+BuddyList::Node::isReachable() const {
+  return hasBeenSeen() && !isOlderThan(NODE_LOSS_TIMEOUT);
 }
 
 
 /* ********************************************************************************************* *
  * Implementation of Buddy
  * ********************************************************************************************* */
-Buddy::Buddy()
-  : _nodes()
+BuddyList::Buddy::Buddy(const QString &name)
+  : Item(0), _name(name), _nodeTable()
 {
   // pass...
 }
 
-const QHash<Identifier, Buddy::NodeItem> &
-Buddy::nodes() const {
-  return _nodes;
+size_t
+BuddyList::Buddy::numNodes() const {
+  return _nodes.size();
 }
 
-Buddy::NodeItem &
-Buddy::node(const Identifier &id) {
-  return _nodes[id];
+BuddyList::Node *
+BuddyList::Buddy::node(size_t idx) {
+  return _nodes[idx];
+}
+
+BuddyList::Node *
+BuddyList::Buddy::node(const Identifier &id) {
+  return _nodes[_nodeTable[id]];
+}
+
+bool
+BuddyList::Buddy::hasNode(const Identifier &id) const {
+  return _nodeTable.contains(id);
+}
+
+const QString &
+BuddyList::Buddy::name() const {
+  return _name;
+}
+
+bool
+BuddyList::Buddy::isReachable() const {
+  for (int i=0; i<_nodes.size(); i++) {
+    if (_nodes[i]->isReachable()) { return true; }
+  }
+  return false;
 }
 
 QJsonObject
-Buddy::toJson() const {
-  QJsonObject obj;
+BuddyList::Buddy::toJson() const {
   QJsonArray nodes;
-
-  QHash<Identifier, Buddy::NodeItem>::const_iterator node = _nodes.begin();
+  QVector<BuddyList::Node *>::const_iterator node = _nodes.begin();
   for (; node != _nodes.end(); node++) {
-    nodes.append(QString(node.key().toHex()));
+    nodes.append(QString((*node)->id().toHex()));
   }
+  QJsonObject obj;
+  obj.insert("name", _name);
   obj.insert("nodes", nodes);
   return obj;
 }
 
-Buddy *
-Buddy::fromJson(const QJsonObject &obj) {
-  Buddy *buddy = new Buddy();
-  if (obj.contains("nodes") && obj["nodes"].isArray()) {
-    QJsonArray nodes = obj["nodes"].toArray();
-    for (int i=0; i<nodes.size(); i++) {
-      buddy->_nodes.insert(
-            QByteArray::fromHex(nodes.at(i).toString().toLocal8Bit()), NodeItem());
+BuddyList::Buddy *
+BuddyList::Buddy::fromJson(const QJsonObject &obj) {
+  Buddy *buddy = 0;
+  if (obj.contains("name") && obj["name"].isString()) {
+    buddy = new Buddy(obj["name"].toString());
+    // Add nodes
+    if (obj.contains("nodes") && obj["nodes"].isArray()) {
+      QJsonArray nodes = obj["nodes"].toArray();
+      for (int i=0; i<nodes.size(); i++) {
+        buddy->_nodes.append(
+              new BuddyList::Node(
+                QByteArray::fromHex(nodes.at(i).toString().toLocal8Bit()), buddy));
+      }
     }
   }
   return buddy;
+}
+
+void
+BuddyList::Buddy::delNode(const Identifier &id) {
+  if (! _nodeTable.contains(id)) { return; }
+  size_t idx = _nodeTable[id];
+  _nodeTable.remove(id);
+  delete _nodes[idx]; _nodes.remove(idx);
+  // update indices
+  for (int i=0; i<_nodes.size(); i++) {
+    _nodeTable[_nodes[i]->id()] = i;
+  }
+}
+
+void
+BuddyList::Buddy::addNode(const Identifier &id, const QHostAddress &host, uint16_t port) {
+  _nodeTable[id] = _nodes.size();
+  _nodes.append(new BuddyList::Node(id, host, port, this));
 }
 
 
@@ -105,58 +171,85 @@ Buddy::fromJson(const QJsonObject &obj) {
  * Implementation of BuddyList
  * ********************************************************************************************* */
 BuddyList::BuddyList(Application &application, const QString path, QObject *parent)
-  : QObject(parent), _application(application), _file(path), _presenceTimer(), _searchTimer()
+  : QAbstractItemModel(parent), _application(application), _file(path),
+    _presenceTimer(), _searchTimer()
 {
   // Setup timer to update presence of buddy nodes every 10 seconds
   _presenceTimer.setInterval(1000*10);
   _presenceTimer.setSingleShot(false);
-  QObject::connect(&_presenceTimer, SIGNAL(timeout()), this, SLOT(_onUpdateNodes()));
+  connect(&_presenceTimer, SIGNAL(timeout()), this, SLOT(_onUpdateNodes()));
   _presenceTimer.start();
 
   // Setup timer to search for offline buddies every 2 minutes
   _searchTimer.setInterval(1000*60*2);
   _searchTimer.setSingleShot(false);
-  QObject::connect(&_searchTimer, SIGNAL(timeout()), this, SLOT(_onSearchNodes()));
+  connect(&_searchTimer, SIGNAL(timeout()), this, SLOT(_onSearchNodes()));
   _searchTimer.start();
+
+  // Get notified if a node is reachable
+  connect(&_application.dht(), SIGNAL(nodeReachable(NodeItem)), this, SLOT(_onNodeReachable(NodeItem)));
 
   // Read buddy list from file
   if (! _file.open(QIODevice::ReadOnly)) {
     qDebug() << "Can not read buddy list from" << _file.fileName(); return;
   }
+  qDebug() << "Read buddy list from file" << _file.fileName();
 
-  QJsonDocument doc = QJsonDocument::fromJson(_file.readAll());
+  QJsonParseError err;
+  QJsonDocument doc = QJsonDocument::fromJson(_file.readAll(), &err);
   _file.close();
-  if (! doc.isObject()) {
-    qDebug() << "Malformed buddy list."; return;
+  if (! doc.isArray()) {
+    qDebug() << "Malformed buddy list:" << err.offset << err.errorString(); return;
   }
-  QJsonObject object = doc.object();
-  QJsonObject::iterator obj = object.begin();
-  for (; obj != object.end(); obj++) {
+  QJsonArray lst = doc.array();
+  QJsonArray::iterator obj = lst.begin();
+  for (; obj != lst.end(); obj++) {
     Buddy *buddy = 0;
-    if ((obj.value().isObject()) && (buddy = Buddy::fromJson(obj.value().toObject()))) {
-      _buddies[obj.key()] = buddy;
-      // Add to node table
-      QHash<Identifier, Buddy::NodeItem>::const_iterator node = buddy->nodes().begin();
-      for (; node != buddy->nodes().end(); node++) {
-        _nodes.insert(node.key(), obj.key());
+    if (((*obj).isObject()) && (buddy = Buddy::fromJson((*obj).toObject()))) {
+      size_t idx = _buddies.size();
+      _buddies.append(buddy);
+      _buddyTable[buddy->name()] = idx;
+      // Add to nodes table
+      Buddy::const_iterator node = buddy->begin();
+      for (; node != buddy->end(); node++) {
+        _nodes.insert((*node)->id(), idx);
       }
     } else {
-      qDebug() << "Malformed buddy" << obj.key() << "in list.";
+      qDebug() << "Malformed buddy in list:" << *obj;
     }
   }
 }
 
 BuddyList::~BuddyList() {
-  QHash<QString, Buddy *>::iterator item = _buddies.begin();
+  QVector<Buddy *>::iterator item = _buddies.begin();
   for (; item != _buddies.end(); item++) {
     delete *item;
   }
-  _buddies.clear();
+  _buddyTable.clear();
+}
+
+size_t
+BuddyList::numBuddies() const {
+  return _buddies.size();
+}
+
+bool
+BuddyList::isBuddy(const QModelIndex &idx) const {
+  if (! idx.isValid()) { return false; }
+  return 0 != dynamic_cast<Buddy *>(
+        reinterpret_cast<Item *>(idx.internalPointer()));
+}
+
+bool
+BuddyList::isNode(const QModelIndex &idx) const {
+  if (! idx.isValid()) { return false; }
+  return 0 != dynamic_cast<Node *>(
+        reinterpret_cast<Item *>(idx.internalPointer()));
 }
 
 bool
 BuddyList::hasBuddy(const QString &name) const {
-  return _buddies.contains(name);
+  return _buddyTable.contains(name);
 }
 
 bool
@@ -164,105 +257,84 @@ BuddyList::hasNode(const Identifier &id) const {
   return _nodes.contains(id);
 }
 
-Buddy *
+BuddyList::Buddy *
+BuddyList::getBuddy(size_t idx) const {
+  return _buddies[idx];
+}
+BuddyList::Buddy *
 BuddyList::getBuddy(const QString &name) const {
-  return _buddies[name];
+  return _buddies[_buddyTable[name]];
 }
 
-Buddy *
+BuddyList::Buddy *
 BuddyList::getBuddy(const Identifier &id) const {
   return _buddies[_nodes[id]];
 }
 
+BuddyList::Buddy *
+BuddyList::getBuddy(const QModelIndex &idx) const {
+  if (! idx.isValid()) { return 0; }
+  return dynamic_cast<Buddy *>(
+        reinterpret_cast<Item *>(idx.internalPointer()));
+}
+
+BuddyList::Node *
+BuddyList::getNode(const QModelIndex &idx) const {
+  if (! idx.isValid()) { return 0; }
+  return dynamic_cast<Node *>(
+        reinterpret_cast<Item *>(idx.internalPointer()));
+}
+
 QString
 BuddyList::buddyName(const Identifier &id) const {
-  return _nodes[id];
+  return _buddies[_nodes[id]]->name();
 }
 
 void
 BuddyList::addBuddy(const QString &name, const Identifier &node) {
-  if (! _buddies.contains(name)) {
-    Buddy *buddy = new Buddy();
-    buddy->_nodes.insert(node, Buddy::NodeItem());
-    _buddies.insert(name, buddy);
-    _nodes.insert(node, name);
+  if (! _buddyTable.contains(name)) {
+    Buddy *buddy = new Buddy(name);
+    buddy->addNode(node);
+    _buddyTable.insert(name, _buddies.size());
+    _nodes.insert(node, _buddies.size());
+    _buddies.append(buddy);
     emit buddyAdded(name);
-  } else {
-    _buddies[name]->_nodes.insert(node, Buddy::NodeItem());
-    _nodes.insert(node, name);
-    emit nodeAdded(name, node);
   }
   save();
 }
 
 void
-BuddyList::addBuddy(const QString &name, const QList<Identifier> &nodes) {
-  if (! _buddies.contains(name)) {
-    Buddy *buddy = new Buddy();
-    _buddies.insert(name, buddy);
-    QList<Identifier>::const_iterator item = nodes.begin();
-    for (; item != nodes.end(); item++) {
-      buddy->_nodes.insert(*item, Buddy::NodeItem());
-      _nodes.insert(*item, name);
-    }
-    emit buddyAdded(name);
-  } else {
-    Buddy *buddy = _buddies[name];
-    QList<Identifier>::const_iterator item = nodes.begin();
-    for (; item != nodes.end(); item++) {
-      buddy->_nodes.insert(*item, Buddy::NodeItem());
-      _nodes.insert(*item, name);
-      emit nodeAdded(name, *item);
-    }
-  }
-  save();
-}
-
-void
-BuddyList::addBuddy(const QString &name, const QSet<Identifier> &nodes) {
-  if (! _buddies.contains(name)) {
-    Buddy *buddy = new Buddy();
-    _buddies.insert(name, buddy);
-    QSet<Identifier>::const_iterator item = nodes.begin();
-    for (; item != nodes.end(); item++) {
-      buddy->_nodes.insert(*item, Buddy::NodeItem());
-      _nodes.insert(*item, name);
-    }
-    emit buddyAdded(name);
-  } else {
-    Buddy *buddy = _buddies[name];
-    QSet<Identifier>::const_iterator item = nodes.begin();
-    for (; item != nodes.end(); item++) {
-      buddy->_nodes.insert(*item, Buddy::NodeItem());
-      _nodes.insert(*item, name);
-      emit nodeAdded(name, *item);
-    }
-  }
+BuddyList::addNode(const QString &name, const Identifier &node) {
+  if (! hasBuddy(name)) { return; }
+  _buddies[_buddyTable[name]]->addNode(node);
+  emit nodeAdded(name, node);
   save();
 }
 
 void
 BuddyList::delBuddy(const QString &name) {
-  if (! _buddies.contains(name)) { return; }
-  delete _buddies[name];
-  _buddies.remove(name);
+  if (! _buddyTable.contains(name)) { return; }
+  size_t idx = _buddyTable[name];
+  delete _buddies[idx];
+  _buddyTable.remove(name);
+  _buddies.remove(idx);
+  // Update indices
+  for (int i=0; i<_buddies.size(); i++) {
+    _buddyTable[_buddies[i]->name()] = i;
+  }
   emit buddyRemoved(name);
   save();
 }
 
 void
 BuddyList::delNode(const QString &name, const Identifier &node) {
-  if (! _buddies.contains(name)) { return; }
-  if (! _buddies[name]->_nodes.contains(node)) { return; }
-  _buddies[name]->_nodes.remove(node);
+  if (! _buddyTable.contains(name)) { return; }
+  size_t idx = _buddyTable[name];
+  if (! _buddies[idx]->hasNode(node)) { return; }
+  _buddies[idx]->delNode(node);
   _nodes.remove(node);
   emit nodeRemoved(name, node);
   save();
-}
-
-const QHash<QString, Buddy *> &
-BuddyList::buddies() const {
-  return _buddies;
 }
 
 void
@@ -272,15 +344,85 @@ BuddyList::save()  {
   }
 
   QJsonDocument doc;
-  QJsonObject lst;
-  QHash<QString, Buddy *>::const_iterator buddy = _buddies.begin();
+  QJsonArray lst;
+  QVector<Buddy *>::const_iterator buddy = _buddies.begin();
   for (; buddy != _buddies.end(); buddy++) {
-    lst.insert(buddy.key(), (*buddy)->toJson());
+    lst.append((*buddy)->toJson());
   }
-  doc.setObject(lst);
+  doc.setArray(lst);
   _file.write(doc.toJson());
   _file.close();
 }
+
+QModelIndex
+BuddyList::index(int row, int column, const QModelIndex &parent) const {
+  if (! hasIndex(row, column, parent)) { return QModelIndex(); }
+  // Single column model
+  if (0 != column) { return QModelIndex(); }
+  if ((! parent.isValid()) && (_buddies.size() > row)) {
+    // If row/column & parent addresses buddy
+    return createIndex(row, column, _buddies.at(row));
+  } else if ( parent.isValid() && (_buddies.size() > parent.row()) ) {
+    // If row/column & parent addresses node
+    return createIndex(row, column, _buddies[parent.row()]->node(row));
+  }
+  return QModelIndex();
+}
+
+QModelIndex
+BuddyList::parent(const QModelIndex &child) const {
+  Item *item = reinterpret_cast<Item *>(child.internalPointer());
+  if (Node *node = dynamic_cast<Node *>(item)) {
+    Buddy *buddy = reinterpret_cast<Buddy *>(node->parent());
+    return createIndex(_buddies.indexOf(buddy), 0, buddy);
+  }
+  return QModelIndex();
+}
+
+int
+BuddyList::rowCount(const QModelIndex &parent) const {
+  if (parent.isValid()) {
+    Item *item = reinterpret_cast<Item *>(parent.internalPointer());
+    if (Buddy *buddy = dynamic_cast<Buddy *>(item)) {
+      return buddy->numNodes();
+    }
+    // Nodes to not have children
+    return 0;
+  }
+  return _buddies.size();
+}
+
+int
+BuddyList::columnCount(const QModelIndex &parent) const {
+  return 1;
+}
+
+QVariant
+BuddyList::data(const QModelIndex &index, int role) const {
+  // Dispatch by role
+  if (Qt::DisplayRole == role) {
+    Item *item = reinterpret_cast<Item *>(index.internalPointer());
+    if (Node *node = dynamic_cast<Node *>(item)) { return QString(node->id().toHex()); }
+    if (Buddy *buddy = dynamic_cast<Buddy *>(item)) { return buddy->name(); }
+  } else if (Qt::DecorationRole == role) {
+    Item *item = reinterpret_cast<Item *>(index.internalPointer());
+    if (Node *node = dynamic_cast<Node *>(item)) {
+      if (node->isReachable()) {
+        return QIcon("://icons/fork_green.png");
+      }
+      return QIcon("://icons/fork.png");
+    }
+    if (Buddy *buddy = dynamic_cast<Buddy *>(item)) {
+      if (buddy->isReachable()) {
+        return QIcon("://icons/person_green.png");
+      }
+      return QIcon("://icons/person.png");
+    }
+  }
+  return QVariant();
+}
+
+
 
 void
 BuddyList::_onNodeFound(const NodeItem &node) {
@@ -294,37 +436,42 @@ void
 BuddyList::_onNodeReachable(const NodeItem &node) {
   // check if node belongs to a buddy
   if (! _nodes.contains(node.id())) { return; }
-  if (! _buddies[_nodes[node.id()]]->node(node.id()).hasBeenSeen()) {
+  if (! _buddies[_nodes[node.id()]]->node(node.id())->hasBeenSeen()) {
     // Update node
-    _buddies[_nodes[node.id()]]->node(node.id()).update(node.addr(), node.port());
+    _buddies[_nodes[node.id()]]->node(node.id())->update(node.addr(), node.port());
     emit appeared(node.id());
   }
   // Update node
-  _buddies[_nodes[node.id()]]->node(node.id()).update(node.addr(), node.port());
+  _buddies[_nodes[node.id()]]->node(node.id())->update(node.addr(), node.port());
 }
 
 void
 BuddyList::_onUpdateNodes() {
-  QHash<Identifier, QString>::iterator node = _nodes.begin();
+  QHash<Identifier, size_t>::iterator node = _nodes.begin();
   for (; node != _nodes.end(); node++) {
-    Buddy::NodeItem &nodeitem = _buddies[(*node)]->node(node.key());
-    if (nodeitem.hasBeenSeen() && nodeitem.isOlderThan(60)) {
+    BuddyList::Buddy *buddy = _buddies[node.value()];
+    BuddyList::Node *nodeitem = buddy->node(node.key());
+    if (nodeitem->hasBeenSeen() && nodeitem->isOlderThan(NODE_LOSS_TIMEOUT)) {
       // Lost contact to node
-      nodeitem.invalidate();
+      nodeitem->invalidate();
       emit disappeared(node.key());
-    } else if (nodeitem.hasBeenSeen() && nodeitem.isOlderThan(30)) {
+      // Update items (buddy and all its nodes)
+      QModelIndex bidx = index(node.value(), 0, QModelIndex()), nidx = bidx;
+      if (buddy->numNodes()) { nidx = index(buddy->numNodes()-1, 0, bidx); }
+      emit dataChanged(bidx, nidx);
+    } else if (nodeitem->hasBeenSeen() && nodeitem->isOlderThan(NODE_LOSS_TIMEOUT/2)) {
       // If last contact is older than 30 second -> ping node
-      _application.dht().ping(nodeitem.addr(), nodeitem.port());
+      _application.dht().ping(nodeitem->addr(), nodeitem->port());
     }
   }
 }
 
 void
 BuddyList::_onSearchNodes() {
-  QHash<Identifier, QString>::iterator node = _nodes.begin();
+  QHash<Identifier, size_t>::iterator node = _nodes.begin();
   for (; node != _nodes.end(); node++) {
-    Buddy::NodeItem &nodeitem = _buddies[(*node)]->node(node.key());
-    if (! nodeitem.hasBeenSeen()) {
+    BuddyList::Node *nodeitem = _buddies[node.value()]->node(node.key());
+    if (! nodeitem->hasBeenSeen()) {
       _application.dht().findNode(node.key());
     }
   }
