@@ -459,7 +459,7 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
     // process null datagram
     this->handleDatagram(0, 0); return;
   } else if (len<4) {
-    // A valid encrypted message needs at least 4 bytes (the sequence int32_t).
+    // A valid encrypted message needs at least 4 bytes (the sequence uint32_t).
     return;
   }
   // Get sequence number

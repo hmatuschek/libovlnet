@@ -12,6 +12,7 @@ HalChat::HalChat(DHT &dht, QHalModel &model, QObject *parent)
   _timeout.setSingleShot(true);
 
   connect(&_keepAlive, SIGNAL(timeout()), this, SLOT(_onKeepAlive()));
+  connect(&_timeout, SIGNAL(timeout()), this, SLOT(_onTimeout()));
 }
 
 void
