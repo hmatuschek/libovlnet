@@ -44,7 +44,10 @@ Application::newSocket(uint16_t service) {
     // neat public chat service
     return new HalChat(*_dht, _model);
   } else if (5 == service) {
-    if (_socksWhiteList.empty()) { return 0; }
+    if (_socksWhiteList.empty()) {
+      qDebug() << "No whitelisted nodes for SOCKS service -> deny.";
+      return 0;
+    }
     // create handler
     return new SOCKSConnection(*this);
   }
