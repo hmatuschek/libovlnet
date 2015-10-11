@@ -665,10 +665,7 @@ DHT::_processFindNodeResponse(
 {
   qDebug() << "Received FindNode response from " << addr << ":" << port;
   // payload length must be a multiple of triple length
-  if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
-    qDebug() << "Received a malformed FIND_NODE response from"
-             << addr << ":" << port;
-  } else {
+  if ( 0 == ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
     // unpack and update query
     size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
     qDebug() << "Received" << Ntriple << "nodes from"  << addr << ":" << port;
@@ -694,6 +691,9 @@ DHT::_processFindNodeResponse(
       // done
       return;
     }
+  } else {
+    qDebug() << "Received a malformed FIND_NODE response from"
+             << addr << ":" << port;
   }
   // Get next node to query
   NodeItem next;

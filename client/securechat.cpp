@@ -7,7 +7,7 @@ SecureChat::SecureChat(Application &application)
     _application(application), _keepAlive(), _timeout()
 {
   // Setup keep-alive timer
-  _keepAlive.setInterval(1000*10);
+  _keepAlive.setInterval(1000*5);
   _keepAlive.setSingleShot(false);
   // Setup watchdog timer
   _timeout.setInterval(1000*60);

@@ -449,6 +449,8 @@ SecureSocket::decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   return len1+len2;
 
 error:
+  ERR_load_crypto_strings();
+  ERR_print_errors_fp(stderr);
   EVP_CIPHER_CTX_cleanup(&ctx);
   return -1;
 }
@@ -487,7 +489,7 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   *((uint32_t *)ptr) = htonl(_outSeq);
   txlen += 4; ptr += 4;
   // store encrypted data if there is any
-  if ( (len > 0) && (0 > (enclen = encrypt(_outSeq, data, len, ptr))) )
+  if ( (len <= 0) || (0 > (enclen = encrypt(_outSeq, data, len, ptr))) )
     return false;
   txlen += enclen;
   // Send datagram
