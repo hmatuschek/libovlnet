@@ -162,13 +162,17 @@ SOCKSOutStream::_clientParse() {
       qDebug() << "SOCKS: read auth meth, len =" << _nAuthMeth;
       continue;
     } else if (RX_AUTHENTICATION == _state) {
+      if (0 == bytesAvailable()) { return; }
       uint8_t buffer[255];
       size_t len = read((char *)buffer, _nAuthMeth);
+      qDebug() << "SOCKS: Read" << len << "bytes of auth method.";
       _authMeth = _authMeth + QString::fromUtf8((char *)buffer, len);
       _nAuthMeth -= len;
       if (0 == _nAuthMeth) {
         // Send response (version=5, no auth)
-        const uint8_t msg[] = {0x05, 0x00}; write((char *) msg, 2);
+        const uint8_t msg[] = {0x05, 0x00};
+        write((const char *) msg, 2);
+        // update state
         _state = RX_REQUEST;
         qDebug() << "SOCKS: send no-auth OK response.";
       }
@@ -221,6 +225,7 @@ SOCKSOutStream::_clientParse() {
       _nHostName = len; _state = RX_REQUEST_ADDR_NAME;
       continue;
     } else if (RX_REQUEST_ADDR_NAME == _state) {
+      if (1 > bytesAvailable()) { return; }
       uint8_t buffer[255];
       size_t len = read((char *)buffer, _nHostName);
       _hostName = _hostName + QString::fromUtf8((char *)buffer, len);
