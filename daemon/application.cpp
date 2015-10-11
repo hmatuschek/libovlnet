@@ -57,6 +57,13 @@ Application::allowConnection(uint16_t service, const NodeItem &peer) {
     // HalChat is public
     return true;
   } else if (5 == service) {
+    if (_socksWhiteList.allowed(peer.id())) {
+      qDebug() << "Allow SOCKS connection from" << peer.id()
+               << peer.addr() << ":" << peer.port();
+    } else {
+      qDebug() << "Deny SOCKS connection from" << peer.id()
+               << peer.addr() << ":" << peer.port();
+    }
     // Check if node is allowed to use the SOCKS service
     return _socksWhiteList.allowed(peer.id());
   }
