@@ -157,6 +157,9 @@ SOCKSOutStream::_clientParse() {
       }
       // Get length of authentication method
       _nAuthMeth = buffer[1];
+      // Update state
+      _state = RX_AUTHENTICATION;
+      qDebug() << "SOCKS: read auth meth, len =" << _nAuthMeth;
       continue;
     } else if (RX_AUTHENTICATION == _state) {
       uint8_t buffer[255];
