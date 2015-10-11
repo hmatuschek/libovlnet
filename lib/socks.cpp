@@ -51,6 +51,7 @@ SOCKSInStream::_clientReadyRead() {
   if (len) {
     len = _inStream->read((char *)buffer, len);
     this->write((const char *)buffer, len);
+    qDebug() << "SOCKS: forward " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -62,6 +63,7 @@ SOCKSInStream::_clientBytesWritten(qint64 bytes) {
   if (len) {
     len = read((char *)buffer, len);
     _inStream->write((const char *)buffer, len);
+    qDebug() << "SOCKS: received " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -84,6 +86,7 @@ SOCKSInStream::_remoteReadyRead() {
   if (len) {
     len = read((char *)buffer, len);
     _inStream->write((const char *)buffer, len);
+    qDebug() << "SOCKS: received " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -96,6 +99,7 @@ SOCKSInStream::_remoteBytesWritten(qint64 bytes) {
   if (len) {
     len = _inStream->read((char *)buffer, len);
     this->write((const char *)buffer, len);
+    qDebug() << "SOCKS: send " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -141,6 +145,7 @@ SOCKSOutStream::open(OpenMode mode) {
 void
 SOCKSOutStream::_clientParse() {
   while (bytesAvailable()) {
+    qDebug() << "SOCKS: " << bytesAvailable() << "bytes left in input buffer.";
     /*
      * Dispatch by state.
      */
@@ -162,7 +167,10 @@ SOCKSOutStream::_clientParse() {
       qDebug() << "SOCKS: read auth meth, len =" << _nAuthMeth;
       continue;
     } else if (RX_AUTHENTICATION == _state) {
-      if (0 == bytesAvailable()) { return; }
+      if (0 == bytesAvailable()) {
+        qDebug() << "No bytes left in buffer -> wait.";
+        return;
+      }
       uint8_t buffer[255];
       size_t len = read((char *)buffer, _nAuthMeth);
       qDebug() << "SOCKS: Read" << len << "bytes of auth method.";
