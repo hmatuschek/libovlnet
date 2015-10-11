@@ -23,7 +23,7 @@ SOCKSInStream::~SOCKSInStream() {
 bool
 SOCKSInStream::open(OpenMode mode) {
   if (! SecureStream::open(mode)) { return false; }
-
+  qDebug() << "SOCKS in stream started.";
   // Connect to client signals
   connect(_inStream, SIGNAL(readyRead()), this, SLOT(_clientReadyRead()));
   connect(_inStream, SIGNAL(bytesWritten(qint64)), this, SLOT(_clientBytesWritten(qint64)));
@@ -152,6 +152,8 @@ SOCKSOutStream::_clientParse() {
       if (5 != buffer[0]) {
         qDebug() << "Unknown SOCKS version number" << int(buffer[0]);
         close(); return;
+      } else {
+        qDebug() << "Got SOCKS v5 request.";
       }
       // Get length of authentication method
       _nAuthMeth = buffer[1];
@@ -165,6 +167,7 @@ SOCKSOutStream::_clientParse() {
         // Send response (version=5, no auth)
         const uint8_t msg[] = {0x05, 0x00}; write((char *) msg, 2);
         _state = RX_REQUEST;
+        qDebug() << "SOCKS: send no-auth OK response.";
       }
       continue;
     } else if (RX_REQUEST == _state) {
@@ -181,10 +184,16 @@ SOCKSOutStream::_clientParse() {
         close(); return;
       }
       // check addr type
-      if (1 == buffer[3]) { _state = RX_REQUEST_ADDR_IP4; }
-      else if (3 == buffer[3]) { _state = RX_REQUEST_ADDR_NAME_LEN; }
-      else if (4 == buffer[3]) { _state = RX_REQUEST_ADDR_IP6; }
-      else {
+      if (1 == buffer[3]) {
+        _state = RX_REQUEST_ADDR_IP4;
+        qDebug() << "SOCKS: RX IP4 addr.";
+      } else if (3 == buffer[3]) {
+        _state = RX_REQUEST_ADDR_NAME_LEN;
+        qDebug() << "SOCKS: RX host name.";
+      } else if (4 == buffer[3]) {
+        _state = RX_REQUEST_ADDR_IP6;
+        qDebug() << "SOCKS: RX IP6 addr.";
+      } else {
         qDebug() << "Unsupported SOCKS address type" << int(buffer[3]);
         close(); return;
       }
@@ -193,12 +202,14 @@ SOCKSOutStream::_clientParse() {
       if (4 > bytesAvailable()) { return; }
       uint32_t ip4=0; read((char *) &ip4, 4);
       _addr = QHostAddress(ntohl(ip4));
+      qDebug() << "SOCKS: got" << _addr;
       _state = RX_REQUEST_PORT;
       continue;
     } else if (RX_REQUEST_ADDR_IP6 == _state) {
       if (16 > bytesAvailable()) { return; }
       uint8_t buffer[16]; read( (char *) buffer, 16);
       _addr = QHostAddress(buffer);
+      qDebug() << "SOCKS: got" << _addr;
       _state = RX_REQUEST_PORT;
       continue;
     } else if (RX_REQUEST_ADDR_NAME_LEN == _state) {
@@ -211,7 +222,10 @@ SOCKSOutStream::_clientParse() {
       size_t len = read((char *)buffer, _nHostName);
       _hostName = _hostName + QString::fromUtf8((char *)buffer, len);
       _nHostName -= len;
-      if (0 == _nHostName) { _state = RX_REQUEST_PORT; }
+      if (0 == _nHostName) {
+        _state = RX_REQUEST_PORT;
+        qDebug() << "SOCKS: got" << _hostName;
+      }
       continue;
     } else if (RX_REQUEST_PORT == _state) {
       if (2 > bytesAvailable()) { return; }
