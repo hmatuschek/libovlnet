@@ -51,7 +51,6 @@ SOCKSInStream::_clientReadyRead() {
   if (len) {
     len = _inStream->read((char *)buffer, len);
     this->write((const char *)buffer, len);
-    logDebug() << "SOCKS: forward " << len << "bytes: " << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -63,7 +62,6 @@ SOCKSInStream::_clientBytesWritten(qint64 bytes) {
   if (len) {
     len = read((char *)buffer, len);
     _inStream->write((const char *)buffer, len);
-    logDebug() << "SOCKS: received " << len << "bytes: " << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -86,8 +84,6 @@ SOCKSInStream::_remoteReadyRead() {
   if (len) {
     len = read((char *)buffer, len);
     _inStream->write((const char *)buffer, len);
-    logDebug() << "SOCKS: received " << len << "bytes: "
-               << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -100,7 +96,6 @@ SOCKSInStream::_remoteBytesWritten(qint64 bytes) {
   if (len) {
     len = _inStream->read((char *)buffer, len);
     this->write((const char *)buffer, len);
-    logDebug() << "SOCKS: send " << len << "bytes: " << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -241,8 +236,6 @@ SOCKSOutStream::_clientParse() {
       connect(_outStream, SIGNAL(connected()), this, SLOT(_remoteConnected()));
       connect(_outStream, SIGNAL(error(QAbstractSocket::SocketError)),
               this, SLOT(_remoteError(QAbstractSocket::SocketError)));
-      logDebug() << "SOCKS: Connect to " << _addr << ":" << _port
-                 << " " << ((0 != _hostName.size()) ? _hostName : "");
 
       _outStream->connectToHost(_addr, _port);
       _state = CONNECTING;
@@ -256,7 +249,6 @@ SOCKSOutStream::_clientReadyRead() {
   while (bytesAvailable()) {
     uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
     int len = read((char *) buffer, DHT_SEC_MAX_DATA_SIZE-5);
-    logDebug() << "SOCKS: Forward " << len << "b to remote host.";
     if (0 == len) { return; }
     _outStream->write((const char *)buffer, len);
   }
@@ -270,7 +262,6 @@ SOCKSOutStream::_clientBytesWritten(qint64 bytes) {
     len = std::min(len, inBufferFree());
     if (0 == len) { return; }
     len = _outStream->read((char *) buffer, len);
-    logDebug() << "SOCKS: Forward " << len << "b to client node.";
     write((const char *)buffer, len);
   }
 }
@@ -340,7 +331,6 @@ SOCKSOutStream::_remoteReadyRead() {
     len = std::min(len, inBufferFree());
     if (0 == len) { return; }
     len = _outStream->read((char *) buffer, len);
-    logDebug() << "SOCKS: Forward " << len << "b to client node.";
     write((const char *)buffer, len);
   }
 }
@@ -350,7 +340,6 @@ SOCKSOutStream::_remoteBytesWritten(qint64 bytes) {
   while (bytesAvailable()) {
     uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
     int len = read((char *) buffer, DHT_SEC_MAX_DATA_SIZE-5);
-    logDebug() << "SOCKS: Forward " << len << "b to remote host.";
     if (0 == len) { return; }
     /// @bug What if _outStream buffer is full?
     _outStream->write((const char *)buffer, len);

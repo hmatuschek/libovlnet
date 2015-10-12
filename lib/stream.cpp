@@ -116,7 +116,6 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       // send ACK
       Message resp(Message::ACK);
       resp.seq = htonl(seq);
-      logDebug() << "SecureStream: Send ACK seq=" << seq << ".";
       if (! sendDatagram((const uint8_t*) &resp, 5)) {
         logWarning() << "SecureStream: Failed to send ACK.";
       }
