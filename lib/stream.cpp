@@ -51,6 +51,7 @@ SecureStream::open(OpenMode mode) {
 
 void
 SecureStream::close() {
+  logDebug() << "SecureStream: Close connection, send RST.";
   _closed = true;
   Message msg(Message::RESET);
   sendDatagram((uint8_t *) &msg, 1);
@@ -79,7 +80,7 @@ SecureStream::inBufferFree() const {
 qint64
 SecureStream::writeData(const char *data, qint64 len) {
   // Determine maximum data length
-  len = std::max(len, qint64(DHT_SEC_MAX_DATA_SIZE-5));
+  len = std::min(len, qint64(DHT_SEC_MAX_DATA_SIZE-5));
   // Pack message
   Message msg(Message::DATA);
   msg.seq = htonl(_outBuffer.sequence());

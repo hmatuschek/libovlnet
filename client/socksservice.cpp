@@ -26,6 +26,7 @@ SocksConnection::close() {
 SocksService::SocksService(Application &app, const NodeItem &remote, uint16_t port, QObject *parent)
   : QObject(parent), _application(app), _remote(remote), _server()
 {
+  logDebug() << "Start SOCKS proxy service at localhost:" << port;
   // Bind socket to local port
   _server.listen(QHostAddress::LocalHost, port);
 
@@ -41,6 +42,7 @@ SocksService::_onNewConnection() {
   while (_server.hasPendingConnections()) {
     // Get for each incomming connection -> create a separate stream to the remote
     QTcpSocket *socket = _server.nextPendingConnection();
+    logDebug() << "New incomming SOCKS connection...";
     _application.dht().startStream(5, _remote, new SocksConnection(_application.dht(), socket));
   }
 }
