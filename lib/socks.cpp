@@ -241,8 +241,12 @@ SOCKSOutStream::_clientParse() {
       connect(_outStream, SIGNAL(connected()), this, SLOT(_remoteConnected()));
       connect(_outStream, SIGNAL(error(QAbstractSocket::SocketError)),
               this, SLOT(_remoteError(QAbstractSocket::SocketError)));
-      _outStream->connectToHost(_addr, port);
+      logDebug() << "SOCKS: Connect to " << _addr << ":" << _port
+                 << " " << ((0 != _hostName.size()) ? _hostName : "");
+
+      _outStream->connectToHost(_addr, _port);
       _state = CONNECTING;
+      return;
     }
   }
 }
@@ -250,8 +254,9 @@ SOCKSOutStream::_clientParse() {
 void
 SOCKSOutStream::_clientReadyRead() {
   while (bytesAvailable()) {
-    uint8_t buffer[1024];
-    int len = read((char *) buffer, 1024);
+    uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
+    int len = read((char *) buffer, DHT_SEC_MAX_DATA_SIZE-5);
+    logDebug() << "SOCKS: Forward " << len << "b to remote host.";
     if (0 == len) { return; }
     _outStream->write((const char *)buffer, len);
   }
@@ -260,11 +265,12 @@ SOCKSOutStream::_clientReadyRead() {
 void
 SOCKSOutStream::_clientBytesWritten(qint64 bytes) {
   while (_outStream->bytesAvailable()) {
-    uint8_t buffer[1024];
-    size_t len = std::min(qint64(1024), _outStream->bytesAvailable());
+    uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
+    size_t len = std::min(qint64(DHT_SEC_MAX_DATA_SIZE-5), _outStream->bytesAvailable());
     len = std::min(len, inBufferFree());
     if (0 == len) { return; }
     len = _outStream->read((char *) buffer, len);
+    logDebug() << "SOCKS: Forward " << len << "b to client node.";
     write((const char *)buffer, len);
   }
 }
@@ -290,6 +296,34 @@ SOCKSOutStream::_remoteConnected() {
     connect(_outStream, SIGNAL(disconnected()), this, SLOT(_remoteDisconnected()));
     connect(_outStream, SIGNAL(error(QAbstractSocket::SocketError)),
             this, SLOT(_remoteError(QAbstractSocket::SocketError)));
+    // Send OK response
+    uint8_t msg[DHT_SEC_MAX_DATA_SIZE-5];
+    uint8_t *ptr = msg; int len=0;
+    // Version
+    (*ptr) = 0x05; ptr++; len++;
+    // success
+    (*ptr) = 0x00; ptr++; len++;
+    // reserved
+    (*ptr) = 0x00; ptr++; len++;
+    // address
+    if (QAbstractSocket::IPv4Protocol == _outStream->localAddress().protocol()) {
+      (*ptr) = 0x01; ptr++; len++; // IPv4
+      (*(uint32_t *)ptr) = htonl(_outStream->localAddress().toIPv4Address()); ptr += 4; len += 4;
+    } else if (QAbstractSocket::IPv6Protocol == _outStream->localAddress().protocol()) {
+      (*ptr) = 0x04; ptr++; len++; // IPv6
+      memcpy(ptr, _outStream->localAddress().toIPv6Address().c, 16); ptr += 16; len += 16;
+    } else {
+      logError() << "SOCKS: Local address of remote connnection is neither IPv4 nor IPv6 -> close.";
+      close();
+      return;
+    }
+    // Local port
+    (*(uint16_t *)ptr) = htons(_outStream->localPort()); ptr+=2; len+=2;
+    if(len != write((const char *)msg, len)) {
+      logError() << "SOCKS: Cannot send response to client -> close.";
+      close(); return;
+    }
+    // done.
     _state = STARTED;
   }
   // Process possible data at client side
@@ -301,11 +335,12 @@ SOCKSOutStream::_remoteConnected() {
 void
 SOCKSOutStream::_remoteReadyRead() {
   while (_outStream->bytesAvailable()) {
-    uint8_t buffer[1024];
-    size_t len = std::min(qint64(1024), _outStream->bytesAvailable());
+    uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
+    size_t len = std::min(qint64(DHT_SEC_MAX_DATA_SIZE-5), _outStream->bytesAvailable());
     len = std::min(len, inBufferFree());
     if (0 == len) { return; }
     len = _outStream->read((char *) buffer, len);
+    logDebug() << "SOCKS: Forward " << len << "b to client node.";
     write((const char *)buffer, len);
   }
 }
@@ -313,8 +348,9 @@ SOCKSOutStream::_remoteReadyRead() {
 void
 SOCKSOutStream::_remoteBytesWritten(qint64 bytes) {
   while (bytesAvailable()) {
-    uint8_t buffer[1024];
-    int len = read((char *) buffer, 1024);
+    uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
+    int len = read((char *) buffer, DHT_SEC_MAX_DATA_SIZE-5);
+    logDebug() << "SOCKS: Forward " << len << "b to remote host.";
     if (0 == len) { return; }
     /// @bug What if _outStream buffer is full?
     _outStream->write((const char *)buffer, len);
