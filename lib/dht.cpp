@@ -367,16 +367,16 @@ DHT::ping(const QHostAddress &addr, uint16_t port) {
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   memcpy(msg.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
   msg.payload.ping.type = MSG_PING;
-  logDebug() << "Send ping to" << addr << ":" << port;
+  logDebug() << "Send ping to " << addr << ":" << port;
   // send it
   if(0 > _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port)) {
-    logError() << "Failed to send ping to" << addr << ":" << port;
+    logError() << "Failed to send ping to " << addr << ":" << port;
   }
 }
 
 void
 DHT::findNode(const Identifier &id) {
-  logDebug() << "Search for node" << id;
+  logDebug() << "Search for node " << id;
   // Create a query instance
   FindNodeQuery *query = new FindNodeQuery(id);
   // Collect DHT_K nearest nodes
@@ -397,7 +397,7 @@ DHT::findNode(const Identifier &id) {
 
 void
 DHT::findValue(const Identifier &id) {
-  logDebug() << "Search for value" << id;
+  logDebug() << "Search for value " << id;
   // Create a query instance
   FindValueQuery *query = new FindValueQuery(id);
   // Collect DHT_K nearest nodes
@@ -405,7 +405,7 @@ DHT::findValue(const Identifier &id) {
   // Send request to the first element in the list
   NodeItem next;
   if (! query->next(next)) {
-    logInfo() << "Can not find value" << id << ". Buckets empty.";
+    logInfo() << "Can not find value " << id << ". Buckets empty.";
     delete query; emit valueNotFound(id);
   } else {
     sendFindValue(next, query);
@@ -414,7 +414,7 @@ DHT::findValue(const Identifier &id) {
 
 void
 DHT::announce(const Identifier &id) {
-  logDebug() << "Announce data " << id << "to the world.";
+  logDebug() << "Announce data " << id << " to the world.";
   _announcedData[id] = QDateTime();
   // lets search for the nodes closest to the data id
   findNode(id);
@@ -451,7 +451,7 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
 
 void
 DHT::streamClosed(const Identifier &id) {
-  logDebug() << "Close stream" << id;
+  logDebug() << "Close stream " << id;
   _streams.remove(id);
 }
 
@@ -629,7 +629,7 @@ DHT::_onReadyRead() {
           _processStartStreamRequest(msg, size, addr, port);
         } else {
           logInfo() << "Unknown request from " << addr << ":" << port
-                    << " dropping" << (size-DHT_HASH_SIZE) << "bytes payload.";
+                    << " dropping " << (size-DHT_HASH_SIZE) << "b payload.";
         }
       }
     }

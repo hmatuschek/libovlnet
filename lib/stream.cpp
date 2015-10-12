@@ -58,7 +58,7 @@ SecureStream::close() {
 
 qint64
 SecureStream::bytesAvailable() const {
-  return _inBuffer.available();
+  return _inBuffer.available() + QIODevice::bytesAvailable();
 }
 
 size_t
@@ -99,33 +99,48 @@ SecureStream::readData(char *data, qint64 maxlen) {
 void
 SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   // Check size
-  if (len<1) { return; }
+  if (0 == len) { return; }
   // Unpack message
   const Message *msg = (const Message *)data;
-  // dispatch by type
+  /*
+   * dispatch by type
+   */
   if (Message::DATA == msg->type) {
-    if (len<5) { return; }
+    if (len<5) {
+      logDebug() << "Received malformed DATA datagram, len=" << len << ".";
+      return;
+    }
     uint32_t seq = ntohl(msg->seq);
     if (_inBuffer.putPacket(seq, (const uint8_t *)msg->data, len-5)) {
       // send ACK
       Message resp(Message::ACK);
       resp.seq = htonl(seq);
-      sendDatagram((const uint8_t*) &resp, 5);
+      logDebug() << "SecureStream: Send ACK seq=" << seq << ".";
+      if (! sendDatagram((const uint8_t*) &resp, 5)) {
+        logWarning() << "SecureStream: Failed to send ACK.";
+      }
       // Signal data available
       emit readyRead();
     }
   } else if (Message::ACK == msg->type) {
-    if (len!=5) { return; }
+    if (len!=5) {
+      logDebug() << "Malformed ACK packet received, len=" << len << ".";
+      return;
+    }
     size_t send = _outBuffer.ack(msg->seq);
-    if (send) {
+    if (0 != send) {
       emit bytesWritten(send);
     }
   } else if (Message::RESET == msg->type) {
-    if (len!=1) { return; }
+    if (len!=1) {
+      logDebug() << "Malformed RST packet received, len=" << len << ".";
+      return;
+    }
+    logDebug() << "SecureStream: RST received -> close stream.";
     _closed = true;
     emit readChannelFinished();
     _dht.streamClosed(id());
   } else {
-    logError() << "Unknown datagram received.";
+    logError() << "Unknown datagram received: type=" << msg->type << ".";
   }
 }
