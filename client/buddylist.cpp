@@ -191,15 +191,15 @@ BuddyList::BuddyList(Application &application, const QString path, QObject *pare
 
   // Read buddy list from file
   if (! _file.open(QIODevice::ReadOnly)) {
-    qDebug() << "Can not read buddy list from" << _file.fileName(); return;
+    logInfo() << "Can not read buddy list from " << _file.fileName(); return;
   }
-  qDebug() << "Read buddy list from file" << _file.fileName();
+  logDebug() << "Read buddy list from file " << _file.fileName();
 
   QJsonParseError err;
   QJsonDocument doc = QJsonDocument::fromJson(_file.readAll(), &err);
   _file.close();
   if (! doc.isArray()) {
-    qDebug() << "Malformed buddy list:" << err.offset << err.errorString(); return;
+    logError() << "Malformed buddy list:" << err.offset << err.errorString(); return;
   }
   QJsonArray lst = doc.array();
   QJsonArray::iterator obj = lst.begin();
@@ -215,7 +215,7 @@ BuddyList::BuddyList(Application &application, const QString path, QObject *pare
         _nodes.insert((*node)->id(), idx);
       }
     } else {
-      qDebug() << "Malformed buddy in list:" << *obj;
+      logWarning() << "Malformed buddy in list:" << (*obj).toString();
     }
   }
 }
@@ -340,7 +340,7 @@ BuddyList::delNode(const QString &name, const Identifier &node) {
 void
 BuddyList::save()  {
   if (!_file.open(QIODevice::WriteOnly)) {
-    qDebug() << "Cannot write buddy list!"; return;
+    logError() << "Cannot write buddy list!"; return;
   }
 
   QJsonDocument doc;

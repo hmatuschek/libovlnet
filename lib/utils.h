@@ -50,13 +50,13 @@ class PacketOutBuffer
 public:
   class Packet {
   public:
-    Packet()
+    inline Packet()
       : _sequence(0), _length(0), _timestamp() { }
-    Packet(uint32_t seq, size_t len)
+    inline Packet(uint32_t seq, size_t len)
       : _sequence(seq), _length(len), _timestamp(QDateTime::currentDateTime()) { }
-    Packet(const Packet &other)
+    inline Packet(const Packet &other)
       : _sequence(other._sequence), _length(other._length), _timestamp(other._timestamp) { }
-    Packet &operator=(const Packet &other) {
+    inline Packet &operator=(const Packet &other) {
       _sequence = other._sequence;
       _length = other._length;
       _timestamp = other._timestamp;

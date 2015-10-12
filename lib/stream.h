@@ -26,11 +26,13 @@ public:
   virtual bool open(OpenMode mode);
   /** Close the stream. */
   virtual void close();
-  /** Retruns the number of bytes in the input buffer. */
+  /** Returns the number of bytes in the input buffer. */
   virtual qint64 bytesAvailable() const;
+  /** Returns the number of free bytes in the output buffer. */
   size_t outBufferFree() const;
-  /** Retruns the number of bytes in the output buffer. */
+  /** Returns the number of bytes in the output buffer. */
   virtual qint64 bytesToWrite() const;
+  /** Returns the number of free bytes in the input buffer. */
   size_t inBufferFree() const;
 
 protected:

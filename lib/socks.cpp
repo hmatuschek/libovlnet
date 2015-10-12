@@ -23,7 +23,7 @@ SOCKSInStream::~SOCKSInStream() {
 bool
 SOCKSInStream::open(OpenMode mode) {
   if (! SecureStream::open(mode)) { return false; }
-  qDebug() << "SOCKS in stream started.";
+  logDebug() << "SOCKS in stream started.";
   // Connect to client signals
   connect(_inStream, SIGNAL(readyRead()), this, SLOT(_clientReadyRead()));
   connect(_inStream, SIGNAL(bytesWritten(qint64)), this, SLOT(_clientBytesWritten(qint64)));
@@ -51,7 +51,7 @@ SOCKSInStream::_clientReadyRead() {
   if (len) {
     len = _inStream->read((char *)buffer, len);
     this->write((const char *)buffer, len);
-    qDebug() << "SOCKS: forward " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
+    logDebug() << "SOCKS: forward " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -63,7 +63,7 @@ SOCKSInStream::_clientBytesWritten(qint64 bytes) {
   if (len) {
     len = read((char *)buffer, len);
     _inStream->write((const char *)buffer, len);
-    qDebug() << "SOCKS: received " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
+    logDebug() << "SOCKS: received " << len << "bytes: " << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -86,7 +86,8 @@ SOCKSInStream::_remoteReadyRead() {
   if (len) {
     len = read((char *)buffer, len);
     _inStream->write((const char *)buffer, len);
-    qDebug() << "SOCKS: received " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
+    logDebug() << "SOCKS: received " << len << "bytes: "
+               << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -99,7 +100,7 @@ SOCKSInStream::_remoteBytesWritten(qint64 bytes) {
   if (len) {
     len = _inStream->read((char *)buffer, len);
     this->write((const char *)buffer, len);
-    qDebug() << "SOCKS: send " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
+    logDebug() << "SOCKS: send " << len << "bytes: " << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -145,7 +146,7 @@ SOCKSOutStream::open(OpenMode mode) {
 void
 SOCKSOutStream::_clientParse() {
   while (bytesAvailable()) {
-    qDebug() << "SOCKS: " << bytesAvailable() << "bytes left in input buffer.";
+    logDebug() << "SOCKS: " << bytesAvailable() << "bytes left in input buffer.";
     /*
      * Dispatch by state.
      */
@@ -155,25 +156,25 @@ SOCKSOutStream::_clientParse() {
       uint8_t buffer[2]; read((char *) buffer, 2);
       // Check version number
       if (5 != buffer[0]) {
-        qDebug() << "Unknown SOCKS version number" << int(buffer[0]);
+        logError() << "Unknown SOCKS version number" << int(buffer[0]);
         close(); return;
       } else {
-        qDebug() << "Got SOCKS v5 request.";
+        logDebug() << "Got SOCKS v5 request.";
       }
       // Get length of authentication method
       _nAuthMeth = buffer[1];
       // Update state
       _state = RX_AUTHENTICATION;
-      qDebug() << "SOCKS: read auth meth, len =" << _nAuthMeth;
+      logDebug() << "SOCKS: read auth meth, len =" << _nAuthMeth;
       continue;
     } else if (RX_AUTHENTICATION == _state) {
       if (0 == bytesAvailable()) {
-        qDebug() << "No bytes left in buffer -> wait.";
+        logDebug() << "No bytes left in buffer -> wait.";
         return;
       }
       uint8_t buffer[255];
       size_t len = read((char *)buffer, _nAuthMeth);
-      qDebug() << "SOCKS: Read" << len << "bytes of auth method.";
+      logDebug() << "SOCKS: Read" << len << "bytes of auth method.";
       _authMeth = _authMeth + QString::fromUtf8((char *)buffer, len);
       _nAuthMeth -= len;
       if (0 == _nAuthMeth) {
@@ -182,7 +183,7 @@ SOCKSOutStream::_clientParse() {
         write((const char *) msg, 2);
         // update state
         _state = RX_REQUEST;
-        qDebug() << "SOCKS: send no-auth OK response.";
+        logDebug() << "SOCKS: send no-auth OK response.";
       }
       continue;
     } else if (RX_REQUEST == _state) {
@@ -190,26 +191,26 @@ SOCKSOutStream::_clientParse() {
       uint8_t buffer[4]; read((char *) buffer, 4);
       // check version
       if (5 != buffer[0]) {
-        qDebug() << "Unknown SOCKS version number" << int(buffer[0]);
+        logError() << "Unknown SOCKS version number" << int(buffer[0]);
         close(); return;
       }
       // check command (only CONNECT (0x01) is supported).
       if (1 != buffer[1]) {
-        qDebug() << "Unsupported command" << int(buffer[1]);
+        logError() << "Unsupported command" << int(buffer[1]);
         close(); return;
       }
       // check addr type
       if (1 == buffer[3]) {
         _state = RX_REQUEST_ADDR_IP4;
-        qDebug() << "SOCKS: RX IP4 addr.";
+        logDebug() << "SOCKS: RX IP4 addr.";
       } else if (3 == buffer[3]) {
         _state = RX_REQUEST_ADDR_NAME_LEN;
-        qDebug() << "SOCKS: RX host name.";
+        logDebug() << "SOCKS: RX host name.";
       } else if (4 == buffer[3]) {
         _state = RX_REQUEST_ADDR_IP6;
-        qDebug() << "SOCKS: RX IP6 addr.";
+        logDebug() << "SOCKS: RX IP6 addr.";
       } else {
-        qDebug() << "Unsupported SOCKS address type" << int(buffer[3]);
+        logError() << "Unsupported SOCKS address type" << int(buffer[3]);
         close(); return;
       }
       continue;
@@ -217,14 +218,14 @@ SOCKSOutStream::_clientParse() {
       if (4 > bytesAvailable()) { return; }
       uint32_t ip4=0; read((char *) &ip4, 4);
       _addr = QHostAddress(ntohl(ip4));
-      qDebug() << "SOCKS: got" << _addr;
+      logDebug() << "SOCKS: got" << _addr;
       _state = RX_REQUEST_PORT;
       continue;
     } else if (RX_REQUEST_ADDR_IP6 == _state) {
       if (16 > bytesAvailable()) { return; }
       uint8_t buffer[16]; read( (char *) buffer, 16);
       _addr = QHostAddress(buffer);
-      qDebug() << "SOCKS: got" << _addr;
+      logDebug() << "SOCKS: got" << _addr;
       _state = RX_REQUEST_PORT;
       continue;
     } else if (RX_REQUEST_ADDR_NAME_LEN == _state) {
@@ -240,7 +241,7 @@ SOCKSOutStream::_clientParse() {
       _nHostName -= len;
       if (0 == _nHostName) {
         _state = RX_REQUEST_PORT;
-        qDebug() << "SOCKS: got" << _hostName;
+        logDebug() << "SOCKS: got" << _hostName;
       }
       continue;
     } else if (RX_REQUEST_PORT == _state) {
@@ -251,7 +252,7 @@ SOCKSOutStream::_clientParse() {
       if (_addr.isNull()) {
         QList<QHostAddress> addrs = QHostInfo::fromName(_hostName).addresses();
         if (addrs.isEmpty()) {
-          qDebug() << "Can not resolve host name" << _hostName;
+          logError() << "Can not resolve host name" << _hostName;
           /// @bug Send a proper error message
           close(); return;
         }
@@ -275,6 +276,7 @@ SOCKSOutStream::_clientReadyRead() {
   while (bytesAvailable()) {
     uint8_t buffer[1024];
     int len = read((char *) buffer, 1024);
+    if (0 == len) { return; }
     _outStream->write((const char *)buffer, len);
   }
 }
@@ -285,6 +287,7 @@ SOCKSOutStream::_clientBytesWritten(qint64 bytes) {
     uint8_t buffer[1024];
     size_t len = std::min(qint64(1024), _outStream->bytesAvailable());
     len = std::min(len, inBufferFree());
+    if (0 == len) { return; }
     len = _outStream->read((char *) buffer, len);
     write((const char *)buffer, len);
   }
@@ -321,6 +324,7 @@ SOCKSOutStream::_remoteReadyRead() {
     uint8_t buffer[1024];
     size_t len = std::min(qint64(1024), _outStream->bytesAvailable());
     len = std::min(len, inBufferFree());
+    if (0 == len) { return; }
     len = _outStream->read((char *) buffer, len);
     write((const char *)buffer, len);
   }
@@ -331,6 +335,8 @@ SOCKSOutStream::_remoteBytesWritten(qint64 bytes) {
   while (bytesAvailable()) {
     uint8_t buffer[1024];
     int len = read((char *) buffer, 1024);
+    if (0 == len) { return; }
+    /// @bug What if _outStream buffer is full?
     _outStream->write((const char *)buffer, len);
   }
 }

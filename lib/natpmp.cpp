@@ -1,5 +1,6 @@
 #include "natpmp.h"
 #include <netinet/in.h>
+#include "logger.h"
 
 
 /** Possible result codes. */
@@ -125,7 +126,7 @@ PMPClient::requestMap(uint16_t iport, const QHostAddress &addr, uint16_t port)
 {
   // Send request
   if (! _sendMapRequest(iport, 0, addr, port)) {
-    qDebug() << "Failed to send NAT-PMP Map request.";
+    logError() << "Failed to send NAT-PMP Map request.";
     emit failed(iport); return;
   }
 
@@ -145,31 +146,31 @@ PMPClient::_onDatagramReceived() {
     // Read data
     QHostAddress addr; uint16_t port;
     size_t size = _socket.readDatagram((char *) &response, sizeof(PMPMapResponse), &addr, &port);
-    qDebug() << "Received message from" << addr << ":" << port;
+    logDebug() << "Received message from" << addr << ":" << port;
 
     // Check if we have a pending request:
     if (! _reqTimestamp.isValid()) {
-      qDebug() << "Unexpected message from" << addr << ":" << port; continue;
+      logError() << "Unexpected message from" << addr << ":" << port; continue;
     }
 
     // Check size
     if (size != sizeof(PMPMapResponse)) {
-      qDebug() << "Invalid response received (size)."; continue;
+      logError() << "Invalid response received (size)."; continue;
     }
 
     // Check opcode & response code
     if (129 != response.opcode) {
-      qDebug() << "Invalid response received (opcode:" << response.opcode << ")"; continue;
+      logError() << "Invalid response received (opcode:" << response.opcode << ")"; continue;
     }
 
     // Check iport
     if (_iport != ntohs(response.iport)) {
-      qDebug() << "Unexpected internal port" << ntohs(response.iport); continue;
+      logError() << "Unexpected internal port" << ntohs(response.iport); continue;
     }
 
     // Check result code
     if (response.result) {
-      qDebug() << "NAT-PMP returned error:" << ntohs(response.result);
+      logError() << "NAT-PMP returned error:" << ntohs(response.result);
       _reqTimer.stop(); _reqTimestamp = QDateTime(); continue;
       // If response was not a refresh -> signal failiure
       if (! _mappings.contains(_iport)) { emit failed(_iport); }

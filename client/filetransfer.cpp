@@ -159,8 +159,8 @@ FileUpload::write(const QByteArray &data) {
 size_t
 FileUpload::write(const uint8_t *buffer, size_t size) {
   if (0 == (size = std::min(size, FILETRANSFER_MAX_DATA_LEN))) {
-    qDebug() << "Skip empty data package, size" << size
-             << "max size" << FILETRANSFER_MAX_DATA_LEN;
+    logDebug() << "Skip empty data package, size" << size
+               << "max size" << FILETRANSFER_MAX_DATA_LEN;
     return 0;
   }
   // get current sequence number
@@ -172,7 +172,7 @@ FileUpload::write(const uint8_t *buffer, size_t size) {
   msg.type = DATA;
   msg.payload.data.seq = qToBigEndian(quint32(sequence));
   memcpy(msg.payload.data.data, buffer, size);
-  qDebug() << "Send" << size << "bytes data.";
+  logDebug() << "Send" << size << "bytes data.";
   sendDatagram((uint8_t *)&msg, size+5);
   return size;
 }
@@ -257,24 +257,24 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
 
   // Just accepted request and received data -> switch to STARTED stage.
   if ((ACCEPTED == _state) && (DATA == msg->type)) {
-    qDebug() << "Received DATA in ACCEPTED state -> switch into STARTED state.";
+    logDebug() << "Received DATA in ACCEPTED state -> switch into STARTED state.";
     _state = STARTED;
     // pass through;
   }
 
   // If started, expect data
   if ((STARTED == _state) && (DATA == msg->type)) {
-    qDebug() << "Received DATA package in STARTED stage.";
+    logDebug() << "Received DATA package in STARTED stage.";
     // check length
     if (len<5) { return; }
     uint32_t seq = qFromBigEndian(msg->payload.data.seq);
-    qDebug() << "Received" << (len-5) << "bytes data with seq" << seq;
+    logDebug() << "Received" << (len-5) << "bytes data with seq" << seq;
     if (_packetBuffer.putPacket(seq, msg->payload.data.data, len-5)) {
       // Send ACK for returned seq number
       FileTransferMessage resp;
       resp.type = ACK; resp.payload.ack.seq = qToBigEndian(quint32(seq));
       sendDatagram((uint8_t *) &resp, 5);
-      qDebug() << "Send ACK for seq" << seq;
+      logDebug() << "Send ACK for seq" << seq;
       emit readyRead();
     }
     return;
@@ -294,7 +294,7 @@ FileDownload::read(uint8_t *buffer, size_t len) {
 void
 FileDownload::accept() {
   if (REQUEST_RECEIVED == _state) {
-    qDebug() << "Send ACK to accept the file-transfer request.";
+    logDebug() << "Send ACK to accept the file-transfer request.";
     _state = ACCEPTED;
     FileTransferMessage resp;
     resp.type = ACK; resp.payload.ack.seq = 0;

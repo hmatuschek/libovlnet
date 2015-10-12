@@ -56,12 +56,12 @@ CallWindow::closeEvent(QCloseEvent *evt) {
 
 void
 CallWindow::onMute() {
-  qDebug() << "Not implemented yet.";
+  logInfo() << "Not implemented yet.";
 }
 
 void
 CallWindow::onPause() {
-  qDebug() << "Not implemented yet.";
+  logInfo() << "Not implemented yet.";
 }
 
 void

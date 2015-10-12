@@ -1,5 +1,6 @@
 #include "pcp.h"
 #include "string.h"
+#include "logger.h"
 #include <netinet/in.h>
 
 
@@ -73,7 +74,7 @@ PCPClient::requestMap(uint16_t iport, const QHostAddress &addr, uint16_t port)
     return;
   }
   QHostAddress local = _socket.localAddress();
-  qDebug() << "Got local address" << local;
+  logInfo() << "Got local address" << local;
 
   // Assemble request
   PCPRequest request;
@@ -88,9 +89,9 @@ PCPClient::requestMap(uint16_t iport, const QHostAddress &addr, uint16_t port)
   request.mapRequest.iport = htons(iport);
   // eport & eipv6 are left 0 -> means any mapping possible
 
-  qDebug() << "Send MAP request.";
+  logDebug() << "Send MAP request.";
   if (int(sizeof(PCPRequest)) > _socket.writeDatagram((char *)&request, addr, port)) {
-    qDebug() << "Can not send PCP request to" << addr << ":" << port;
+    logError() << "Can not send PCP request to" << addr << ":" << port;
   }
   _socket.disconnectFromHost();
 }
@@ -102,13 +103,13 @@ PCPClient::_onDatagramReceived() {
     memset(&response, 0, sizeof(PCPResponse));
     QHostAddress addr; uint16_t port;
     size_t size = _socket.readDatagram((char *)&response, sizeof(PCPResponse), &addr, &port);
-    qDebug() << "Response received from" << addr << ":" << port;
+    logDebug() << "Response received from" << addr << ":" << port;
     if (size!=sizeof(PCPResponse)) {
-      qDebug() << "Invalid response received from" << addr << ":" << port;
+      logError() << "Invalid response received from" << addr << ":" << port;
       return;
     }
     if (memcmp(response.mapResponse.nonce, _nonce, 12)) {
-      qDebug() << "Invalid response nonce received from" << addr << ":" << port;
+      logError() << "Invalid response nonce received from" << addr << ":" << port;
       return;
     }
     if (SUCCESS == response.result) {

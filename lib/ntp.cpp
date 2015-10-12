@@ -1,8 +1,10 @@
 #include "ntp.h"
+#include "logger.h"
 #include <QtEndian>
-#include <QDebug>
 #include <QHostInfo>
 #include <QEventLoop>
+
+
 
 /* ********************************************************************************************* *
  * Non-public declaraions
@@ -188,7 +190,7 @@ NTPClient::onDatagramReceived() {
     _offset =
         (packet.basic.originateTimestamp.toDateTime().msecsTo(packet.basic.receiveTimestamp.toDateTime())
          + now.msecsTo(packet.basic.transmitTimestamp.toDateTime())) / 2;
-    qDebug() << "Got NTP local offset:" << _offset << "ms.";
+    logDebug() << "Got NTP local offset:" << _offset << "ms.";
     emit received(_offset);
   }
 }

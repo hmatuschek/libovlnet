@@ -2,6 +2,7 @@
 #define BUCKETS_H
 
 #include "dht_config.h"
+#include "logger.h"
 
 #include <QByteArray>
 #include <QList>
@@ -56,6 +57,12 @@ inline QDebug &operator<<(QDebug &stream, const Identifier &id) {
   stream << id.toHex();
   return stream;
 }
+
+inline LogMessageStream &operator<<(LogMessageStream &stream, const Identifier &id) {
+  stream << QString::fromLocal8Bit(id.toHex());
+  return stream;
+}
+
 
 /** Represents a peer (IP address + port) in the network. */
 class PeerItem

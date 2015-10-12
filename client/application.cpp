@@ -7,6 +7,8 @@
 #include "filetransferdialog.h"
 #include "socksservice.h"
 
+#include "lib/logger.h"
+
 #include <portaudio.h>
 
 #include <QMenu>
@@ -45,15 +47,15 @@ Application::Application(int &argc, char *argv[])
   // Load or create identity
   QString idFile(vlfDir.canonicalPath()+"/identity.pem");
   if (!QFile::exists(idFile)) {
-    qDebug() << "No identity found -> create one.";
+    logError() << "No identity found -> create new identity.";
     _identity = Identity::newIdentity(idFile);
   } else {
-    qDebug() << "Load identity from" << idFile;
+    logDebug() << "Load identity from" << idFile;
     _identity = Identity::load(idFile);
   }
 
   if (0 == _identity) {
-    qDebug() << "Error while loading or creating my identity.";
+    logError() << "Error while loading or creating identity.";
     return;
   }
 
@@ -189,18 +191,23 @@ Application::onQuit() {
 SecureSocket *
 Application::newSocket(uint16_t service) {
   if (1 == service) {
-    qDebug() << "Create new SecureCall instance.";
     // VoIP service
+    logDebug() << "Create new SecureCall instance.";
     return new SecureCall(true, *this);
   } else if (2 == service) {
     // Chat service
+    logDebug() << "Create new SecureChat instance.";
     return new SecureChat(*this);
   } else if (4 == service) {
     // File download
+    logDebug() << "Create new Download instance.";
     return new FileDownload(*this);
   } else if (5 == service) {
     // SOCKS proxy service not implemented yet
+    logWarning() << "Secure SOCKS proxy not implemented yet.";
     return 0;
+  } else {
+    logWarning() << "Unknown service number " << service;
   }
   return 0;
 }
@@ -306,13 +313,13 @@ Application::onNodeFound(const NodeItem &node) {
 
   // Dispatch by type
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
-    qDebug() << "Node" << node.id() << "found: Start chat...";
+    logInfo() << "Node " << node.id() << " found: Start chat.";
     _dht->startStream(2, node, stream);
   } else if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
-    qDebug() << "Node" << node.id() << "found: Start call...";
+    logInfo() << "Node " << node.id() << " found: Start call.";
     _dht->startStream(1, node, stream);
   } else if (0 != (upload = dynamic_cast<FileUpload *>(stream))) {
-    qDebug() << "Node" << node.id() << "found: Start uploaing" << upload->fileName();
+    logInfo() << "Node " << node.id() << "found: Start upload of file " << upload->fileName();
     _dht->startStream(4, node, stream);
   }
 }

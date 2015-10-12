@@ -132,7 +132,7 @@ BuddyListView::onSearch() {
 
 void
 BuddyListView::onDelete() {
-  qDebug() << "Not implemented yet.";
+  logInfo() << "Not implemented yet.";
 }
 
 void

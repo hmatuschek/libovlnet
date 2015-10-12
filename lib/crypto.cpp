@@ -39,7 +39,10 @@ Identity::Identity(EVP_PKEY *key, QObject *parent)
 
 error:
   ERR_load_crypto_strings();
-  ERR_print_errors_fp(stderr);
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   EVP_MD_CTX_cleanup(&mdctx);
 }
 
@@ -101,7 +104,10 @@ Identity::sign(const uint8_t *data, size_t datalen, uint8_t *sig, size_t siglen)
 
 error:
   ERR_load_crypto_strings();
-  ERR_print_errors_fp(stderr);
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   EVP_MD_CTX_cleanup(&mdctx);
   return -1;
 }
@@ -124,6 +130,11 @@ Identity::verify(const uint8_t *data, size_t datalen, const uint8_t *sig, size_t
   return true;
 
 error:
+  ERR_load_crypto_strings();
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   EVP_MD_CTX_cleanup(&mdctx);
   return false;
 }
@@ -168,7 +179,10 @@ Identity::newIdentity(const QString &path)
 
 error:
   ERR_load_crypto_strings();
-  ERR_print_errors_fp(stderr);
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   if (key) { EC_KEY_free(key); }
   if (pkey) { EVP_PKEY_free(pkey); }
   if (out) { BIO_free_all(out); }
@@ -186,7 +200,7 @@ Identity::load(const QString &path)
   if (! (pkey = PEM_read_bio_PUBKEY(bio, 0, 0,0)))
     goto error;
   if ( (pkey = PEM_read_bio_PrivateKey(bio, &pkey, 0,0)) ) {
-    qDebug() << "Read private key from" << path;
+    logDebug() << "Read private key from" << path;
   }
   BIO_free_all(bio);
 
@@ -195,7 +209,10 @@ Identity::load(const QString &path)
 
 error:
   ERR_load_crypto_strings();
-  ERR_print_errors_fp(stderr);
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   if (pkey) { EVP_PKEY_free(pkey); }
   if (bio) { BIO_free_all(bio); }
   return 0;
@@ -206,7 +223,10 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
   EVP_PKEY *pkey = EVP_PKEY_new();
   if (0 == d2i_PUBKEY(&pkey, &key, len)) {
     ERR_load_crypto_strings();
-    ERR_print_errors_fp(stderr);
+    unsigned long e = 0;
+    while ( 0 != (e = ERR_get_error()) ) {
+      logError() << "OpenSSL: " << ERR_error_string(e, 0);
+    }
     return 0;
   }
   return new Identity(pkey);
@@ -276,6 +296,11 @@ SecureSocket::prepare(uint8_t *msg, size_t len) {
   return stored;
 
 error:
+  ERR_load_crypto_strings();
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   if (key && !_sessionKeyPair) { EC_KEY_free(key); }
   if (_sessionKeyPair) {
     EVP_PKEY_free(_sessionKeyPair);
@@ -335,6 +360,11 @@ SecureSocket::verify(const uint8_t *msg, size_t len)
   return true;
 
 error:
+  ERR_load_crypto_strings();
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   if (peer) { delete peer; }
   if (_peerPubKey) { EVP_PKEY_free(_peerPubKey); }
   return false;
@@ -385,6 +415,11 @@ SecureSocket::start(const Identifier &streamId, const PeerItem &peer, QUdpSocket
   return true;
 
 error:
+  ERR_load_crypto_strings();
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   if (ctx) { EVP_PKEY_CTX_free(ctx); }
   if (skey) { OPENSSL_free(skey); }
   return false;
@@ -418,6 +453,11 @@ SecureSocket::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   return len1+len2;
 
 error:
+  ERR_load_crypto_strings();
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   EVP_CIPHER_CTX_cleanup(&ctx);
   return -1;
 }
@@ -450,7 +490,10 @@ SecureSocket::decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
 
 error:
   ERR_load_crypto_strings();
-  ERR_print_errors_fp(stderr);
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
   EVP_CIPHER_CTX_cleanup(&ctx);
   return -1;
 }
@@ -469,7 +512,7 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
   int rxlen = 0;
   // Decrypt message
   if (0 > (rxlen = decrypt(seq, data, len-4, _inBuffer))) {
-    qDebug() << "Failed to decrypt message" << seq;
+    logDebug() << "Failed to decrypt message" << seq;
     return;
   }
   // Forward decrypted data

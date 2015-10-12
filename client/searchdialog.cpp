@@ -98,7 +98,7 @@ SearchDialog::_onSearchSuccess(const NodeItem &node) {
 void
 SearchDialog::_onSearchFailed(const Identifier &id, const QList<NodeItem> &best) {
   if (id != _currentSearch) { return; }
-  qDebug() << "Got " << best.size() << "nodes.";
+  logDebug() << "Got " << best.size() << "nodes.";
   QList<NodeItem>::const_iterator node = best.begin();
   for (; node != best.end(); node++) {
     // Exclude myself from list

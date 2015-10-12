@@ -10,7 +10,7 @@ SecureCall::SecureCall(bool incomming, Application &application)
   int err = 0;
   _encoder = opus_encoder_create(48000, 1, OPUS_APPLICATION_VOIP, &err);
   if (OPUS_OK != err) {
-    qDebug() << "Cannot setup opus encoder:" << opus_strerror(err);
+    logError() << "Cannot setup opus encoder:" << opus_strerror(err);
     return;
   }
   opus_encoder_ctl(_encoder, OPUS_SET_BANDWIDTH(OPUS_BANDWIDTH_WIDEBAND));
@@ -19,7 +19,7 @@ SecureCall::SecureCall(bool incomming, Application &application)
   // Init decoder
   _decoder = opus_decoder_create(48000, 1, &err);
   if (OPUS_OK != err) {
-    qDebug() << "Cannot setup opus decoder:" << opus_strerror(err);
+    logError() << "Cannot setup opus decoder:" << opus_strerror(err);
     return;
   }
 
@@ -27,8 +27,8 @@ SecureCall::SecureCall(bool incomming, Application &application)
   PaError paerr = Pa_OpenDefaultStream(&_paStream, 1, 1, paInt16, 48000, VLF_CALL_NUM_FRAMES,
                                        SecureCall::_handleFrames, this);
   if (paNoError != paerr) {
-    qDebug() << "Can not configure PortAudio source:"
-             << ((const char *)Pa_GetErrorText(err));
+    logError() << "Can not configure PortAudio source:"
+               << ((const char *)Pa_GetErrorText(err));
     return;
   }
 }
@@ -51,7 +51,7 @@ SecureCall::isIncomming() const {
 
 void
 SecureCall::initialized() {
-  qDebug() << "SecureCall stream initialized.";
+  logDebug() << "SecureCall stream initialized.";
   _state = INITIALIZED;
 }
 
@@ -62,7 +62,7 @@ SecureCall::accept() {
     _state = RUNNING;
     if (_paStream) {
       Pa_StartStream(_paStream);
-      qDebug() << "Audio stream started.";
+      logDebug() << "Audio stream started.";
     }
     emit started();
   }
@@ -87,7 +87,7 @@ SecureCall::handleDatagram(const uint8_t *data, size_t len) {
       _state = RUNNING;
       if (_paStream) {
         Pa_StartStream(_paStream);
-        qDebug() << "Audio stream started.";
+        logDebug() << "Audio stream started.";
       }
       emit started();
     }
@@ -98,7 +98,7 @@ SecureCall::handleDatagram(const uint8_t *data, size_t len) {
   } else if ((0 == len) && (0 == data)) {
     // An null datagram indicates end of stream,
     if (RUNNING == _state) {
-      qDebug() << "Null datagram received -> stop stream.";
+      logDebug() << "Null datagram received -> stop stream.";
       _state = TERMINATED;
       Pa_StopStream(_paStream);
       emit ended();

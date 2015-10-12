@@ -18,7 +18,10 @@ struct __attribute__((packed)) Message {
   /** Payload. */
   uint8_t  data[DHT_SEC_MAX_DATA_SIZE-5];
 
-  inline Message(Type type) { memset(this, 0, sizeof(Message)); this->type = type; }
+  /** Constructor. */
+  inline Message(Type type) {
+    memset(this, 0, sizeof(Message)); this->type = type;
+  }
 };
 
 
@@ -123,6 +126,6 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     emit readChannelFinished();
     _dht.streamClosed(id());
   } else {
-    qDebug() << "Unknown datagram received.";
+    logError() << "Unknown datagram received.";
   }
 }

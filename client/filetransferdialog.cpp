@@ -64,7 +64,7 @@ void
 FileUploadDialog::_onAccepted() {
   QFileInfo fileinfo(_file.fileName());
   _info->setText(tr("Transfer file \"%1\" ...").arg(fileinfo.fileName()));
-  qDebug() << "Start transfer of file" << _file.fileName();
+  logDebug() << "Start transfer of file" << _file.fileName();
   _file.open(QIODevice::ReadOnly);
   size_t offset = 0;
   uint8_t buffer[FILETRANSFER_MAX_DATA_LEN];
@@ -77,7 +77,7 @@ FileUploadDialog::_onAccepted() {
 
 void
 FileUploadDialog::_onClosed() {
-  qDebug() << "Stop transfer of file" << _file.fileName();
+  logDebug() << "Stop transfer of file" << _file.fileName();
   _file.close();
 
   QFileInfo fileinfo(_file.fileName());
@@ -100,13 +100,13 @@ FileUploadDialog::_onBytesWritten(size_t bytes) {
 
   // if complete -> close stream etc.
   if (_upload->fileSize() == _bytesSend) {
-    qDebug() << "Transmission complete.";
+    logDebug() << "Transmission complete.";
     _upload->stop();
     _file.close();
     return;
   }
 
-  qDebug() << "Continue transfer of file" << _file.fileName() << "at byte" << _bytesSend;
+  logDebug() << "Continue transfer of file" << _file.fileName() << "at byte" << _bytesSend;
 
   // If not complete -> continue
   size_t offset = _file.pos();
@@ -194,10 +194,10 @@ FileDownloadDialog::_onRequest(const QString &filename, uint64_t size) {
 void
 FileDownloadDialog::_onReadyRead() {
   uint8_t buffer[FILETRANSFER_MAX_DATA_LEN];
-  qDebug() << "In _onReadyRead:";
+  logDebug() << "In _onReadyRead:";
   while (_download->available()) {
     size_t len = _download->read(buffer, FILETRANSFER_MAX_DATA_LEN);
-    qDebug() << " received" << len << "bytes.";
+    logDebug() << " received" << len << "bytes.";
     /// @bug Check if data was written.
     _file.write((const char *) buffer, len);
     _bytesReceived += len;
