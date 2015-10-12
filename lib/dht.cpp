@@ -423,7 +423,7 @@ DHT::announce(const Identifier &id) {
 bool
 DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
   if (0 == _streamHandler) { delete stream; return false; }
-  logDebug() << "Send start stream to" << node.id() << "@" << node.addr() << ":" << node.port();
+  logDebug() << "Send start stream to " << node.id() << " @" << node.addr() << ":" << node.port();
   if (! stream) { delete stream; return false; }
   StartStreamRequest *req = new StartStreamRequest(service, node.id(), stream);
 

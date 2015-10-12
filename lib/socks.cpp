@@ -51,7 +51,7 @@ SOCKSInStream::_clientReadyRead() {
   if (len) {
     len = _inStream->read((char *)buffer, len);
     this->write((const char *)buffer, len);
-    logDebug() << "SOCKS: forward " << len << "bytes" << QByteArray((const char *)buffer, len).toHex();
+    logDebug() << "SOCKS: forward " << len << "bytes: " << QByteArray((const char *)buffer, len).toHex();
   }
 }
 
@@ -156,7 +156,7 @@ SOCKSOutStream::_clientParse() {
       uint8_t buffer[2]; read((char *) buffer, 2);
       // Check version number
       if (5 != buffer[0]) {
-        logError() << "Unknown SOCKS version number" << int(buffer[0]);
+        logError() << "Unknown SOCKS version number " << int(buffer[0]);
         close(); return;
       } else {
         logDebug() << "Got SOCKS v5 request.";
@@ -174,7 +174,7 @@ SOCKSOutStream::_clientParse() {
       }
       uint8_t buffer[255];
       size_t len = read((char *)buffer, _nAuthMeth);
-      logDebug() << "SOCKS: Read" << len << "bytes of auth method.";
+      logDebug() << "SOCKS: Read" << len << "b of auth method.";
       _authMeth = _authMeth + QString::fromUtf8((char *)buffer, len);
       _nAuthMeth -= len;
       if (0 == _nAuthMeth) {
@@ -191,12 +191,12 @@ SOCKSOutStream::_clientParse() {
       uint8_t buffer[4]; read((char *) buffer, 4);
       // check version
       if (5 != buffer[0]) {
-        logError() << "Unknown SOCKS version number" << int(buffer[0]);
+        logError() << "Unknown SOCKS version number " << int(buffer[0]);
         close(); return;
       }
       // check command (only CONNECT (0x01) is supported).
       if (1 != buffer[1]) {
-        logError() << "Unsupported command" << int(buffer[1]);
+        logError() << "Unsupported command " << int(buffer[1]);
         close(); return;
       }
       // check addr type
@@ -210,7 +210,7 @@ SOCKSOutStream::_clientParse() {
         _state = RX_REQUEST_ADDR_IP6;
         logDebug() << "SOCKS: RX IP6 addr.";
       } else {
-        logError() << "Unsupported SOCKS address type" << int(buffer[3]);
+        logError() << "Unsupported SOCKS address type " << int(buffer[3]);
         close(); return;
       }
       continue;
@@ -218,14 +218,14 @@ SOCKSOutStream::_clientParse() {
       if (4 > bytesAvailable()) { return; }
       uint32_t ip4=0; read((char *) &ip4, 4);
       _addr = QHostAddress(ntohl(ip4));
-      logDebug() << "SOCKS: got" << _addr;
+      logDebug() << "SOCKS: got " << _addr;
       _state = RX_REQUEST_PORT;
       continue;
     } else if (RX_REQUEST_ADDR_IP6 == _state) {
       if (16 > bytesAvailable()) { return; }
       uint8_t buffer[16]; read( (char *) buffer, 16);
       _addr = QHostAddress(buffer);
-      logDebug() << "SOCKS: got" << _addr;
+      logDebug() << "SOCKS: got " << _addr;
       _state = RX_REQUEST_PORT;
       continue;
     } else if (RX_REQUEST_ADDR_NAME_LEN == _state) {
@@ -241,7 +241,7 @@ SOCKSOutStream::_clientParse() {
       _nHostName -= len;
       if (0 == _nHostName) {
         _state = RX_REQUEST_PORT;
-        logDebug() << "SOCKS: got" << _hostName;
+        logDebug() << "SOCKS: got " << _hostName;
       }
       continue;
     } else if (RX_REQUEST_PORT == _state) {
@@ -252,7 +252,7 @@ SOCKSOutStream::_clientParse() {
       if (_addr.isNull()) {
         QList<QHostAddress> addrs = QHostInfo::fromName(_hostName).addresses();
         if (addrs.isEmpty()) {
-          logError() << "Can not resolve host name" << _hostName;
+          logError() << "Can not resolve host name " << _hostName;
           /// @bug Send a proper error message
           close(); return;
         }

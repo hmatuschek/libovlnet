@@ -58,7 +58,7 @@ inline QDebug &operator<<(QDebug &stream, const Identifier &id) {
   return stream;
 }
 
-inline LogMessageStream &operator<<(LogMessageStream &stream, const Identifier &id) {
+inline QTextStream &operator<<(QTextStream &stream, const Identifier &id) {
   stream << QString::fromLocal8Bit(id.toHex());
   return stream;
 }
