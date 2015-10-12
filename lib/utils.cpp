@@ -276,15 +276,12 @@ __inBetweenSeq(uint32_t x, uint32_t a, uint32_t b) {
 
 bool
 PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len) {
-  logDebug() << "PacketInBuffer: process " << len << "b at seq=" << seq
-             << ": " << QByteArray((const char *)data, len).toHex();
   // Compute the offset of where the packet should be stored in the buffer
   size_t offset = (seq >= _nextSequence) ?
         (seq - _nextSequence) :
         (seq + (size_t(std::numeric_limits<uint32_t>::max())-_nextSequence+1));
   // Check if packet fits into buffer (somehow)
   if ((_available+offset+len)>_buffer.size()) {
-    logWarning() << "PacketInBuffer: Packet does not fit into buffer -> drop.";
     return false;
   }
   // Allocate space in buffer if needed
