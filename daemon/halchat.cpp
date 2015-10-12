@@ -29,9 +29,9 @@ HalChat::handleDatagram(const uint8_t *data, size_t len) {
   if ((0 == data) && (0 == len)) { return; }
   // Handle messages
   QString msg = QString::fromUtf8((const char *)data, len);
-  qDebug() << "Got" << msg;
+  logDebug() << "Got '" << msg << "'.";
   msg = _model.reply(msg);
-  qDebug() << "Reply" << msg;
+  logDebug() << "Reply '" << msg << "'.";
   QByteArray buffer = msg.toUtf8();
   // Send response
   sendDatagram((const uint8_t *)buffer.constData(), buffer.size());

@@ -17,7 +17,7 @@ SOCKSWhitelist::SOCKSWhitelist(const QString &filename)
 {
   QFile file(filename);
   if (! file.open(QIODevice::ReadOnly)) {
-    qDebug() << "Can not read SOCKS whitelist from" << filename;
+    logWarning() << "Can not read SOCKS whitelist from" << filename;
     return;
   }
 

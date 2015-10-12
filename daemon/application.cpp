@@ -19,17 +19,17 @@ Application::Application(int argc, char *argv[])
   // Create identity if not present
   QString idFile(vlfDir.canonicalPath()+"/identity.pem");
   if (!QFile::exists(idFile)) {
-    qDebug() << "No identity found -> create one.";
+    logInfo() << "No identity found -> create one.";
     _identity = Identity::newIdentity(idFile);
   } else {
-    qDebug() << "Load identity from" << idFile;
+    logDebug() << "Load identity from" << idFile;
     _identity = Identity::load(idFile);
   }
 
   if (_identity) {
     _dht = new DHT(*_identity, this);
   } else {
-    qDebug() << "Error while loading or creating my identity.";
+    logError() << "Error while loading or creating my identity.";
   }
 }
 
@@ -45,7 +45,7 @@ Application::newSocket(uint16_t service) {
     return new HalChat(*_dht, _model);
   } else if (5 == service) {
     if (_socksWhiteList.empty()) {
-      qDebug() << "No whitelisted nodes for SOCKS service -> deny.";
+      logInfo() << "No whitelisted nodes for SOCKS service -> deny.";
       return 0;
     }
     // create handler
@@ -61,11 +61,11 @@ Application::allowConnection(uint16_t service, const NodeItem &peer) {
     return true;
   } else if (5 == service) {
     if (_socksWhiteList.allowed(peer.id())) {
-      qDebug() << "Allow SOCKS connection from" << peer.id()
-               << peer.addr() << ":" << peer.port();
+      logDebug() << "Allow SOCKS connection from " << peer.id()
+                 << " @" << peer.addr() << ":" << peer.port();
     } else {
-      qDebug() << "Deny SOCKS connection from" << peer.id()
-               << peer.addr() << ":" << peer.port();
+      logInfo() << "Deny SOCKS connection from " << peer.id()
+                << " @" << peer.addr() << ":" << peer.port();
     }
     // Check if node is allowed to use the SOCKS service
     return _socksWhiteList.allowed(peer.id());
@@ -75,7 +75,7 @@ Application::allowConnection(uint16_t service, const NodeItem &peer) {
 
 void
 Application::connectionStarted(SecureSocket *stream) {
-  qDebug() << "Stream service" << stream << "started";
+  logDebug() << "Stream service " << stream << " started";
   HalChat *chat = 0;
   SOCKSConnection *socks = 0;
   if (0 != (chat = dynamic_cast<HalChat *>(stream))) {

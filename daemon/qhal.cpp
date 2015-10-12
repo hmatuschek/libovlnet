@@ -2,7 +2,6 @@
 #include <QListIterator>
 #include <QString>
 #include <cmath>
-#include <QDebug>
 #include <QBuffer>
 #include <QIODevice>
 
@@ -152,7 +151,7 @@ QHalTree::serialize(QIODevice &device) {
 void
 QHalTree::clear() {
   // Free all branches
-  for (size_t i=0; i<_branches.size(); i++) {
+  for (int i=0; i<_branches.size(); i++) {
     delete _branches[i];
   }
   // clear data structures
@@ -238,7 +237,7 @@ QHalDict::serialize(QIODevice &device) {
   size_t n = _symbols.size();
   device.write((char *)&n, sizeof(size_t));
   // serialize strings
-  for (size_t i=0; i<_symbols.size(); i++) {
+  for (int i=0; i<_symbols.size(); i++) {
     // Encode string in local 8bit form (i.e. UTF-8)
     QByteArray tmp = _symbols[i].toLocal8Bit();
     // Get size
@@ -475,7 +474,7 @@ QHalModel::seed(const QStringList &keywords) {
         return(symbol);
       }
       ++i;
-      if(i==keywords.size()) i=0;
+      if(i==size_t(keywords.size())) i=0;
       if(i==stop) return(symbol);
     }
   }
@@ -509,7 +508,7 @@ QHalModel::babble(const QStringList &keywords, const QStringList &replies) {
       break;
     }
     count -= node->branch(i)->count();
-    i = (i>=(node->size()-1)) ? 0 : (i+1);
+    i = (i>=(int(node->size())-1)) ? 0 : (i+1);
   }
 
   return(symbol);
