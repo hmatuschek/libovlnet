@@ -68,7 +68,7 @@ SecureStream::_onKeepAlive() {
   sendNull();
   // Resent messages
   Message msg(Message::DATA); size_t len; uint32_t seq=0;
-  while (_outBuffer.resend(msg.data, len, seq)) {
+  if (_outBuffer.resend(msg.data, len, seq)) {
     msg.seq = htonl(seq);
     sendDatagram((const uint8_t *) &msg, len+5);
   }
