@@ -71,6 +71,7 @@ PCPClient::requestMap(uint16_t iport, const QHostAddress &addr, uint16_t port)
   // Figure out the client IP address used to reach the PCP service at the specified address.
   _socket.connectToHost(addr, port);
   if (! _socket.waitForConnected(1000)) {
+    logError() << "Failed to connect PCP server " << addr << ":" << port;
     return;
   }
   QHostAddress local = _socket.localAddress();
