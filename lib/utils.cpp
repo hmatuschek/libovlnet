@@ -52,7 +52,9 @@ RingBuffer::read(QByteArray &buffer) {
 size_t
 RingBuffer::read(uint8_t *buffer, size_t len) {
   // If empty or no byte requested -> done
-  if (((_inptr == _outptr) && (!_full)) || (0 == len)) { return 0; }
+  if (((_inptr == _outptr) && (!_full)) || (0 == len)) {
+    return 0;
+  }
   // Determine how many bytes to read
   size_t nread = std::min(available(), len);
   if ((_outptr < _inptr) || (int(_outptr+nread)<=_buffer.size())) {
@@ -73,26 +75,35 @@ RingBuffer::read(uint8_t *buffer, size_t len) {
 
 size_t
 RingBuffer::drop(size_t len) {
-  if (((_inptr == _outptr) && (!_full)) || (0 == len)) { return 0; }
+  // If empty or no byte to drop -> done
+  if (((_inptr == _outptr) && (!_full)) || (0 == len)) {
+    return 0;
+  }
   // Determine how many bytes to read
   len = std::min(available(), len);
   if ((_outptr < _inptr) || (int(_outptr+len)<=_buffer.size())) {
     _outptr = ((_outptr + len) % _buffer.size());
+    _full = false;
     return len;
   }
   // with wrap around:
   size_t n= _buffer.size()-_outptr;
   _outptr = len-n;
+  _full = false;
   return len;
 }
 
 size_t
 RingBuffer::peek(size_t offset, uint8_t *buffer, size_t len) const {
   // If empty or no byte requested -> done
-  if (((_inptr == _outptr) && (!_full)) || (0 == len)) { return 0; }
+  if (((_inptr == _outptr) && (!_full)) || (0 == len)) {
+    return 0;
+  }
   // If offset is larger than available data -> done
-  if (offset>=available()) { return 0; }
-  // Get howmany bytes to read
+  if (offset>=available()) {
+    return 0;
+  }
+  // Get how many bytes to read
   len = std::min(available(), offset+len)-offset;
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
@@ -129,29 +140,36 @@ RingBuffer::write(const uint8_t *buffer, size_t len) {
   // fill-up buffer to end
   memcpy(_buffer.data(), buffer, n);
   _inptr = 0; _full = (_inptr == _outptr);
-  return write(buffer+n, nwrite-n) + n;
+  return ( write(buffer+n, nwrite-n) + n );
 }
 
 size_t
 RingBuffer::allocate(size_t len) {
   len = std::min(free(), len);
+  // If no space is left in the buffer or nothing is allocated -> done.
   if (0 == len) { return 0; }
+  // Just update the pointers
   _inptr = (_inptr+len) % _buffer.size();
+  // If buffer is now full
   _full = (_inptr == _outptr);
   return len;
 }
 
 size_t
 RingBuffer::put(size_t offset, const uint8_t *buffer, size_t len) {
-  // If empty or no byte requested -> done
-  if (((_inptr == _outptr) && (!_full)) || (0 == len)) { return 0; }
+  // If empty or no byte to write -> done
+  if (((_inptr == _outptr) && (!_full)) || (0 == len)) {
+    return 0;
+  }
   // If offset is larger than available data -> done
-  if (offset>=available()) { return 0; }
-  // Get howmany bytes to write
-  len = std::min(available(), offset+len)-offset;
+  if (offset>=available()) {
+    return 0;
+  }
+  // Get how many bytes to write
+  len = ( std::min(available(), offset+len)-offset );
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
-  if (offset < _inptr) {
+  if ((offset+len) <= _inptr) {
     memcpy(_buffer.data()+offset, buffer, len);
     return len;
   }
@@ -195,7 +213,10 @@ PacketOutBuffer::write(const QByteArray &buffer) {
 size_t
 PacketOutBuffer::write(const uint8_t *buffer, size_t len) {
   len = _buffer.write(buffer, len);
-  _packets.append(Packet(_nextSequence, len)); _nextSequence += len;
+  if (0 < len) {
+    _packets.append(Packet(_nextSequence, len));
+    _nextSequence += len;
+  }
   return len;
 }
 

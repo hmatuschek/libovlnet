@@ -14,4 +14,14 @@ qt5_add_resources(VLF_CLIENT_RCC_SOURCES ../shared/resources.qrc)
 add_executable(ovlclient ${VLF_CLIENT_SOURCES} ${VLF_CLIENT_MOC_SOURCES} ${VLF_CLIENT_RCC_SOURCES})
 target_link_libraries(ovlclient ovl ${LIBS})
 
+# Install binary
 INSTALL(TARGETS ovlclient DESTINATION bin)
+
+# Install logo and .desktop file under Linux:
+IF(UNIX AND NOT APPLE)
+ INSTALL(FILES shared/icons/ovlclient.png
+         DESTINATION share/icons)
+ INSTALL(FILES shared/ovlclient.desktop
+         DESTINATION share/applications)
+ENDIF(UNIX AND NOT APPLE)
+

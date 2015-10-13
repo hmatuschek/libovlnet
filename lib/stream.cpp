@@ -127,6 +127,7 @@ SecureStream::writeData(const char *data, qint64 len) {
   msg.seq = htonl(_outBuffer.sequence());
   // put in output buffer
   len = _outBuffer.write((const uint8_t *)data, len);
+  if (0 >= len) { return len; }
   // store in message
   memcpy(msg.data, data, len);
   // send message

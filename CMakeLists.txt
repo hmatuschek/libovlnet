@@ -58,16 +58,6 @@ add_subdirectory(lib)
 add_subdirectory(client)
 add_subdirectory(daemon)
 
-#
-# Install logo and .desktop file under Linux:
-#
-IF(UNIX AND NOT APPLE)
- INSTALL(FILES shared/icons/ovlclient.png
-         DESTINATION share/icons)
- INSTALL(FILES shared/ovlclient.desktop
-         DESTINATION share/applications)
-ENDIF(UNIX AND NOT APPLE)
-
 # Source distribution packages:
 set(CPACK_PACKAGE_VERSION_MAJOR "1")
 set(CPACK_PACKAGE_VERSION_MINOR "0")
