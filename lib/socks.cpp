@@ -363,7 +363,8 @@ SOCKSOutStream::_remoteDisconnected() {
 void
 SOCKSOutStream::_remoteError(QAbstractSocket::SocketError error) {
   logInfo() << "SOCKS: Remote connection error: " << _outStream->errorString();
-  logDebug() << " " << (_outStream->bytesAvailable() + bytesToWrite()) << " not send to client yet.";
+  logDebug() << " " << (_outStream->bytesAvailable() + bytesToWrite())
+             << " (" << bytesToWrite() << ") not send to client yet.";
   logDebug() << " " << (_outStream->bytesToWrite() + bytesAvailable()) << " not send to remote yet.";
   if (QAbstractSocket::RemoteHostClosedError == error) {
     _state = CLOSING;
