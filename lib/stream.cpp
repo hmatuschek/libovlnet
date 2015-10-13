@@ -29,7 +29,7 @@ struct __attribute__((packed)) Message {
  * Implementation of SecureStream
  * ******************************************************************************************** */
 SecureStream::SecureStream(DHT &dht, QObject *parent)
-  : QIODevice(parent), SecureSocket(dht), _inBuffer(1<<16), _outBuffer(1<<16, 2000), _closed(false),
+  : QIODevice(parent), SecureSocket(dht), _inBuffer(16<<16), _outBuffer(16<<16, 2000), _closed(false),
     _keepalive(), _timeout()
 {
   // Setup keep-alive timer, gets started by open();

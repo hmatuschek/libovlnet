@@ -4,7 +4,7 @@
 /** Size of of the hash to use, e.g. RMD160 -> 20bytes. */
 #define DHT_HASH_SIZE        20
 /** Maximum message size per UDP packet. */
-#define DHT_MAX_MESSAGE_SIZE 1024
+#define DHT_MAX_MESSAGE_SIZE 65515
 /** Minimum message size per UDP packet. */
 #define DHT_MIN_MESSAGE_SIZE DHT_HASH_SIZE
 

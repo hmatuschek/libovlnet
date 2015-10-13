@@ -94,7 +94,7 @@ Message::Message()
 class SearchQuery
 {
 protected:
-  SearchQuery(const Identifier &id);
+  SearchQuery(const Identifier &self, const Identifier &id);
 
 public:
   const Identifier &id() const;
@@ -114,7 +114,7 @@ protected:
 class FindNodeQuery: public SearchQuery
 {
 public:
-  FindNodeQuery(const Identifier &id);
+  FindNodeQuery(const Identifier &self, const Identifier &id);
 
   bool found() const;
 };
@@ -123,7 +123,7 @@ public:
 class FindValueQuery: public SearchQuery
 {
 public:
-  FindValueQuery(const Identifier &id);
+  FindValueQuery(const Identifier &self, const Identifier &id);
 };
 
 
@@ -194,10 +194,10 @@ protected:
 /* ******************************************************************************************** *
  * Implementation of SearchQuery etc.
  * ******************************************************************************************** */
-SearchQuery::SearchQuery(const Identifier &id)
-  : _id(id), _best()
+SearchQuery::SearchQuery(const Identifier &self, const Identifier &id)
+  : _id(id), _best(), _queried()
 {
-  // pass...
+  _queried.insert(self);
 }
 
 const Identifier &
@@ -207,8 +207,6 @@ SearchQuery::id() const {
 
 void
 SearchQuery::update(const NodeItem &node) {
-  logDebug() << "Update search list with " << node.id()
-             << " @ " << node.addr() << ":" << node.port();
   // Skip nodes already queried or in the best list -> done
   if (_queried.contains(node.id())) { return; }
   // Perform an "insort" into best list
@@ -253,8 +251,8 @@ SearchQuery::first() const {
 }
 
 
-FindNodeQuery::FindNodeQuery(const Identifier &id)
-  : SearchQuery(id)
+FindNodeQuery::FindNodeQuery(const Identifier &self, const Identifier &id)
+  : SearchQuery(self, id)
 {
   // pass...
 }
@@ -265,8 +263,8 @@ FindNodeQuery::found() const {
   return _id == _best.front().id();
 }
 
-FindValueQuery::FindValueQuery(const Identifier &id)
-  : SearchQuery(id)
+FindValueQuery::FindValueQuery(const Identifier &self, const Identifier &id)
+  : SearchQuery(self, id)
 {
   // pass...
 }
@@ -388,7 +386,7 @@ void
 DHT::findNode(const Identifier &id) {
   logDebug() << "Search for node " << id;
   // Create a query instance
-  FindNodeQuery *query = new FindNodeQuery(id);
+  FindNodeQuery *query = new FindNodeQuery(_self.id(), id);
   // Collect DHT_K nearest nodes
   _buckets.getNearest(id, query->best());
   // Send request to the first element in the list
@@ -409,7 +407,7 @@ void
 DHT::findValue(const Identifier &id) {
   logDebug() << "Search for value " << id;
   // Create a query instance
-  FindValueQuery *query = new FindValueQuery(id);
+  FindValueQuery *query = new FindValueQuery(_self.id(), id);
   // Collect DHT_K nearest nodes
   _buckets.getNearest(id, query->best());
   // Send request to the first element in the list
