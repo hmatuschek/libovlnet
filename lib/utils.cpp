@@ -107,10 +107,12 @@ RingBuffer::peek(size_t offset, uint8_t *buffer, size_t len) const {
   len = std::min(available()-offset, len);
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
-  if ( (offset+len) < _inptr) {
+  /// @bug tripple check
+  if ( ((offset+len) < _inptr) || ((offset+len) <= _buffer.size()) ) {
     memcpy(buffer, _buffer.constData()+offset, len);
     return len;
   }
+  /// @bug tripple check
   // with wrap around
   size_t n = (_buffer.size()-offset);
   memcpy(buffer, _buffer.constData()+offset, n);
@@ -169,11 +171,13 @@ RingBuffer::put(size_t offset, const uint8_t *buffer, size_t len) {
   len = std::min(available()-offset, len);
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
-  if ((offset+len) <= _inptr) {
+  /// @bug tripple check
+  if ( ((offset+len) <= _inptr) || ((offset+len) <= _buffer.size()) ) {
     memcpy(_buffer.data()+offset, buffer, len);
     return len;
   }
-  // with wrap around
+ /// @bug tripple check
+ // with wrap around
   size_t n = (_buffer.size()-offset);
   memcpy(_buffer.data()+offset, buffer, n);
   memcpy(_buffer.data(), buffer+n, len-n);
