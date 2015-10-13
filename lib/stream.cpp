@@ -62,6 +62,7 @@ SecureStream::open(OpenMode mode) {
   if ((! _closed) && ok) {
     _keepalive.start();
     _timeout.start();
+    _packetTimer.start();
   }
   return (!_closed) && ok;
 }
