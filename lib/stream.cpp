@@ -148,8 +148,8 @@ void
 SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   // Restart time-out timer
   _timeout.start();
-  // Check size
-  if (0 == len) { return; }
+  // Handle null-packets
+  if ((0==data) && (0 == len)) { return; }
   // Unpack message
   const Message *msg = (const Message *)data;
   /*
