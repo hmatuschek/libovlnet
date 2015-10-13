@@ -311,7 +311,7 @@ SOCKSOutStream::_remoteReadyRead() {
     int len = std::min(qint64(outBufferFree()),
                        std::min(qint64(DHT_SEC_MAX_DATA_SIZE-5),
                                 _outStream->bytesAvailable()));
-    if (0 == len) { return; }
+    if (0 >= len) { return; }
     len = _outStream->read((char *) buffer, len);
     if (len != this->write((const char *)buffer, len)) {
       logError() << "SOCKS: Dataloss: Remote (" << len
@@ -326,7 +326,7 @@ SOCKSOutStream::_remoteBytesWritten(qint64 bytes) {
   while (this->bytesAvailable()) {
     uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
     int len = this->read((char *) buffer, DHT_SEC_MAX_DATA_SIZE-5);
-    if (0 == len) { return; }
+    if (0 >= len) { return; }
     /// @bug What if _outStream buffer is full?
     if (len != _outStream->write((const char *)buffer, len)) {
       logError() << "SOCKS: Dataloss: Client -> Remote. => Close connection.";
@@ -373,7 +373,7 @@ SOCKSOutStream::_clientReadyRead() {
   while (this->bytesAvailable() && (CONNECTED == _state)) {
     uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
     int len = this->read((char *) buffer, DHT_SEC_MAX_DATA_SIZE-5);
-    if (0 == len) { return; }
+    if (0 >= len) { return; }
     if (len != _outStream->write((const char *)buffer, len)) {
       logError() << "SOCKS: Dataloss: Client -> Remote. => Close connection.";
       close(); return;
@@ -383,8 +383,7 @@ SOCKSOutStream::_clientReadyRead() {
 
 void
 SOCKSOutStream::_clientBytesWritten(qint64 bytes) {
-  logDebug() << "SOCKS: " << bytes << "b send to client.";
-  while (_outStream->bytesAvailable()) {
+  while (_outStream->bytesAvailable())  {
     if (CLOSING == _state) {
       logDebug() << "SOCKS: Connection closing -> send "
                  << _outStream->bytesAvailable() << " remaining bytes.";
@@ -392,7 +391,7 @@ SOCKSOutStream::_clientBytesWritten(qint64 bytes) {
     uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
     int len = std::min(qint64(DHT_SEC_MAX_DATA_SIZE-5), _outStream->bytesAvailable());
     len = std::min(len, int(outBufferFree()));
-    if (0 == len) { return; }
+    if (0 >= len) { return; }
     len = _outStream->read((char *) buffer, len);
     if ( len != write((const char *)buffer, len) ) {
       logError() << "SOCKS: Dataloss: Remot -> Client. => Close connection.";

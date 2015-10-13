@@ -176,9 +176,11 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       logDebug() << "Malformed ACK packet received, len=" << len << ".";
       return;
     }
-    //logDebug() << "SecureStream: ACK=" << ntohl(msg->seq);
+    logDebug() << "SecureStream: Received ACK=" << ntohl(msg->seq);
     size_t send = _outBuffer.ack(ntohl(msg->seq));
     if (0 != send) {
+      logDebug() << "SecureStream: Received ACK=" << ntohl(msg->seq)
+                 << ", outbuffer free=" << _outBuffer.free();
       emit bytesWritten(send);
     }
   } else if (Message::RESET == msg->type) {
