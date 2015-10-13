@@ -167,6 +167,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       if (! sendDatagram((const uint8_t*) &resp, 5)) {
         logWarning() << "SecureStream: Failed to send ACK.";
       }
+      //logDebug() << "SecureSocket: Send ACK=" << seq;
       // Signal data available
       emit readyRead();
     }
@@ -175,7 +176,8 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       logDebug() << "Malformed ACK packet received, len=" << len << ".";
       return;
     }
-    size_t send = _outBuffer.ack(msg->seq);
+    //logDebug() << "SecureStream: ACK=" << ntohl(msg->seq);
+    size_t send = _outBuffer.ack(ntohl(msg->seq));
     if (0 != send) {
       emit bytesWritten(send);
     }
