@@ -187,6 +187,7 @@ BuddyList::BuddyList(Application &application, const QString path, QObject *pare
   _searchTimer.start();
 
   // Get notified if a node is reachable
+  connect(&_application.dht(), SIGNAL(nodeFound(NodeItem)), this, SLOT(_onNodeFound(NodeItem)));
   connect(&_application.dht(), SIGNAL(nodeReachable(NodeItem)), this, SLOT(_onNodeReachable(NodeItem)));
 
   // Read buddy list from file
@@ -428,6 +429,7 @@ void
 BuddyList::_onNodeFound(const NodeItem &node) {
   // check if node belongs to a buddy
   if (! _nodes.contains(node.id())) { return; }
+  logDebug() << "Node " << node.id() << " found: Send ping request.";
   // Send ping to node
   _application.dht().ping(node.addr(), node.port());
 }
@@ -436,13 +438,21 @@ void
 BuddyList::_onNodeReachable(const NodeItem &node) {
   // check if node belongs to a buddy
   if (! _nodes.contains(node.id())) { return; }
-  if (! _buddies[_nodes[node.id()]]->node(node.id())->hasBeenSeen()) {
+  logDebug() << "Node " << node.id() << " reachable at " << node.addr() << ":" << node.port();
+  BuddyList::Buddy *buddy = _buddies[_nodes[node.id()]];
+  BuddyList::Node *nodeitem = buddy->node(node.id());
+  if (! nodeitem->hasBeenSeen()) {
     // Update node
-    _buddies[_nodes[node.id()]]->node(node.id())->update(node.addr(), node.port());
+    nodeitem->update(node.addr(), node.port());
     emit appeared(node.id());
+    logDebug() << "Node " << node.id() << " appeared.";
   }
   // Update node
-  _buddies[_nodes[node.id()]]->node(node.id())->update(node.addr(), node.port());
+  nodeitem->update(node.addr(), node.port());
+  // Update items (buddy and all its nodes)
+  QModelIndex bidx = index(_nodes[node.id()], 0, QModelIndex()), nidx = bidx;
+  if (buddy->numNodes()) { nidx = index(buddy->numNodes()-1, 0, bidx); }
+  emit dataChanged(bidx, nidx);
 }
 
 void

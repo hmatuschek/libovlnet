@@ -14,7 +14,7 @@ class Application;
 /** Self destructing variant of @c SOCKSInStream.
  * This class extends @c SOCKSInStream by deleting the instance if either the TCP or the
  * connection to the remote node is closed. */
-class SocksConnection: public SOCKSInStream
+class SocksConnection: public SOCKSLocalStream
 {
   Q_OBJECT
 
@@ -46,12 +46,22 @@ public:
    * @param port Specifies the local TCP port to listen for incomming connections.
    * @param parent The optional QObject parent. */
   explicit SocksService(Application &app, const NodeItem &remote, uint16_t port=1080, QObject *parent = 0);
+
   /** Destructor. */
   virtual ~SocksService();
+
+  /** Retruns true if the server is running. */
+  bool isListening() const;
+  /** Returns the current number of active proxy connections. */
+  size_t connectionCount() const;
+
+signals:
+  void connectionCountChanged(size_t count);
 
 protected slots:
   /** Handles incomming TCP connections. */
   void _onNewConnection();
+  void _onConnectionClosed();
 
 protected:
   /** A weak reference to the application. */
@@ -60,6 +70,8 @@ protected:
   NodeItem _remote;
   /** The local TCP server waiting for incomming connections. */
   QTcpServer _server;
+  /** Holds the current connection count. */
+  size_t _connectionCount;
 };
 
 #endif // SOCKSSERVICE_H

@@ -29,9 +29,18 @@ struct __attribute__((packed)) Message {
  * Implementation of SecureStream
  * ******************************************************************************************** */
 SecureStream::SecureStream(DHT &dht, QObject *parent)
-  : QIODevice(parent), SecureSocket(dht), _inBuffer(1<<16), _outBuffer(1<<16, 2000), _closed(false)
+  : QIODevice(parent), SecureSocket(dht), _inBuffer(1<<16), _outBuffer(1<<16, 2000), _closed(false),
+    _keepalive(), _timeout()
 {
-  // pass...
+  // Setup keep-alive timer, gets started by open();
+  _keepalive.setInterval(1000);
+  _keepalive.setSingleShot(false);
+  // Setup connection timeout timer.
+  _timeout.setInterval(10000);
+  _keepalive.setSingleShot(true);
+
+  connect(&_keepalive, SIGNAL(timeout()), this, SLOT(_onKeepAlive()));
+  connect(&_timeout, SIGNAL(timeout()), this, SLOT(_onTimeOut()));
 }
 
 SecureStream::~SecureStream() {
@@ -46,19 +55,50 @@ SecureStream::isSequential() const {
 bool
 SecureStream::open(OpenMode mode) {
   bool ok = QIODevice::open(mode);
+  if ((! _closed) && ok) {
+    _keepalive.start();
+    _timeout.start();
+  }
   return (!_closed) && ok;
 }
 
 void
+SecureStream::_onKeepAlive() {
+  // send "keep-alive" ping
+  sendNull();
+}
+
+void
+SecureStream::_onTimeOut() {
+  logDebug() << "SecureStream: Connection timeout -> close().";
+  // close connection
+  close();
+}
+
+void
 SecureStream::close() {
-  logDebug() << "SecureStream: Close connection, send RST.";
-  _closed = true;
-  Message msg(Message::RESET);
-  sendDatagram((uint8_t *) &msg, 1);
+  // Make sure the stream does not get notified anymore.
+  _dht.socketClosed(id());
+  // close QIODevice
+  QIODevice::close();
+  // Stop keep alive timer
+  _keepalive.stop();
+  // Stop timeout timer
+  _timeout.stop();
+  // Send reset packet
+  if (! _closed) {
+    logDebug() << "SecureStream: Close connection, send RST.";
+    _closed = true;
+    Message msg(Message::RESET);
+    if(! sendDatagram((uint8_t *) &msg, 1)) {
+      logDebug() << "SecureConnection: Can not send RST packet.";
+    }
+  }
 }
 
 qint64
 SecureStream::bytesAvailable() const {
+  // IO device buffer + internal packet-buffer
   return _inBuffer.available() + QIODevice::bytesAvailable();
 }
 
@@ -69,7 +109,8 @@ SecureStream::outBufferFree() const {
 
 qint64
 SecureStream::bytesToWrite() const {
-  return _outBuffer.available();
+  // IO device buffer + internal packet-buffer
+  return _outBuffer.available() + QIODevice::bytesToWrite();
 }
 
 size_t
@@ -86,9 +127,13 @@ SecureStream::writeData(const char *data, qint64 len) {
   msg.seq = htonl(_outBuffer.sequence());
   // put in output buffer
   len = _outBuffer.write((const uint8_t *)data, len);
+  // store in message
   memcpy(msg.data, data, len);
   // send message
-  sendDatagram((const uint8_t *)&msg, len+5);
+  if(sendDatagram((const uint8_t *)&msg, len+5)) {
+    // reset keep-alive timer
+    _keepalive.start();
+  }
   return len;
 }
 
@@ -99,6 +144,8 @@ SecureStream::readData(char *data, qint64 maxlen) {
 
 void
 SecureStream::handleDatagram(const uint8_t *data, size_t len) {
+  // Restart time-out timer
+  _timeout.start();
   // Check size
   if (0 == len) { return; }
   // Unpack message
@@ -139,7 +186,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     logDebug() << "SecureStream: RST received -> close stream.";
     _closed = true;
     emit readChannelFinished();
-    _dht.streamClosed(id());
+    close();
   } else {
     logError() << "Unknown datagram received: type=" << msg->type << ".";
   }

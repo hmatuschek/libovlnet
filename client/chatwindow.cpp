@@ -14,7 +14,8 @@ ChatWindow::ChatWindow(Application &app, SecureChat *chat, QWidget *parent)
     _peer = _application.buddies().buddyName(chat->peerId());
   }
   setWindowTitle(tr("Chat with %1").arg(_peer));
-  setMinimumWidth(200);
+  setMinimumWidth(400);
+  setMinimumHeight(300);
 
   _view = new QTextBrowser();
   _text = new QLineEdit();
@@ -49,6 +50,7 @@ ChatWindow::_onMessageReceived(const QString &msg) {
   cursor.insertText(":\n");
   cursor.insertText(msg);
   cursor.endEditBlock();
+  _view->ensureCursorVisible();
 }
 
 void
@@ -65,6 +67,7 @@ ChatWindow::_onMessageSend() {
   cursor.insertText(msg);
   cursor.endEditBlock();
   _chat->sendMessage(msg);
+  _view->ensureCursorVisible();
 }
 
 void

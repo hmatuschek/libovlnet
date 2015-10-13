@@ -6,22 +6,22 @@
 /* ******************************************************************************************** *
  * Implementation of SOCKSInStream
  * ******************************************************************************************** */
-SOCKSInStream::SOCKSInStream(DHT &dht, QTcpSocket *instream, QObject *parent)
+SOCKSLocalStream::SOCKSLocalStream(DHT &dht, QTcpSocket *instream, QObject *parent)
   : SecureStream(dht, parent), _inStream(instream)
 {
+  // Take ownership of TCP socket.
+  _inStream->setParent(this);
 }
 
-SOCKSInStream::~SOCKSInStream() {
-  if (_inStream->isOpen())
-    _inStream->close();
-  if (_inStream)
-    delete _inStream;
-  if (this->isOpen())
-    this->close();
+SOCKSLocalStream::~SOCKSLocalStream() {
+  _inStream->close();
+  if (isOpen()) {
+    SOCKSLocalStream::close();
+  }
 }
 
 bool
-SOCKSInStream::open(OpenMode mode) {
+SOCKSLocalStream::open(OpenMode mode) {
   if (! SecureStream::open(mode)) { return false; }
   logDebug() << "SOCKS in stream started.";
   // Connect to client signals
@@ -43,7 +43,7 @@ SOCKSInStream::open(OpenMode mode) {
 }
 
 void
-SOCKSInStream::_clientReadyRead() {
+SOCKSLocalStream::_clientReadyRead() {
   uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
   size_t len = DHT_SEC_MAX_DATA_SIZE-5;
   len = std::min(len, size_t(_inStream->bytesAvailable()));
@@ -55,7 +55,7 @@ SOCKSInStream::_clientReadyRead() {
 }
 
 void
-SOCKSInStream::_clientBytesWritten(qint64 bytes) {
+SOCKSLocalStream::_clientBytesWritten(qint64 bytes) {
   uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
   size_t len = DHT_SEC_MAX_DATA_SIZE-5;
   len = std::min(len, size_t(bytesAvailable()));
@@ -66,18 +66,21 @@ SOCKSInStream::_clientBytesWritten(qint64 bytes) {
 }
 
 void
-SOCKSInStream::_clientDisconnected() {
+SOCKSLocalStream::_clientDisconnected() {
+  logDebug() << "Client disconnected -> close SOCKS stream";
   close();
 }
 
 void
-SOCKSInStream::_clientError(QAbstractSocket::SocketError error) {
+SOCKSLocalStream::_clientError(QAbstractSocket::SocketError error) {
+  logDebug() << "Client connection error: " << _inStream->errorString()
+             << " -> close socks stream";
   _inStream->close();
   close();
 }
 
 void
-SOCKSInStream::_remoteReadyRead() {
+SOCKSLocalStream::_remoteReadyRead() {
   uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
   size_t len = DHT_SEC_MAX_DATA_SIZE-5;
   len = std::min(len, size_t(bytesAvailable()));
@@ -88,7 +91,7 @@ SOCKSInStream::_remoteReadyRead() {
 }
 
 void
-SOCKSInStream::_remoteBytesWritten(qint64 bytes) {
+SOCKSLocalStream::_remoteBytesWritten(qint64 bytes) {
   uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
   size_t len = DHT_SEC_MAX_DATA_SIZE-5;
   len = std::min(len, size_t(_inStream->bytesAvailable()));
@@ -100,8 +103,11 @@ SOCKSInStream::_remoteBytesWritten(qint64 bytes) {
 }
 
 void
-SOCKSInStream::_remoteClosed() {
-  _inStream->close();
+SOCKSLocalStream::_remoteClosed() {
+  if (_inStream && _inStream->isOpen()) {
+    logDebug() << "SOCKS connection closed -> close client connection.";
+    _inStream->close();
+  }
 }
 
 
@@ -115,11 +121,14 @@ SOCKSOutStream::SOCKSOutStream(DHT &dht, QObject *parent)
 }
 
 SOCKSOutStream::~SOCKSOutStream() {
+  if (isOpen()) {
+    close();
+  }
   if (_outStream) {
     _outStream->close();
     delete _outStream;
+    _outStream = 0;
   }
-  this->close();
 }
 
 bool
@@ -150,7 +159,7 @@ SOCKSOutStream::_clientParse() {
       uint8_t buffer[2]; read((char *) buffer, 2);
       // Check version number
       if (5 != buffer[0]) {
-        logInfo() << "Unknown SOCKS version number " << int(buffer[0]);
+        logInfo() << "SOCKS: Unknown version number " << int(buffer[0]);
         close(); return;
       }
       // Get length of authentication method
@@ -166,7 +175,10 @@ SOCKSOutStream::_clientParse() {
       if (0 == _nAuthMeth) {
         // Send response (version=5, no auth)
         const uint8_t msg[] = {0x05, 0x00};
-        write((const char *) msg, 2);
+        if(2 != write((const char *) msg, 2)) {
+          logError() << "SOCKS: Can not send response.";
+          close(); return;
+        }
         // update state
         _state = RX_REQUEST;
       }
@@ -175,12 +187,12 @@ SOCKSOutStream::_clientParse() {
       uint8_t buffer[4]; read((char *) buffer, 4);
       // check version
       if (5 != buffer[0]) {
-        logInfo() << "Unknown SOCKS version number " << int(buffer[0]);
+        logInfo() << "SOCKS: Unknown version number " << int(buffer[0]);
         close(); return;
       }
       // check command (only CONNECT (0x01) is supported).
       if (1 != buffer[1]) {
-        logInfo() << "Unsupported command " << int(buffer[1]);
+        logInfo() << "SOCKS: Unsupported command " << int(buffer[1]);
         close(); return;
       }
       // check addr type
@@ -349,15 +361,15 @@ SOCKSOutStream::_remoteBytesWritten(qint64 bytes) {
 void
 SOCKSOutStream::_remoteDisconnected() {
   logInfo() << "SOCKS: Remote connection closed -> close proxy stream.";
-  _outStream->close();
-  close();
+  if (_outStream && _outStream->isOpen()) { _outStream->close(); }
+  if (isOpen()) { close(); }
 }
 
 void
 SOCKSOutStream::_remoteError(QAbstractSocket::SocketError error) {
   logInfo() << "SOCKS: Remote connection error: " << _outStream->errorString()
             << " -> close proxy stream.";
-  _outStream->close();
-  close();
+  if (_outStream && _outStream->isOpen()) { _outStream->close(); }
+  if (isOpen()) { close(); }
 }
 

@@ -246,7 +246,7 @@ SecureSocket::SecureSocket(DHT &dht)
 SecureSocket::~SecureSocket() {
   if (_sessionKeyPair) { EVP_PKEY_free(_sessionKeyPair); }
   if (_peerPubKey) { EVP_PKEY_free(_peerPubKey); }
-  _dht.streamClosed(_streamId);
+  _dht.socketClosed(_streamId);
 }
 
 int

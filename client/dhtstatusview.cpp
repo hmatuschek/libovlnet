@@ -85,7 +85,7 @@ DHTStatusView::_formatRate(double rate) {
     return QString("%1b/s").arg(QString::number(rate, 'f', 1));
   }
   if (rate < 2e6) {
-    return QString("%1kb").arg(QString::number(rate/1000., 'f', 1));
+    return QString("%1kb/s").arg(QString::number(rate/1000., 'f', 1));
   }
   return QString("%1Mb/s").arg(QString::number(rate/1e6, 'f', 1));
 }

@@ -8,14 +8,15 @@
  * Implementation of SocksConnection
  * ********************************************************************************************* */
 SocksConnection::SocksConnection(DHT &dht, QTcpSocket *instream, QObject *parent)
-  : SOCKSInStream(dht, instream, parent)
+  : SOCKSLocalStream(dht, instream, parent)
 {
   // pass...
 }
 
 void
 SocksConnection::close() {
-  SOCKSInStream::close();
+
+  SOCKSLocalStream::close();
   this->deleteLater();
 }
 
@@ -28,8 +29,9 @@ SocksService::SocksService(Application &app, const NodeItem &remote, uint16_t po
 {
   logDebug() << "Start SOCKS proxy service at localhost:" << port;
   // Bind socket to local port
-  _server.listen(QHostAddress::LocalHost, port);
-
+  if(! _server.listen(QHostAddress::LocalHost, port)) {
+    logError() << "SOCKS: Can not bind to localhost:" << port;
+  }
   connect(&_server, SIGNAL(newConnection()), this, SLOT(_onNewConnection()));
 }
 
@@ -37,12 +39,35 @@ SocksService::~SocksService() {
   _server.close();
 }
 
+bool
+SocksService::isListening() const {
+  return _server.isListening();
+}
+
+size_t
+SocksService::connectionCount() const {
+  return _connectionCount;
+}
+
+
 void
 SocksService::_onNewConnection() {
   while (_server.hasPendingConnections()) {
     // Get for each incomming connection -> create a separate stream to the remote
     QTcpSocket *socket = _server.nextPendingConnection();
     logDebug() << "New incomming SOCKS connection...";
-    _application.dht().startStream(5, _remote, new SocksConnection(_application.dht(), socket));
+    SocksConnection *conn = new SocksConnection(_application.dht(), socket);
+    connect(conn, SIGNAL(destroyed()), this, SLOT(_onConnectionClosed()));
+    _connectionCount++;
+    emit connectionCountChanged(_connectionCount);
+    _application.dht().startStream(5, _remote, conn);
   }
+}
+
+
+void
+SocksService::_onConnectionClosed() {
+  if (_connectionCount)
+    _connectionCount--;
+  emit connectionCountChanged(_connectionCount);
 }

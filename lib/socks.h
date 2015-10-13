@@ -7,22 +7,23 @@
 #include <QTcpSocket>
 
 
-/** Implements a local enpoint of a SOCKS v4 or v5 connection that will be relayed to another
- * node which acts as the exit point. This class is simple, once the connection to the node is
- * established, the data to and from the local TCP connection is forwarded to the node, including
- * the SOCKS messages. It is the remote node that implements the actual SOCKS proxy. */
-class SOCKSInStream: public SecureStream
+/** Implements a local enpoint of a SOCKS v4 or v5 connection (tunnel) that will be relayed to
+ * another node which acts as the exit point. This class is simple, once the connection to the node
+ * is established, the data to and from the local TCP connection is forwarded to the node,
+ * including the SOCKS messages. It is the remote node that implements the actual SOCKS proxy. */
+class SOCKSLocalStream: public SecureStream
 {
   Q_OBJECT
 
 public:
-  /** Constructs a local SOCK input stream.
+  /** Constructs a local SOCK stream.
    * @param dht A weak reference to the DHT instance.
-   * @param instream The local incomming TCP-SOCKS connection.
+   * @param instream The local incomming TCP-SOCKS connection. The ownership of the socket is taken
+   *        by the instance.
    * @param parent The optional QObject parent. */
-  SOCKSInStream(DHT &dht, QTcpSocket *instream, QObject *parent=0);
+  SOCKSLocalStream(DHT &dht, QTcpSocket *instream, QObject *parent=0);
   /** Destructor, closes the TCP and @c SecureStream connections. */
-  virtual ~SOCKSInStream();
+  virtual ~SOCKSLocalStream();
 
   /** Gets called once the connection to the remote node is established. */
   bool open(OpenMode mode);
@@ -45,11 +46,12 @@ protected slots:
   void _remoteClosed();
 
 protected:
+  /** The TCP connection to the client. */
   QTcpSocket *_inStream;
 };
 
 
-/** Represents the exit point of a SOCKS v5 prox connection.
+/** Represents the exit point of a SOCKS v5 proxy connection.
  * Once the connection with the client is made, the SOCKS request is parsed and a connection
  * to the requested host is established. Any further data to and from the client is then
  * proxied to that host. */
@@ -58,7 +60,7 @@ class SOCKSOutStream: public SecureStream
   Q_OBJECT
 
 public:
-  /** Connection and SOCKS request parser state. */
+  /** Connection and SOCKS request parser states. */
   typedef enum {
     RX_VERSION,                ///< Initial state, parse SOCKS version number.
     RX_AUTHENTICATION,         ///< Parse authentication methods.
@@ -94,17 +96,20 @@ protected slots:
   /** Gets called if the connection to the client is peer. */
   void _clientClosed();
 
+  /** Gets called if the TCP connection to the remote host is established. */
   void _remoteConnected();
   /** Gets called if data has been arrived from the remote host. */
   void _remoteReadyRead();
   /** Gets called if data has been send to the remote host. */
   void _remoteBytesWritten(qint64 bytes);
-  /** Gets called if the connection to the remote host is closed. */
+  /** Gets called if the connection to the remote host is closed, e.g. the remote resets the
+   * TCP connection. */
   void _remoteDisconnected();
-  /** Gets called on error. */
+  /** Gets called on error, e.g. connection problems with the remote host. */
   void _remoteError(QAbstractSocket::SocketError error);
 
 protected:
+  /** The state of the parser & connection. */
   State _state;
   /** The connection to the remote host. */
   QTcpSocket *_outStream;

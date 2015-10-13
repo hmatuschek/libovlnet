@@ -151,6 +151,7 @@ protected:
   Identifier _streamId;
   /** The UDP socket. */
   QUdpSocket *_socket;
+
   // DHT may access some of the protected methods
   friend class DHT;
 };

@@ -47,12 +47,22 @@ struct __attribute__((packed)) Message
 
     struct __attribute__((packed)) {
       uint8_t type; // == FIND_NODE
+      /** The identifier of the node to find. */
       char    id[DHT_HASH_SIZE];
+      /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
+       * attack. It ensures that the request has at least the same size as the response. The size
+       * of this field implicitly defines the number of triples returned by the remote node. */
+      char    dummy[DHT_MAX_TRIPLES*DHT_TRIPLE_SIZE-DHT_HASH_SIZE];
     } find_node;
 
     struct __attribute__((packed)) {
       uint8_t type; // == FIND_VALUE
+      /** The identifier of the value to find. */
       char    id[DHT_HASH_SIZE];
+      /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
+       * attack. It ensures that the request has at least the same size as the response. The size
+       * of this field implicitly defines the number of triples returned by the remote node. */
+      char    dummy[DHT_MAX_TRIPLES*DHT_TRIPLE_SIZE-DHT_HASH_SIZE];
     } find_value;
 
     struct __attribute__((packed)) {
@@ -423,7 +433,8 @@ DHT::announce(const Identifier &id) {
 bool
 DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
   if (0 == _streamHandler) { delete stream; return false; }
-  logDebug() << "Send start stream to " << node.id() << " @" << node.addr() << ":" << node.port();
+  logDebug() << "Send start secure connection to " << node.id()
+             << " @" << node.addr() << ":" << node.port();
   if (! stream) { delete stream; return false; }
   StartStreamRequest *req = new StartStreamRequest(service, node.id(), stream);
 
@@ -450,8 +461,8 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
 }
 
 void
-DHT::streamClosed(const Identifier &id) {
-  logDebug() << "Close stream " << id;
+DHT::socketClosed(const Identifier &id) {
+  logDebug() << "Secure socket " << id << " closed.";
   _streams.remove(id);
 }
 
@@ -528,11 +539,12 @@ DHT::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
   // Queue request
   _pendingRequests.insert(req->cookie(), req);
   // Assemble & send message
-  struct Message msg;
+  Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   msg.payload.find_node.type = MSG_FIND_NODE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
-  if(0 > _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port())) {
+  size_t size = DHT_HASH_SIZE+1+DHT_K*DHT_TRIPLE_SIZE;
+  if(0 > _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindNode request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
   }
@@ -547,11 +559,12 @@ DHT::sendFindValue(const NodeItem &to, FindValueQuery *query) {
   // Queue request
   _pendingRequests.insert(req->cookie(), req);
   // Assemble & send message
-  struct Message msg;
+  Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   msg.payload.find_node.type = MSG_FIND_VALUE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
-  if (0 > _socket.writeDatagram((char *)&msg, 2*DHT_HASH_SIZE+1, to.addr(), to.port())) {
+  size_t size = DHT_HASH_SIZE+1+DHT_K*DHT_TRIPLE_SIZE;
+  if (0 > _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindNode request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
   }
@@ -619,9 +632,9 @@ DHT::_onReadyRead() {
         // Message is likely a request
         if ((size == (2*DHT_HASH_SIZE+1)) && (MSG_PING == msg.payload.ping.type)){
           _processPingRequest(msg, size, addr, port);
-        } else if ((size == (2*DHT_HASH_SIZE+1)) && (MSG_FIND_NODE == msg.payload.find_node.type)) {
+        } else if ((size >= (DHT_HASH_SIZE+1)) && (MSG_FIND_NODE == msg.payload.find_node.type)) {
           _processFindNodeRequest(msg, size, addr, port);
-        } else if ((size == (2*DHT_HASH_SIZE+1)) && (MSG_FIND_VALUE == msg.payload.find_value.type)) {
+        } else if ((size >= (DHT_HASH_SIZE+1)) && (MSG_FIND_VALUE == msg.payload.find_value.type)) {
           _processFindValueRequest(msg, size, addr, port);
         } else if ((size == (3*DHT_HASH_SIZE+1)) && (MSG_ANNOUNCE == msg.payload.announce.type)) {
           _processAnnounceRequest(msg, size, addr, port);
@@ -668,7 +681,7 @@ DHT::_processFindNodeResponse(
   if ( 0 == ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
     // unpack and update query
     size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
-    logDebug() << "Received" << Ntriple << "nodes from"  << addr << ":" << port;
+    logDebug() << "Received " << Ntriple << " nodes from "  << addr << ":" << port;
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
       NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip)),
@@ -839,9 +852,11 @@ DHT::_processFindNodeRequest(
   // Assemble response
   memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
   resp.payload.result.success = 0;
+  // Determine the number of nodes to reply
+  size_t N = std::min(size_t(DHT_K), (size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
   // Add items
   QList<NodeItem>::iterator item = best.begin();
-  for (int i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
+  for (int i = 0; (item!=best.end()) && (i<N); item++, i++) {
     memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
     memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
     resp.payload.result.triples[i].port = htons(item->port());
@@ -850,7 +865,7 @@ DHT::_processFindNodeRequest(
   }
 
   // Compute size and send reponse
-  size_t resp_size = (1 + DHT_HASH_SIZE + std::min(best.size(), DHT_K)*DHT_TRIPLE_SIZE);
+  size_t resp_size = (1 + DHT_HASH_SIZE + N*DHT_TRIPLE_SIZE);
   _socket.writeDatagram((char *) &resp, resp_size, addr, port);
 }
 
@@ -866,14 +881,16 @@ DHT::_processFindValueRequest(
     // Assemble response
     memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
     resp.payload.result.success = 1;
+    // Determine the number of nodes to reply
+    size_t N = std::min(size_t(DHT_MAX_TRIPLES), (size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
     QHash<Identifier, AnnouncementItem>::iterator item = owners.begin();
-    for (int i = 0; (item!=owners.end()) && (i<DHT_MAX_TRIPLES); item++, i++) {
+    for (int i = 0; (item!=owners.end()) && (i<N); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item.key().data(), DHT_HASH_SIZE);
       memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
       resp.payload.result.triples[i].port = htons(item->port());
     }
     // Compute size and send reponse
-    size_t resp_size = 1+DHT_HASH_SIZE+std::min(owners.size(), DHT_K)*DHT_TRIPLE_SIZE;
+    size_t resp_size = 1+DHT_HASH_SIZE+N*DHT_TRIPLE_SIZE;
     _socket.writeDatagram((char *) &resp, resp_size, addr, port);
   } else {
     // Get best matching nodes from the buckets
@@ -882,14 +899,16 @@ DHT::_processFindValueRequest(
     // Assemble response
     memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
     resp.payload.result.success = 0;
+    // Determine the number of nodes to reply
+    size_t N = std::min(size_t(DHT_K), (size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
     QList<NodeItem>::iterator item = best.begin();
-    for (int i = 0; (item!=best.end()) && (i<DHT_K); item++, i++) {
+    for (int i = 0; (item!=best.end()) && (i<N); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
       memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
       resp.payload.result.triples[i].port = htons(item->port());
     }
     // Compute size and send reponse
-    size_t resp_size = 1+DHT_HASH_SIZE+std::min(best.size(), DHT_K)*DHT_TRIPLE_SIZE;
+    size_t resp_size = 1+DHT_HASH_SIZE+N*DHT_TRIPLE_SIZE;
     _socket.writeDatagram((char *) &resp, resp_size, addr, port);
   }
 }

@@ -4,10 +4,11 @@
 #include "crypto.h"
 #include "utils.h"
 
+#include <QTimer>
+
 /** Implements a encrypted stream. While the @c SecureSocket implements encrypted datagrams
  * (UDP like), the secure stream implements an encrypted data stream (TCP like), handling packet
- * loss and maintaining the data order.
- * @bug Implement keep-alive pings. */
+ * loss and maintaining the data order. */
 class SecureStream: public QIODevice, public SecureSocket
 {
   Q_OBJECT
@@ -43,6 +44,12 @@ protected:
   /** Write some data into the output buffer. */
   virtual qint64 writeData(const char *data, qint64 len);
 
+protected slots:
+  /** Gets called periodically to keep the connection alive. */
+  void _onKeepAlive();
+  /** Gets called if the connection time-out. */
+  void _onTimeOut();
+
 protected:
   /** The input buffer. */
   PacketInBuffer  _inBuffer;
@@ -50,6 +57,10 @@ protected:
   PacketOutBuffer _outBuffer;
   /** If @c true the stream has been closed. */
   bool _closed;
+  /** Keep-alive timer. */
+  QTimer _keepalive;
+  /** Signals loss of connection. */
+  QTimer _timeout;
 };
 
 

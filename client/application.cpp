@@ -252,7 +252,7 @@ Application::connectionStarted(SecureSocket *stream) {
     // Simply open the stream
     socks->open(QIODevice::ReadWrite);
   } else {
-    _dht->streamClosed(stream->id());
+    _dht->socketClosed(stream->id());
     delete stream;
   }
 }
