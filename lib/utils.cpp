@@ -104,7 +104,7 @@ RingBuffer::peek(size_t offset, uint8_t *buffer, size_t len) const {
     return 0;
   }
   // Get how many bytes to read
-  len = std::min(available(), offset+len)-offset;
+  len = std::min(available()-offset, len);
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
   if ( (offset+len) < _inptr) {
@@ -166,7 +166,7 @@ RingBuffer::put(size_t offset, const uint8_t *buffer, size_t len) {
     return 0;
   }
   // Get how many bytes to write
-  len = ( std::min(available(), offset+len)-offset );
+  len = std::min(available()-offset, len);
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
   if ((offset+len) <= _inptr) {
