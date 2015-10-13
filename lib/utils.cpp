@@ -241,7 +241,7 @@ PacketOutBuffer::ack(uint32_t sequence) {
       _buffer.drop(drop);
       // Erase all packets upto and including the matching one
       // from the packet queue
-      _packets.erase(_packets.begin(), ++packet);
+      ++packet; _packets.erase(_packets.begin(), packet);
       // done
       return drop;
     }

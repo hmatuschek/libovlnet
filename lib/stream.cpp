@@ -77,7 +77,7 @@ void
 SecureStream::_onCheckPacketTimeout() {
   // Resent messages
   Message msg(Message::DATA); size_t len; uint32_t seq=0;
-  while (_outBuffer.resend(msg.data, len, seq)) {
+  if (_outBuffer.resend(msg.data, len, seq)) {
     logDebug() << "SecureStream: Resend packet SEQ=" << seq
                << " (" << len <<"b).";
     msg.seq = htonl(seq);
@@ -179,6 +179,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       return;
     }
     uint32_t seq = ntohl(msg->seq);
+    qDebug() << "Secure Socket: Received packet SEQ=" << seq;
     if (_inBuffer.putPacket(seq, (const uint8_t *)msg->data, len-5)) {
       // send ACK
       Message resp(Message::ACK);
@@ -189,6 +190,8 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       //logDebug() << "SecureSocket: Send ACK=" << seq;
       // Signal data available
       emit readyRead();
+    } else {
+      qDebug() << " ... drop SEQ=" << seq;
     }
   } else if (Message::ACK == msg->type) {
     if (len!=5) {
