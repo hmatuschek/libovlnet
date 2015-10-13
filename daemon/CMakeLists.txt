@@ -1,18 +1,18 @@
-SET(VLF_DAEMON_SOURCES main.cpp echostream.cpp application.cpp qhal.cpp halchat.cpp
+SET(OVL_DAEMON_SOURCES main.cpp echostream.cpp application.cpp qhal.cpp halchat.cpp
     socksconnection.cpp)
-SET(VLF_DAEMON_MOC_HEADERS application.h halchat.h socksconnection.h)
-SET(VLF_DAEMON_HEADERS echostream.h qhal.h)
+SET(OVL_DAEMON_MOC_HEADERS application.h halchat.h socksconnection.h)
+SET(OVL_DAEMON_HEADERS ${OVL_DAEMON_MOC_HEADERS} echostream.h qhal.h)
 
-qt5_wrap_cpp(VLF_DAEMON_MOC_SOURCES ${VLF_DAEMON_MOC_HEADERS})
+qt5_wrap_cpp(OVL_DAEMON_MOC_SOURCES ${OVL_DAEMON_MOC_HEADERS})
 
-add_executable(vlfdaemon ${VLF_DAEMON_SOURCES} ${VLF_DAEMON_MOC_SOURCES} ${VLF_DAEMON_RCC_SOURCES})
-target_link_libraries(vlfdaemon vlf ${LIBS})
+add_executable(ovldaemon ${OVL_DAEMON_SOURCES} ${OVL_DAEMON_MOC_SOURCES} ${OVL_DAEMON_RCC_SOURCES})
+target_link_libraries(ovldaemon ovl ${LIBS})
 
-INSTALL(TARGETS vlfdaemon DESTINATION bin)
+INSTALL(TARGETS ovldaemon DESTINATION bin)
 
 # Install service script
 IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
 INSTALL(
-  FILES "${CMAKE_SOURCE_DIR}/shared/vlfdaemon.conf"
+  FILES "${CMAKE_SOURCE_DIR}/shared/ovldaemon.conf"
   DESTINATION "/etc/init")
 ENDIF(CMAKE_SYSTEM_NAME MATCHES "Linux")

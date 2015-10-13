@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Overlay Network Client	
+GenericName=Overlay Network Client
+Comment=A client to the OVL network.
+Exec=ovlclient
+Icon=/usr/share/icons/ovlclient.png
+Type=Application
+Categories=Education;Teaching;
+Terminal=false
+Encoding=UTF-8

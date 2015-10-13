@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.8)
-project(VLF)
+project(ovlnet)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 include(InstallHeadersWithDirectory)
@@ -57,15 +57,14 @@ ENDIF(UNIX AND NOT APPLE)
 add_subdirectory(lib)
 add_subdirectory(client)
 add_subdirectory(daemon)
-add_subdirectory(test)
 
 #
 # Install logo and .desktop file under Linux:
 #
 IF(UNIX AND NOT APPLE)
- INSTALL(FILES shared/icons/vlfclient.png
+ INSTALL(FILES shared/icons/ovlclient.png
          DESTINATION share/icons)
- INSTALL(FILES shared/vlfclient.desktop
+ INSTALL(FILES shared/ovlclient.desktop
          DESTINATION share/applications)
 ENDIF(UNIX AND NOT APPLE)
 

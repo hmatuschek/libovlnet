@@ -9,7 +9,7 @@
 DHTStatusView::DHTStatusView(DHTStatus *status, QWidget *parent) :
   QWidget(parent), _status(status), _updateTimer()
 {
-  setWindowTitle(tr("VLF DHT network status"));
+  setWindowTitle(tr("Overlay network status"));
 
   _updateTimer.setInterval(5000);
   _updateTimer.setSingleShot(false);
