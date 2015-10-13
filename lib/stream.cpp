@@ -148,9 +148,10 @@ SecureStream::writeData(const char *data, qint64 len) {
   // store in message
   memcpy(msg.data, data, len);
   // send message
-  if(sendDatagram((const uint8_t *)&msg, len+5)) {
+  if( sendDatagram((const uint8_t *)&msg, len+5) ) {
     // reset keep-alive timer
     _keepalive.start();
+    logDebug() << "SecureStream: Send packet SEQ=" << ntohl(msg.seq);
     return len;
   }
   return -1;
