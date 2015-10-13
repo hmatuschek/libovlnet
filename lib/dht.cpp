@@ -543,8 +543,8 @@ DHT::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   msg.payload.find_node.type = MSG_FIND_NODE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
-  size_t size = DHT_HASH_SIZE+1+DHT_K*DHT_TRIPLE_SIZE;
-  if(size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
+  int size = DHT_HASH_SIZE+1+DHT_K*DHT_TRIPLE_SIZE;
+  if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindNode request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
   }
@@ -564,7 +564,7 @@ DHT::sendFindValue(const NodeItem &to, FindValueQuery *query) {
   msg.payload.find_node.type = MSG_FIND_VALUE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
   // Determine size of request
-  size_t size = DHT_HASH_SIZE+1+DHT_MAX_TRIPLES*DHT_TRIPLE_SIZE;
+  int size = DHT_HASH_SIZE+1+DHT_MAX_TRIPLES*DHT_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindNode request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
