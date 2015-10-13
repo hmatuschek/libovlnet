@@ -107,7 +107,7 @@ RingBuffer::peek(size_t offset, uint8_t *buffer, size_t len) const {
   len = std::min(available(), offset+len)-offset;
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
-  if (offset < _inptr) {
+  if ( (offset+len) < _inptr) {
     memcpy(buffer, _buffer.constData()+offset, len);
     return len;
   }
