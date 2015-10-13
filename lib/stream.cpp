@@ -133,8 +133,9 @@ SecureStream::writeData(const char *data, qint64 len) {
   if(sendDatagram((const uint8_t *)&msg, len+5)) {
     // reset keep-alive timer
     _keepalive.start();
+    return len;
   }
-  return len;
+  return -1;
 }
 
 qint64

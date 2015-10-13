@@ -536,7 +536,7 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
     return false;
   txlen += enclen;
   // Send datagram
-  if (txlen != _socket->writeDatagram((char *)msg, txlen, _peer.addr(), _peer.port()))
+  if (txlen != _socket->writeDatagram((const char *)msg, txlen, _peer.addr(), _peer.port()))
     return false;
   // Update seq
   _outSeq += txlen;
