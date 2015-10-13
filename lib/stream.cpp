@@ -30,16 +30,20 @@ struct __attribute__((packed)) Message {
  * ******************************************************************************************** */
 SecureStream::SecureStream(DHT &dht, QObject *parent)
   : QIODevice(parent), SecureSocket(dht), _inBuffer(16<<16), _outBuffer(16<<16, 2000), _closed(false),
-    _keepalive(), _timeout()
+    _keepalive(), _packetTimer(), _timeout()
 {
   // Setup keep-alive timer, gets started by open();
   _keepalive.setInterval(1000);
   _keepalive.setSingleShot(false);
+  // Setup packet timeout timer
+  _packetTimer.setInterval(250);
+  _packetTimer.setSingleShot(false);
   // Setup connection timeout timer.
   _timeout.setInterval(10000);
   _timeout.setSingleShot(true);
 
   connect(&_keepalive, SIGNAL(timeout()), this, SLOT(_onKeepAlive()));
+  connect(&_packetTimer, SIGNAL(timeout()), this, SLOT(_onCheckPacketTimeout()));
   connect(&_timeout, SIGNAL(timeout()), this, SLOT(_onTimeOut()));
 }
 
@@ -66,9 +70,13 @@ void
 SecureStream::_onKeepAlive() {
   // send "keep-alive" ping
   sendNull();
+}
+
+void
+SecureStream::_onCheckPacketTimeout() {
   // Resent messages
   Message msg(Message::DATA); size_t len; uint32_t seq=0;
-  if (_outBuffer.resend(msg.data, len, seq)) {
+  while (_outBuffer.resend(msg.data, len, seq)) {
     logDebug() << "SecureStream: Resend packet SEQ=" << seq
                << " (" << len <<"b).";
     msg.seq = htonl(seq);

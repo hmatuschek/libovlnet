@@ -257,7 +257,8 @@ PacketOutBuffer::resend(uint8_t *buffer, size_t &len, uint32_t &sequence) {
   for (; packet != _packets.end(); packet++) {
     if (packet->olderThan(_timeout)) {
       _buffer.peek(offset, buffer, packet->length());
-      len = packet->length(); sequence = packet->sequence();
+      len = packet->length();
+      sequence = packet->sequence();
       packet->markResend();
       return true;
     }

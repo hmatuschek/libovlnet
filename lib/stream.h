@@ -47,6 +47,8 @@ protected:
 protected slots:
   /** Gets called periodically to keep the connection alive. */
   void _onKeepAlive();
+  /** Gets called periodically to check of a packet time-out. */
+  void _onCheckPacketTimeout();
   /** Gets called if the connection time-out. */
   void _onTimeOut();
 
@@ -59,6 +61,7 @@ protected:
   bool _closed;
   /** Keep-alive timer. */
   QTimer _keepalive;
+  QTimer _packetTimer;
   /** Signals loss of connection. */
   QTimer _timeout;
 };
