@@ -71,7 +71,9 @@ public:
     RX_REQUEST_ADDR_IP6,       ///< Parse remote address as IPv6 address.
     RX_REQUEST_PORT,           ///< Parse remote port.
     CONNECTING,                ///< Connecting to the remote host & port.
-    STARTED,                   ///< Connection established.
+    CONNECTED,                   ///< Connection established.
+    CLOSING,                   ///< Finalizes the connection, tries to empty the buffers and
+                               ///  closes the connection when done.
     CLOSED                     ///< Connection closed.
   } State;
 
@@ -102,6 +104,7 @@ protected slots:
   void _remoteReadyRead();
   /** Gets called if data has been send to the remote host. */
   void _remoteBytesWritten(qint64 bytes);
+  void _remoteReadChannelFinished();
   /** Gets called if the connection to the remote host is closed, e.g. the remote resets the
    * TCP connection. */
   void _remoteDisconnected();

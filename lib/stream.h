@@ -22,27 +22,27 @@ public:
   virtual ~SecureStream();
 
   /** Returns @c true. */
-  virtual bool isSequential() const;
+  bool isSequential() const;
   /** Open the stream, should be called if the connection has been established. */
-  virtual bool open(OpenMode mode);
+  bool open(OpenMode mode);
   /** Close the stream. */
-  virtual void close();
+  void close();
   /** Returns the number of bytes in the input buffer. */
-  virtual qint64 bytesAvailable() const;
+  qint64 bytesAvailable() const;
   /** Returns the number of free bytes in the output buffer. */
   size_t outBufferFree() const;
   /** Returns the number of bytes in the output buffer. */
-  virtual qint64 bytesToWrite() const;
+  qint64 bytesToWrite() const;
   /** Returns the number of free bytes in the input buffer. */
   size_t inBufferFree() const;
 
 protected:
   /** Gets called for every received decrypted datagram. */
-  virtual void handleDatagram(const uint8_t *data, size_t len);
+  void handleDatagram(const uint8_t *data, size_t len);
   /** Read some data from the input buffer. */
-  virtual qint64 readData(char *data, qint64 maxlen);
+  qint64 readData(char *data, qint64 maxlen);
   /** Write some data into the output buffer. */
-  virtual qint64 writeData(const char *data, qint64 len);
+  qint64 writeData(const char *data, qint64 len);
 
 protected slots:
   /** Gets called periodically to keep the connection alive. */
