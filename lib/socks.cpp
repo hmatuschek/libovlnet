@@ -138,6 +138,7 @@ SOCKSOutStream::open(OpenMode mode) {
 
   // Connect to client signals
   connect(this, SIGNAL(readyRead()), this, SLOT(_clientParse()));
+  // ...
   connect(this, SIGNAL(readChannelFinished()), this, SLOT(_clientClosed()));
 
   // If there is some data available at the input stream -> start transfer
@@ -262,7 +263,7 @@ void
 SOCKSOutStream::_remoteConnected() {
   if (CONNECTING == _state) {
     logDebug() << "SOCKS: Remote " << _addr << ":" << _port << " connected -> start proxy session";
-    // connect proxy
+    // connect proxy client
     connect(this, SIGNAL(readyRead()), this, SLOT(_clientReadyRead()));
     connect(this, SIGNAL(bytesWritten(qint64)), this, SLOT(_clientBytesWritten(qint64)));
     // Connect to remote signals
@@ -306,6 +307,8 @@ SOCKSOutStream::_remoteConnected() {
 
 void
 SOCKSOutStream::_remoteReadyRead() {
+  // As long as there is data to read from the remote socket,
+  // the connection is established and there is space left in the output buffer.
   while (_outStream->bytesAvailable() && (CONNECTED == _state) && outBufferFree()) {
     uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
     int len = std::min(qint64(outBufferFree()),
@@ -323,6 +326,7 @@ SOCKSOutStream::_remoteReadyRead() {
 
 void
 SOCKSOutStream::_remoteBytesWritten(qint64 bytes) {
+  // As long as there is data left send by the client
   while (this->bytesAvailable()) {
     uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
     int len = this->read((char *) buffer, DHT_SEC_MAX_DATA_SIZE-5);
@@ -390,8 +394,9 @@ SOCKSOutStream::_clientBytesWritten(qint64 bytes) {
                  << _outStream->bytesAvailable() << " remaining bytes.";
     }
     uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
-    int len = std::min(qint64(DHT_SEC_MAX_DATA_SIZE-5), _outStream->bytesAvailable());
-    len = std::min(len, int(outBufferFree()));
+    int len = std::min(qint64(outBufferFree()),
+                       std::min(qint64(DHT_SEC_MAX_DATA_SIZE-5),
+                                _outStream->bytesAvailable()));
     if (0 == len) { return; }
     len = _outStream->read((char *) buffer, len);
     if ( len != write((const char *)buffer, len) ) {

@@ -212,24 +212,33 @@ PacketOutBuffer::write(const QByteArray &buffer) {
 
 size_t
 PacketOutBuffer::write(const uint8_t *buffer, size_t len) {
+  // Store data into buffer
   len = _buffer.write(buffer, len);
+  // If some data was stored
   if (0 < len) {
+    // Add a packet to the queue
     _packets.append(Packet(_nextSequence, len));
+    // update sequence number
     _nextSequence += len;
   }
+  // done.
   return len;
 }
 
 size_t
 PacketOutBuffer::ack(uint32_t sequence) {
-  size_t drop=0;
+  size_t drop = 0;  // <- how many bytes are ACKed
   QList<Packet>::iterator packet = _packets.begin();
   for (; packet != _packets.end(); packet++) {
     // If sequence matches -> done
     if (packet->sequence() == sequence) {
       drop += packet->length();
+      // drop data from the output buffer
       _buffer.drop(drop);
+      // Erase all packets upto and including the matching one
+      // from the packet queue
       _packets.erase(_packets.begin(), ++packet);
+      // done
       return drop;
     }
     drop += packet->length();
