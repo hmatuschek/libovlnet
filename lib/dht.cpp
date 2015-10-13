@@ -633,9 +633,9 @@ DHT::_onReadyRead() {
         // Message is likely a request
         if ((size == (2*DHT_HASH_SIZE+1)) && (MSG_PING == msg.payload.ping.type)){
           _processPingRequest(msg, size, addr, port);
-        } else if ((size >= (DHT_HASH_SIZE+1)) && (MSG_FIND_NODE == msg.payload.find_node.type)) {
+        } else if ((size >= (2*DHT_HASH_SIZE+1)) && (MSG_FIND_NODE == msg.payload.find_node.type)) {
           _processFindNodeRequest(msg, size, addr, port);
-        } else if ((size >= (DHT_HASH_SIZE+1)) && (MSG_FIND_VALUE == msg.payload.find_value.type)) {
+        } else if ((size >= (2*DHT_HASH_SIZE+1)) && (MSG_FIND_VALUE == msg.payload.find_value.type)) {
           _processFindValueRequest(msg, size, addr, port);
         } else if ((size == (3*DHT_HASH_SIZE+1)) && (MSG_ANNOUNCE == msg.payload.announce.type)) {
           _processAnnounceRequest(msg, size, addr, port);
@@ -847,8 +847,6 @@ DHT::_processFindNodeRequest(
   QList<NodeItem> best;
   _buckets.getNearest(msg.payload.find_node.id, best);
 
-  logDebug() << "Assemble FindNode response:";
-
   struct Message resp;
   // Assemble response
   memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
@@ -856,6 +854,7 @@ DHT::_processFindNodeRequest(
   // Determine the number of nodes to reply
   int N = std::min(std::min(DHT_K, best.size()),
                    int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
+  logDebug() << "Assemble FindNode response (N req.: " << N << ")";
   // Add items
   QList<NodeItem>::iterator item = best.begin();
   for (int i = 0; (item!=best.end()) && (i<N); item++, i++) {
@@ -886,6 +885,7 @@ DHT::_processFindValueRequest(
     // Determine the number of nodes to reply
     int N = std::min(std::min(DHT_MAX_TRIPLES, owners.size()),
                      int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
+    logDebug() << "Assemble FindValue response (N req.: " << N << ")";
     QHash<Identifier, AnnouncementItem>::iterator item = owners.begin();
     for (int i = 0; (item!=owners.end()) && (i<N); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item.key().data(), DHT_HASH_SIZE);
