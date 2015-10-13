@@ -853,7 +853,8 @@ DHT::_processFindNodeRequest(
   memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
   resp.payload.result.success = 0;
   // Determine the number of nodes to reply
-  size_t N = std::min(size_t(DHT_K), (size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
+  int N = std::min(std::min(DHT_K, best.size()),
+                   int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
   // Add items
   QList<NodeItem>::iterator item = best.begin();
   for (int i = 0; (item!=best.end()) && (i<N); item++, i++) {
@@ -882,7 +883,8 @@ DHT::_processFindValueRequest(
     memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
     resp.payload.result.success = 1;
     // Determine the number of nodes to reply
-    size_t N = std::min(size_t(DHT_MAX_TRIPLES), (size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
+    int N = std::min(std::min(DHT_MAX_TRIPLES, owners.size()),
+                     int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
     QHash<Identifier, AnnouncementItem>::iterator item = owners.begin();
     for (int i = 0; (item!=owners.end()) && (i<N); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item.key().data(), DHT_HASH_SIZE);
@@ -900,7 +902,8 @@ DHT::_processFindValueRequest(
     memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
     resp.payload.result.success = 0;
     // Determine the number of nodes to reply
-    size_t N = std::min(size_t(DHT_K), (size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
+    int N = std::min(std::min(DHT_K, best.size()),
+                     int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
     QList<NodeItem>::iterator item = best.begin();
     for (int i = 0; (item!=best.end()) && (i<N); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
