@@ -37,7 +37,7 @@ SecureStream::SecureStream(DHT &dht, QObject *parent)
   _keepalive.setSingleShot(false);
   // Setup connection timeout timer.
   _timeout.setInterval(10000);
-  _keepalive.setSingleShot(true);
+  _timeout.setSingleShot(true);
 
   connect(&_keepalive, SIGNAL(timeout()), this, SLOT(_onKeepAlive()));
   connect(&_timeout, SIGNAL(timeout()), this, SLOT(_onTimeOut()));

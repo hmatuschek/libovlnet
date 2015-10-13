@@ -369,6 +369,9 @@ void
 SOCKSOutStream::_remoteError(QAbstractSocket::SocketError error) {
   logInfo() << "SOCKS: Remote connection error: " << _outStream->errorString()
             << " -> close proxy stream.";
+  logDebug() << " " << (_outStream->bytesAvailable() + bytesToWrite()) << " not send to client yet.";
+  logDebug() << " " << (_outStream->bytesToWrite() + bytesAvailable()) << " not send to remote yet.";
+
   if (_outStream && _outStream->isOpen()) { _outStream->close(); }
   if (isOpen()) { close(); }
 }
