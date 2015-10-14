@@ -36,7 +36,7 @@ public:
 class Identifier : public QByteArray
 {
 public:
-  /** Creates a new random identifier. */
+  /** Creates an empty identifier. */
   Identifier();
   /** Constructor. */
   Identifier(const char *id);
@@ -51,15 +51,29 @@ public:
   bool operator==(const Identifier &other) const;
   /** Computes the distance. */
   Distance operator-(const Identifier &other) const;
+
+  /** Returns @c true if the identifier is empty. */
+  bool isNull() const;
+  /** Returns @c true if the identifier is a valid DHT ID. */
+  bool isValid() const;
+
+  /** Returns the base-32 (RFC4648) representation of the key. */
+  QString toBase32() const;
+
+public:
+  /** Constructs a new random identifier. */
+  static Identifier create();
+  /** Constructs an identifier from its base-32 (RFC4648) representation. */
+  static Identifier fromBase32(const QString &base32);
 };
 
 inline QDebug &operator<<(QDebug &stream, const Identifier &id) {
-  stream << id.toHex();
+  stream << id.toBase32();
   return stream;
 }
 
 inline QTextStream &operator<<(QTextStream &stream, const Identifier &id) {
-  stream << QString::fromLocal8Bit(id.toHex());
+  stream << id.toBase32();
   return stream;
 }
 

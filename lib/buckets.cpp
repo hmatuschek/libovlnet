@@ -1,16 +1,27 @@
 #include "buckets.h"
 #include <inttypes.h>
+#include <QChar>
+
+char bits_to_base32(uint8_t val) {
+  if ((val >= 0) && (val<=25)) { return ('a'+val); }
+  if ((val >=26) && (val<=31)) { return ('2'+(val-26)); }
+  return '\0';
+}
+
+uint8_t base32_to_bits(char c) {
+  if ((c>='a') && (c<='z')) { return uint8_t(c-'a'); }
+  if ((c>='2') && (c<='9')) { return uint8_t((c-'2')+26); }
+  return 0;
+}
 
 
 /* ******************************************************************************************** *
  * Implementation of Identifier
  * ******************************************************************************************** */
 Identifier::Identifier()
-  : QByteArray(DHT_HASH_SIZE, 0)
+  : QByteArray()
 {
-  for (int i=0; i<DHT_HASH_SIZE; i++) {
-    (*this)[i] = qrand() % 0xff;
-  }
+  // pass...
 }
 
 Identifier::Identifier(const char *id)
@@ -50,6 +61,80 @@ Identifier::operator-(const Identifier &other) const {
   return Distance(*this, other);
 }
 
+bool
+Identifier::isNull() const {
+  return 0 == this->size();
+}
+
+bool
+Identifier::isValid() const {
+  return (DHT_HASH_SIZE == this->size());
+}
+
+Identifier
+Identifier::create() {
+  Identifier id;
+  id.reserve(DHT_HASH_SIZE);
+  for (int i=0; i<DHT_HASH_SIZE; i++) {
+    id.append(qrand() % 0xff);
+  }
+  return id;
+}
+
+QString
+Identifier::toBase32() const {
+  // Ensure we have the correct length
+  if (DHT_HASH_SIZE != size()) { return ""; }
+  // Get the number of chars to encode HASH as base32 (no padding, we know the length)
+  size_t sc = ((DHT_HASH_SIZE*8/5) + (((DHT_HASH_SIZE*8)%5) ? 1 : 0));
+  QString code; code.reserve(sc);
+  for (size_t i=0; i<sc; i++) {
+    // Get byte and msb of the i-th 5-bit symbol in a byte.
+    size_t byte = (i*5)/8, msb = (7 - ((i*5)%8));
+    uint8_t val = 0;
+    if (msb>3) {
+      // If the 5-bits are within this byte entirely
+      val = (((uint8_t *)constData())[byte]>>(msb-4));
+    } else {
+      // If the 5-bits span into the next byte:
+      //  take the first (msb+1) bits from this byte
+      val = (((uint8_t *)constData())[byte]<<(4-msb));
+      // If there is a next byte
+      if ((byte+1)<size()) {
+        // take the first (4-msb) bits from the
+        val |= (((uint8_t *)constData())[byte+1]>>(4+msb));
+      }
+    }
+    code.append(bits_to_base32(val & 0x1f));
+  }
+  return code;
+}
+
+Identifier
+Identifier::fromBase32(const QString &base32) {
+  Identifier id;
+  // Get the number of chars to encode HASH as base32 (no padding, we know the length)
+  size_t sc = ((DHT_HASH_SIZE*8/5) + (((DHT_HASH_SIZE*8)%5) ? 1 : 0));
+  if (base32.size() != sc) { return id; }
+  id.reserve(DHT_HASH_SIZE); id.fill(0, DHT_HASH_SIZE);
+  for (size_t i=0; i<sc; i++) {
+    // Get byte and msb of the i-th 5-bit symbol in a byte.
+    size_t byte = (i*5)/8, msb = (7 - ((i*5)%8));
+    uint8_t val = base32_to_bits(base32.at(i).toLatin1());
+    if (msb>3) {
+      // If the 5-bits are within this byte entirely
+      ((uint8_t *)id.constData())[byte] |= (val<<(msb-4));
+    } else {
+      // But the first msb+1 bits of this value into buffer
+      ((uint8_t *)id.constData())[byte] |= (val>>(4-msb));
+      // If there is a next byte
+      if ((byte+1)<id.size()) {
+        ((uint8_t *)id.constData())[byte+1] |= (val<<(4+msb));
+      }
+    }
+  }
+  return id;
+}
 
 /* ******************************************************************************************** *
  * Implementation of Distance

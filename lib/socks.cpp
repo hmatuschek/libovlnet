@@ -57,11 +57,13 @@ SOCKSLocalStream::_clientReadyRead() {
 void
 SOCKSLocalStream::_clientBytesWritten(qint64 bytes) {
   uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
-  size_t len = DHT_SEC_MAX_DATA_SIZE-5;
-  len = std::min(len, size_t(bytesAvailable()));
-  if (len) {
-    len = read((char *)buffer, len);
-    _inStream->write((const char *)buffer, len);
+  while (bytesAvailable()) {
+    size_t len = DHT_SEC_MAX_DATA_SIZE-5;
+    len = std::min(len, size_t(bytesAvailable()));
+    if (len) {
+      len = read((char *)buffer, len);
+      _inStream->write((const char *)buffer, len);
+    }
   }
 }
 
@@ -82,11 +84,13 @@ SOCKSLocalStream::_clientError(QAbstractSocket::SocketError error) {
 void
 SOCKSLocalStream::_remoteReadyRead() {
   uint8_t buffer[DHT_SEC_MAX_DATA_SIZE-5];
-  size_t len = DHT_SEC_MAX_DATA_SIZE-5;
-  len = std::min(len, size_t(bytesAvailable()));
-  if (len) {
-    len = read((char *)buffer, len);
-    _inStream->write((const char *)buffer, len);
+  while (bytesAvailable()) {
+    size_t len = DHT_SEC_MAX_DATA_SIZE-5;
+    len = std::min(len, size_t(bytesAvailable()));
+    if (len) {
+      len = read((char *)buffer, len);
+      _inStream->write((const char *)buffer, len);
+    }
   }
 }
 

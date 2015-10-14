@@ -49,22 +49,8 @@ public:
   Identity &identity();
   /** Returns a weak reference it the identity of the node. */
   const Identity &identity() const;
-
   /** Returns the identifier of the DHT node. */
   const Identifier &id() const;
-
-  /** Returns the number of nodes in the buckets. */
-  size_t numNodes() const;
-  /** Returns the list of all nodes in the buckets. */
-  void nodes(QList<NodeItem> &lst);
-
-  /** Returns the number of keys held by this DHT node. */
-  size_t numKeys() const;
-  /** Retunrs the number of data items provided by this node. */
-  size_t numData() const;
-
-  /** Retunrs the number of active streams. */
-  size_t numStreams() const;
 
   /** Returns the number of bytes send. */
   size_t bytesSend() const;
@@ -75,21 +61,30 @@ public:
   /** Returns the upload rate. */
   double outRate() const;
 
+  /** Returns the number of nodes in the buckets. */
+  size_t numNodes() const;
   /** Sends a ping request to the given peer. */
   void ping(const QString &addr, uint16_t port);
   /** Sends a ping request to the given peer. */
   void ping(const QHostAddress &addr, uint16_t port);
   /** Sends a ping request to the given peer. */
   void ping(const PeerItem &peer);
-
   /** Starts the search for a node with the given identifier. */
   void findNode(const Identifier &id);
+  /** Returns the list of all nodes in the buckets. */
+  void nodes(QList<NodeItem> &lst);
 
+  /** Returns the number of keys held by this DHT node. */
+  size_t numKeys() const;
+  /** Retunrs the number of data items provided by this node. */
+  size_t numData() const;
   /** Starts the search for a value with the given identifier. */
   void findValue(const Identifier &id);
   /** Announces a value. */
   void announce(const Identifier &id);
 
+  /** Retunrs the number of active streams. */
+  size_t numStreams() const;
   /** Starts a secure connection.
    * The ownership of the @c SecureSocket instance is passed to the DHT. */
   bool startStream(uint16_t service, const NodeItem &node, SecureSocket *stream);

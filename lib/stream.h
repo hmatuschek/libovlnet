@@ -61,6 +61,7 @@ protected:
   bool _closed;
   /** Keep-alive timer. */
   QTimer _keepalive;
+  /** Checks for packet timeouts. */
   QTimer _packetTimer;
   /** Signals loss of connection. */
   QTimer _timeout;

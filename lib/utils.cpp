@@ -81,7 +81,7 @@ RingBuffer::drop(size_t len) {
   }
   // Determine how many bytes to read
   len = std::min(available(), len);
-  if ((_outptr < _inptr) || (int(_outptr+len)<=_buffer.size())) {
+  if ((_outptr < _inptr) || (int(_outptr+len) <= _buffer.size())) {
     _outptr = ((_outptr + len) % _buffer.size());
     _full = false;
     return len;
@@ -220,7 +220,7 @@ PacketOutBuffer::write(const uint8_t *buffer, size_t len) {
   len = _buffer.write(buffer, len);
   // If some data was stored
   if (0 < len) {
-    // Add a packet to the queue
+    // Add the packet to the queue
     _packets.append(Packet(_nextSequence, len));
     // update sequence number
     _nextSequence += len;

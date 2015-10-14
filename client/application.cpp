@@ -47,8 +47,9 @@ Application::Application(int &argc, char *argv[])
   // Load or create identity
   QString idFile(vlfDir.canonicalPath()+"/identity.pem");
   if (!QFile::exists(idFile)) {
-    logError() << "No identity found -> create new identity.";
-    _identity = Identity::newIdentity(idFile);
+    logInfo() << "No identity found -> create new identity.";
+    _identity = Identity::newIdentity();
+    if (_identity) { _identity->save(idFile); }
   } else {
     logDebug() << "Load identity from" << idFile;
     _identity = Identity::load(idFile);

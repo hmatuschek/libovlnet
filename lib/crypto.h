@@ -17,7 +17,8 @@
 
 
 /** Represents the identity of a node. A node is unquely identified by its keypair. The private key
- * of that key is only known to the node. Its public key is used to verify its identity. */
+ * of that key is only known to the node. Its public key is used to verify its identity. The hash
+ * of the public key is the identifier of the node. */
 class Identity
 {
 protected:
@@ -30,27 +31,29 @@ public:
   /** Destructor. */
   virtual ~Identity();
 
-  /** Returns the identifier of the identity (RMD160 of the public key). */
+  /** Returns the identifier of the identity (RMD160 hash of the public key). */
   const Identifier &id() const;
-  /** Retruns @c true if the public key of the identity is present. */
+  /** Returns @c true if the public key of the identity is present. */
   bool hasPublicKey() const;
-  /** Retruns @c true if the private key of the identity is present. */
+  /** Returns @c true if the private key of the identity is present. */
   bool hasPrivateKey() const;
   /** Copyies the public key in a binary format into the given buffer. */
   int publicKey(uint8_t *key, size_t len) const;
 
-  /** Requires the private key. */
+  /** Signs the given data and stores the signature in @c sig. Requires the private key. */
   int sign(const uint8_t *data, size_t datalen, uint8_t *sig, size_t siglen) const;
-  /** Requires the public key. */
+  /** Verifies the signature @c sig of the given @c data. Requires the public key. */
   bool verify(const uint8_t *data, size_t datalen, const uint8_t *sig, size_t siglen) const;
 
 public:
-  /** Creates a new identity and stores the key pair in the specified file. */
-  static Identity *newIdentity(const QString &path);
+  /** Creates a new identity. */
+  static Identity *newIdentity();
   /** Loads the identity (key pair or public key) from the specified file. */
   static Identity *load(const QString &path);
   /** Constructs an Identity from the given public key (e.g. received via network). */
   static Identity *fromPublicKey(const uint8_t *key, size_t len);
+  /** Saves the identity in the given file. */
+  bool save(const QString &path) const;
 
 protected:
   /** Key pair or public key. */

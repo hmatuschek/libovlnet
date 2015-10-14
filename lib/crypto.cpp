@@ -140,9 +140,8 @@ error:
 }
 
 Identity *
-Identity::newIdentity(const QString &path)
+Identity::newIdentity()
 {
-  BIO *out = 0;
   EC_KEY *key = 0;
   EVP_PKEY *pkey = 0;
 
@@ -161,19 +160,6 @@ Identity::newIdentity(const QString &path)
   // Ownership of key has been taken by pkey
   key = 0;
 
-  // Store keys in file
-  if (0 == (out = BIO_new_file(path.toLocal8Bit(), "w")))
-    goto error;
-  if (!PEM_write_bio_PUBKEY(out, pkey))
-    goto error;
-  if (!PEM_write_bio_PrivateKey(out, pkey, NULL, NULL, 0, 0, NULL))
-    goto error;
-  (void) BIO_flush(out);
-  BIO_free_all(out);
-
-  // Senure proper file permissions:
-  QFile::setPermissions(path, QFileDevice::ReadOwner|QFileDevice::WriteOwner);
-
   // Create identity instance with key pair
   return new Identity(pkey);
 
@@ -185,8 +171,46 @@ error:
   }
   if (key) { EC_KEY_free(key); }
   if (pkey) { EVP_PKEY_free(pkey); }
-  if (out) { BIO_free_all(out); }
   return 0;
+}
+
+
+bool
+Identity::save(const QString &path) const {
+  BIO *out = 0;
+
+  // Store keys in file
+  if (0 == (out = BIO_new_file(path.toLocal8Bit(), "w"))) {
+    logError() << "Identity: Cannot open file " << path;
+    goto error;
+  }
+
+  if (hasPublicKey()) {
+    if (! PEM_write_bio_PUBKEY(out, _keyPair)) {
+      logError() << "Identity: Cannot write public key to file " << path;
+      goto error;
+    }
+  }
+
+  if (hasPrivateKey()) {
+    if (!PEM_write_bio_PrivateKey(out, _keyPair, NULL, NULL, 0, 0, NULL)) {
+      logError() << "Identity: Cannot write private key to file " << path;
+      goto error;
+    }
+  }
+
+  (void) BIO_flush(out);
+  BIO_free_all(out);
+
+  // Senure proper file permissions:
+  if (! QFile::setPermissions(path, QFileDevice::ReadOwner|QFileDevice::WriteOwner)) {
+    logWarning() << "Identity: Can not set permissions of file " << path << ".";
+  }
+  return true;
+
+error:
+  if (out) { BIO_free_all(out); }
+  return false;
 }
 
 Identity *

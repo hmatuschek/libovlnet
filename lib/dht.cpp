@@ -142,8 +142,8 @@ public:
 
 protected:
   MessageType _type;
-  Identifier    _cookie;
-  QDateTime     _timestamp;
+  Identifier  _cookie;
+  QDateTime   _timestamp;
 };
 
 
@@ -274,7 +274,7 @@ FindValueQuery::FindValueQuery(const Identifier &self, const Identifier &id)
  * Implementation of Request etc.
  * ******************************************************************************************** */
 Request::Request(MessageType type)
-  : _type(type), _cookie(), _timestamp(QDateTime::currentDateTime())
+  : _type(type), _cookie(Identifier::create()), _timestamp(QDateTime::currentDateTime())
 {
   // pass...
 }

@@ -4,6 +4,7 @@
 #include "ntp.h"
 #include "pcp.h"
 #include "natpmp.h"
+#include "logger.h"
 
 #include <inttypes.h>
 #include <QByteArray>
@@ -62,14 +63,22 @@ protected:
 class PacketOutBuffer
 {
 public:
-  class Packet {
+  /** Represents a packet that has been send to the remote host. */
+  class Packet
+  {
   public:
+    /** Empty constructor. */
     inline Packet()
       : _sequence(0), _length(0), _timestamp() { }
+    /** Constructor.
+     * @param seq Specifies the sequence number of the packet.
+     * @param len Specifies the length of the packet. */
     inline Packet(uint32_t seq, size_t len)
       : _sequence(seq), _length(len), _timestamp(QDateTime::currentDateTime()) { }
+    /** Copy constructor. */
     inline Packet(const Packet &other)
       : _sequence(other._sequence), _length(other._length), _timestamp(other._timestamp) { }
+    /** Assignement operator. */
     inline Packet &operator=(const Packet &other) {
       _sequence = other._sequence;
       _length = other._length;
@@ -77,11 +86,15 @@ public:
       return *this;
     }
 
+    /** Returns the sequence number of the packet. */
     inline uint32_t sequence() const { return _sequence; }
+    /** Returns the length of the packet. */
     inline size_t length() const { return _length; }
+    /** Returns @c true if the packet is older than the specified number of milliseconds. */
     inline bool olderThan(size_t ms) const {
       return (_timestamp.addMSecs(ms)<QDateTime::currentDateTime());
     }
+    /** Mark the packet as resend (updates the timestamp). */
     inline void markResend() {
       _timestamp = QDateTime::currentDateTime();
     }
