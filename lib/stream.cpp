@@ -179,8 +179,12 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       return;
     }
     uint32_t seq = ntohl(msg->seq);
-    qDebug() << "Secure Socket: Received packet SEQ=" << seq;
+    logDebug() << "Secure Socket: Received packet SEQ=" << seq;
     if (_inBuffer.putPacket(seq, (const uint8_t *)msg->data, len-5)) {
+      logDebug() << " ... processed " << (len-5) << "b"
+                 << ", avl=" << _inBuffer.available()
+                 << ", free=" << _inBuffer.free()
+                 << ", wait for SEQ=" << _inBuffer.nextSequence();
       // send ACK
       Message resp(Message::ACK);
       resp.seq = htonl(seq);
@@ -191,7 +195,10 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       // Signal data available
       emit readyRead();
     } else {
-      qDebug() << " ... drop SEQ=" << seq;
+      logDebug() << " ... drop SEQ=" << seq
+                 << ", avl=" << _inBuffer.available()
+                 << ", free=" << _inBuffer.free()
+                 << ", wait for SEQ=" << _inBuffer.nextSequence();
     }
   } else if (Message::ACK == msg->type) {
     if (len!=5) {

@@ -189,7 +189,7 @@ RingBuffer::put(size_t offset, const uint8_t *buffer, size_t len) {
  * Implementation of PacketOutBuffer
  * ********************************************************************************************* */
 PacketOutBuffer::PacketOutBuffer(size_t bufferSize, size_t timeout)
-  : _buffer(bufferSize), _nextSequence(0), _packets()
+  : _buffer(bufferSize), _nextSequence(0), _packets(), _timeout(timeout)
 {
   // pass...
 }

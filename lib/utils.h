@@ -140,6 +140,8 @@ public:
   size_t read(QByteArray &buffer);
   size_t read(uint8_t *buffer, size_t len);
 
+  inline uint32_t nextSequence() const { return _nextSequence; }
+
   bool putPacket(uint32_t &seq, const uint8_t *data, size_t len);
 
 protected:
