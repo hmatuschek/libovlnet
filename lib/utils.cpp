@@ -310,11 +310,13 @@ __inBetweenSeq(uint32_t x, uint32_t a, uint32_t b) {
 }
 
 bool
-PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len) {
+PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len, bool &ack) {
   // Compute the offset of where the packet should be stored in the buffer
   size_t offset = (seq >= _nextSequence) ?
         (seq - _nextSequence) :
         (seq + (size_t(std::numeric_limits<uint32_t>::max())-_nextSequence+1));
+  // Set no-ack
+  ack = false;
   // Check if packet fits into buffer (somehow)
   if ((_available+offset+len)>_buffer.size()) {
     return false;
@@ -339,6 +341,8 @@ PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len) {
   }
   // ACK continous data (there is at least one element in the list)
   while ((_packets.size()) && (_nextSequence == _packets.front().first)) {
+    // Enable ACK
+    ack = true;
     // Get sequence number of next expected packet
     seq = _packets.front().first;
     // mark payload as available

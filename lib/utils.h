@@ -142,7 +142,7 @@ public:
 
   inline uint32_t nextSequence() const { return _nextSequence; }
 
-  bool putPacket(uint32_t &seq, const uint8_t *data, size_t len);
+  bool putPacket(uint32_t &seq, const uint8_t *data, size_t len, bool &ack);
 
 protected:
   /** The buffer of received packages. */

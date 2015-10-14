@@ -36,7 +36,7 @@ SecureStream::SecureStream(DHT &dht, QObject *parent)
   _keepalive.setInterval(1000);
   _keepalive.setSingleShot(false);
   // Setup packet timeout timer
-  _packetTimer.setInterval(250);
+  _packetTimer.setInterval(100);
   _packetTimer.setSingleShot(false);
   // Setup connection timeout timer.
   _timeout.setInterval(10000);
@@ -100,6 +100,8 @@ SecureStream::close() {
   QIODevice::close();
   // Stop keep alive timer
   _keepalive.stop();
+  // Stop packet timer.
+  _packetTimer.stop();
   // Stop timeout timer
   _timeout.stop();
   // Send reset packet
@@ -179,19 +181,23 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       return;
     }
     uint32_t seq = ntohl(msg->seq);
+    bool ack = false;
     logDebug() << "Secure Socket: Received packet SEQ=" << seq;
-    if (_inBuffer.putPacket(seq, (const uint8_t *)msg->data, len-5)) {
+    if (_inBuffer.putPacket(seq, (const uint8_t *)msg->data, len-5, ack)) {
       logDebug() << " ... processed " << (len-5) << "b"
                  << ", avl=" << _inBuffer.available()
                  << ", free=" << _inBuffer.free()
                  << ", wait for SEQ=" << _inBuffer.nextSequence();
+
       // send ACK
-      Message resp(Message::ACK);
-      resp.seq = htonl(seq);
-      if (! sendDatagram((const uint8_t*) &resp, 5)) {
-        logWarning() << "SecureStream: Failed to send ACK.";
+      if (ack) {
+        //logDebug() << "SecureSocket: Send ACK=" << ack_seq;
+        Message resp(Message::ACK);
+        resp.seq = htonl(seq);
+        if (! sendDatagram((const uint8_t*) &resp, 5)) {
+          logWarning() << "SecureStream: Failed to send ACK.";
+        }
       }
-      //logDebug() << "SecureSocket: Send ACK=" << seq;
       // Signal data available
       emit readyRead();
     } else {

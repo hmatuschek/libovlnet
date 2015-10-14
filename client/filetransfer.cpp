@@ -268,14 +268,17 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
     // check length
     if (len<5) { return; }
     uint32_t seq = qFromBigEndian(msg->payload.data.seq);
+    bool ack = false;
     logDebug() << "Received" << (len-5) << "bytes data with seq" << seq;
-    if (_packetBuffer.putPacket(seq, msg->payload.data.data, len-5)) {
-      // Send ACK for returned seq number
-      FileTransferMessage resp;
-      resp.type = ACK; resp.payload.ack.seq = qToBigEndian(quint32(seq));
-      sendDatagram((uint8_t *) &resp, 5);
-      logDebug() << "Send ACK for seq" << seq;
-      emit readyRead();
+    if (_packetBuffer.putPacket(seq, msg->payload.data.data, len-5, ack)) {
+      if (ack) {
+        // Send ACK for returned seq number
+        FileTransferMessage resp;
+        resp.type = ACK; resp.payload.ack.seq = qToBigEndian(quint32(seq));
+        sendDatagram((uint8_t *) &resp, 5);
+        logDebug() << "Send ACK for seq" << seq;
+        emit readyRead();
+      }
     }
     return;
   }
