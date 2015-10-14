@@ -8,18 +8,26 @@
 struct __attribute__((packed)) Message {
   /** Possible stream message types. */
   typedef enum {
-    DATA = 0, ACK, RESET
-  } Type;
+    DATA = 0,  ///< A data packet.
+    ACK,       ///< Acknowledgement of some received data.
+    RESET,     ///< (Hard) Reset the connection.
+    FIN        ///< No further data will be transmitted.
+  } Flags;
 
   /** The message type. */
   uint8_t  type;
   /** The sequential number. */
   uint32_t seq;
-  /** Payload. */
-  uint8_t  data[DHT_SEC_MAX_DATA_SIZE-5];
+  /** The message payload, either some data if type=DATA or the window size if type=ACK. */
+  union {
+    /** The number of bytes the receiver is willing to accept. */
+    uint32_t window;
+    /** Payload. */
+    uint8_t  data[DHT_SEC_MAX_DATA_SIZE-5];
+  } payload;
 
   /** Constructor. */
-  inline Message(Type type) {
+  inline Message(Flags type) {
     memset(this, 0, sizeof(Message)); this->type = type;
   }
 };
@@ -77,9 +85,9 @@ void
 SecureStream::_onCheckPacketTimeout() {
   // Resent messages
   Message msg(Message::DATA); size_t len; uint32_t seq=0;
-  if (_outBuffer.resend(msg.data, len, seq)) {
-    logDebug() << "SecureStream: Resend packet SEQ=" << seq
-               << " (" << len <<"b).";
+  if (_outBuffer.resend(msg.payload.data, len, seq)) {
+    /* logDebug() << "SecureStream: Resend packet SEQ=" << seq
+               << " (" << len <<"b)."; */
     msg.seq = htonl(seq);
     sendDatagram((const uint8_t *) &msg, len+5);
   }
@@ -110,7 +118,7 @@ SecureStream::close() {
     _closed = true;
     Message msg(Message::RESET);
     if(! sendDatagram((uint8_t *) &msg, 1)) {
-      logDebug() << "SecureConnection: Can not send RST packet.";
+      logError() << "SecureConnection: Can not send RST packet.";
     }
   }
 }
@@ -148,12 +156,11 @@ SecureStream::writeData(const char *data, qint64 len) {
   len = _outBuffer.write((const uint8_t *)data, len);
   if (0 >= len) { return len; }
   // store in message
-  memcpy(msg.data, data, len);
+  memcpy(msg.payload.data, data, len);
   // send message
   if( sendDatagram((const uint8_t *)&msg, len+5) ) {
     // reset keep-alive timer
     _keepalive.start();
-    logDebug() << "SecureStream: Send packet SEQ=" << ntohl(msg.seq);
     return len;
   }
   return -1;
@@ -176,19 +183,10 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
    * dispatch by type
    */
   if (Message::DATA == msg->type) {
-    if (len<5) {
-      logDebug() << "Received malformed DATA datagram, len=" << len << ".";
-      return;
-    }
+    if (len<5) { return; }
     uint32_t seq = ntohl(msg->seq);
     bool ack = false;
-    logDebug() << "Secure Socket: Received packet SEQ=" << seq;
-    if (_inBuffer.putPacket(seq, (const uint8_t *)msg->data, len-5, ack)) {
-      logDebug() << " ... processed " << (len-5) << "b"
-                 << ", avl=" << _inBuffer.available()
-                 << ", free=" << _inBuffer.free()
-                 << ", wait for SEQ=" << _inBuffer.nextSequence();
-
+    if (_inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5, ack)) {
       // send ACK
       if (ack) {
         //logDebug() << "SecureSocket: Send ACK=" << ack_seq;
@@ -200,30 +198,15 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       }
       // Signal data available
       emit readyRead();
-    } else {
-      logDebug() << " ... drop SEQ=" << seq
-                 << ", avl=" << _inBuffer.available()
-                 << ", free=" << _inBuffer.free()
-                 << ", wait for SEQ=" << _inBuffer.nextSequence();
     }
   } else if (Message::ACK == msg->type) {
-    if (len!=5) {
-      logDebug() << "Malformed ACK packet received, len=" << len << ".";
-      return;
-    }
-    logDebug() << "SecureStream: Received ACK=" << ntohl(msg->seq);
+    if (len!=5) { return; }
     size_t send = _outBuffer.ack(ntohl(msg->seq));
     if (0 != send) {
-      logDebug() << "SecureStream: Received ACK=" << ntohl(msg->seq)
-                 << ", outbuffer free=" << _outBuffer.free();
       emit bytesWritten(send);
     }
   } else if (Message::RESET == msg->type) {
-    if (len!=1) {
-      logDebug() << "Malformed RST packet received, len=" << len << ".";
-      return;
-    }
-    logDebug() << "SecureStream: RST received -> close stream.";
+    if (len!=1) { return; }
     _closed = true;
     emit readChannelFinished();
     close();

@@ -7,7 +7,6 @@
 #include <QByteArray>
 #include <QList>
 #include <QHash>
-#include <QDebug>
 #include <QHostAddress>
 #include <QDateTime>
 
@@ -66,11 +65,6 @@ public:
   /** Constructs an identifier from its base-32 (RFC4648) representation. */
   static Identifier fromBase32(const QString &base32);
 };
-
-inline QDebug &operator<<(QDebug &stream, const Identifier &id) {
-  stream << id.toBase32();
-  return stream;
-}
 
 inline QTextStream &operator<<(QTextStream &stream, const Identifier &id) {
   stream << id.toBase32();
