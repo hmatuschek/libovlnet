@@ -13,7 +13,7 @@ DHTStatus::DHTStatus(Application &app, QObject *parent)
 
 QString
 DHTStatus::identifier() const {
-  return _application.dht().id().toHex();
+  return _application.dht().id().toBase32();
 }
 
 size_t

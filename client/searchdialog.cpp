@@ -47,7 +47,7 @@ SearchDialog::SearchDialog(DHT *dht, BuddyList *buddies, QWidget *parent)
 void
 SearchDialog::_onStartSearch() {
   // Assemble ID
-  QByteArray id = QByteArray::fromHex(_query->text().toLocal8Bit());
+  Identifier id = Identifier::fromBase32(_query->text());
   if (id.size() > DHT_HASH_SIZE) { id.resize(DHT_HASH_SIZE); }
   else if (id.size() < DHT_HASH_SIZE) {
     id.reserve(DHT_HASH_SIZE);
@@ -66,7 +66,7 @@ SearchDialog::_onAddAsNewBuddy() {
   QList<QTableWidgetItem *>::iterator item = selectedItems.begin();
   for (; item != selectedItems.end(); item++) {
     nodes.insert(
-          QByteArray::fromHex(_result->item((*item)->row(), 0)->text().toLocal8Bit()));
+          Identifier::fromBase32(_result->item((*item)->row(), 0)->text()));
   }
   if (0 == nodes.size()) { return; }
   Identifier node = *(nodes.begin());
@@ -90,7 +90,7 @@ SearchDialog::_onSearchSuccess(const NodeItem &node) {
   // Append a row with the results
   size_t idx = _result->rowCount();
   _result->setRowCount(idx+1);
-  _result->setItem(idx, 0, new QTableWidgetItem(QString(node.id().toHex())));
+  _result->setItem(idx, 0, new QTableWidgetItem(node.id().toBase32()));
   _result->setItem(idx, 1, new QTableWidgetItem(node.addr().toString()));
   _result->setItem(idx, 2, new QTableWidgetItem(QString::number(node.port())));
 }
@@ -98,14 +98,13 @@ SearchDialog::_onSearchSuccess(const NodeItem &node) {
 void
 SearchDialog::_onSearchFailed(const Identifier &id, const QList<NodeItem> &best) {
   if (id != _currentSearch) { return; }
-  logDebug() << "Got " << best.size() << "nodes.";
   QList<NodeItem>::const_iterator node = best.begin();
   for (; node != best.end(); node++) {
     // Exclude myself from list
     if (node->id() == _dht->id()) { continue; }
     // Append a row with the results
     size_t idx = _result->rowCount(); _result->setRowCount(idx+1);
-    _result->setItem(idx, 0, new QTableWidgetItem(QString(node->id().toHex())));
+    _result->setItem(idx, 0, new QTableWidgetItem(node->id().toBase32()));
     _result->setItem(idx, 1, new QTableWidgetItem(node->addr().toString()));
     _result->setItem(idx, 2, new QTableWidgetItem(QString::number(node->port())));
   }

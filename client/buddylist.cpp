@@ -403,7 +403,7 @@ BuddyList::data(const QModelIndex &index, int role) const {
   // Dispatch by role
   if (Qt::DisplayRole == role) {
     Item *item = reinterpret_cast<Item *>(index.internalPointer());
-    if (Node *node = dynamic_cast<Node *>(item)) { return QString(node->id().toHex()); }
+    if (Node *node = dynamic_cast<Node *>(item)) { return node->id().toBase32(); }
     if (Buddy *buddy = dynamic_cast<Buddy *>(item)) { return buddy->name(); }
   } else if (Qt::DecorationRole == role) {
     Item *item = reinterpret_cast<Item *>(index.internalPointer());

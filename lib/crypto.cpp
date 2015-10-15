@@ -2,6 +2,7 @@
 
 #include "dht.h"
 #include "dht_config.h"
+#include "utils.h"
 
 #include <QFile>
 #include <QByteArray>
@@ -430,8 +431,8 @@ SecureSocket::start(const Identifier &streamId, const PeerItem &peer, QUdpSocket
   EVP_PKEY_CTX_free(ctx);
   OPENSSL_free(skey);
 
-  // Set seq to 0
-  _outSeq = 0;
+  // Set seq to random value
+  _outSeq = dht_rand32();
   // Store peer
   _peer = peer;
   // Store stream id and socket
