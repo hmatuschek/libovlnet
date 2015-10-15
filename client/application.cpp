@@ -60,6 +60,10 @@ Application::Application(int &argc, char *argv[])
     return;
   }
 
+  // Create logger model
+  _logModel = new LogModel();
+  Logger::addHandler(_logModel);
+
   _dht = new DHT(*_identity, this, QHostAddress::Any, 7742);
 
   // load a list of bootstrap servers.
@@ -79,6 +83,8 @@ Application::Application(int &argc, char *argv[])
   _bootstrap   = new QAction(QIcon("://icons/bootstrap.png"), tr("Bootstrap..."), this);
   _showStatus  = new QAction(QIcon("://icons/settings.png"),  tr("Show status ..."), this);
   _statusWindow = 0;
+  _showLogWindow = new QAction(QIcon("://icons/list.png"), tr("Show log..."), this);
+  _logWindow = 0;
   _quit        = new QAction(QIcon("://icons/quit.png"),      tr("Quit"), this);
 
   QMenu *ctx = new QMenu();
@@ -87,6 +93,7 @@ Application::Application(int &argc, char *argv[])
   ctx->addSeparator();
   ctx->addAction(_bootstrap);
   ctx->addAction(_showStatus);
+  ctx->addAction(_showLogWindow);
   ctx->addSeparator();
   ctx->addAction(_quit);
 
@@ -103,6 +110,7 @@ Application::Application(int &argc, char *argv[])
   QObject::connect(_showBuddies, SIGNAL(triggered()), this, SLOT(onShowBuddies()));
   QObject::connect(_search, SIGNAL(triggered()), this, SLOT(search()));
   QObject::connect(_showStatus, SIGNAL(triggered()), this, SLOT(onShowStatus()));
+  QObject::connect(_showLogWindow, SIGNAL(triggered()), this, SLOT(onShowLogWindow()));
   QObject::connect(_quit, SIGNAL(triggered()), this, SLOT(onQuit()));
 }
 
@@ -182,6 +190,23 @@ Application::onShowStatus() {
 void
 Application::onStatusWindowClosed() {
   _statusWindow = 0;
+}
+
+void
+Application::onShowLogWindow() {
+  if (_logWindow) {
+    _logWindow->activateWindow();
+  } else {
+    _logWindow = new LogWindow(_logModel);
+    _logWindow->show();
+    QObject::connect(_logWindow, SIGNAL(destroyed()),
+                     this, SLOT(onLogWindowClosed()));
+  }
+}
+
+void
+Application::onLogWindowClosed() {
+  _logWindow = 0;
 }
 
 void

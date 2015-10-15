@@ -12,6 +12,7 @@
 #include "buddylist.h"
 #include "securechat.h"
 #include "bootstrapnodelist.h"
+#include "logwindow.h"
 
 
 class Application : public QApplication, public SocketHandler
@@ -53,12 +54,15 @@ protected slots:
   void onBootstrap();
   /** Callback for the "show DHT status" action. */
   void onShowStatus();
+  /** Callback for the "show log window" action. */
+  void onShowLogWindow();
   /** Callback for the "quit" action. */
   void onQuit();
 
   void onSearchWindowClosed();
   void onBuddyListClosed();
   void onStatusWindowClosed();
+  void onLogWindowClosed();
 
   /** Get notified if a node search was successful. */
   void onNodeFound(const NodeItem &node);
@@ -76,16 +80,20 @@ protected:
   BuddyList *_buddies;
   /** The list of bootstap servers. */
   BootstrapNodeList _bootstrapList;
+  /** Receives log messages. */
+  LogModel *_logModel;
 
   QAction *_showBuddies;
   QAction *_search;
   QAction *_bootstrap;
   QAction *_showStatus;
+  QAction *_showLogWindow;
   QAction *_quit;
 
   QWidget *_searchWindow;
   QWidget *_buddyListWindow;
   QWidget *_statusWindow;
+  QWidget *_logWindow;
 
   /** Table of pending streams. */
   QHash<Identifier, SecureSocket *> _pendingStreams;
