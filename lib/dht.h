@@ -91,6 +91,9 @@ public:
   /** Unregister the socket with the DHT instance. */
   void socketClosed(const Identifier &id);
 
+  /** Sends a rendezvous request for the given node ID to the specified nodes. */
+  bool rendezvous(const Identifier &id, const QList<NodeItem> &vias);
+  
 signals:
   /** Gets emitted as the DHT node enters the network. */
   void connected();
@@ -123,6 +126,8 @@ protected:
   bool isPendingAnnouncement(const Identifier &id) const;
   /** Sends an Annouce message to the given node. */
   void sendAnnouncement(const NodeItem &to, const Identifier &what);
+  /** Sends a Rendezvous request to the given node. */
+  void sendRendezvous(const Identifier &with, const NodeItem &to); 
 
 private:
   /** Processes a Ping response. */
@@ -153,7 +158,8 @@ private:
   void _processStartStreamRequest(const Message &msg, size_t size,
                                   const QHostAddress &addr, uint16_t port);
   /** Processes a Rendezvous request. */
-  void processRendezvousRequest(Message &msg, size_t size, const QHostAddress &addr, uint16_t port);
+  void _processRendezvousRequest(Message &msg, size_t size,
+                                 const QHostAddress &addr, uint16_t port);
 
 private slots:
   /** Gets called on the reception of a UDP package. */

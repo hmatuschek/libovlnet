@@ -373,6 +373,14 @@ Bucket::contains(const Identifier &id) const {
   return _triples.contains(id);
 }
 
+NodeItem
+Bucket::getNode(const Identifier &id) const {
+  if (_triples.contains(id)) {
+    return NodeItem(id, _triples[id].addr(), _triples[id].port());
+  }
+  return NodeItem();
+}
+
 bool
 Bucket::add(const Identifier &id, const Item &item) {
   _triples[id] = item;
@@ -496,6 +504,15 @@ Buckets::contains(const Identifier &id) const {
     if (bucket->contains(id)) { return true; }
   }
   return false;
+}
+
+NodeItem
+Buckets::getNode(const Identifier &id) const {
+  QList<Bucket>::const_iterator bucket = _buckets.begin();
+  for (; bucket != _buckets.end(); bucket++) {
+    if (bucket->contains(id)) { return bucket->getNode(id); }
+  }
+  return NodeItem();
 }
 
 bool

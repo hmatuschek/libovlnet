@@ -184,6 +184,7 @@ public:
   void nodes(QList<NodeItem> &lst) const;
   /** Returns @c true if the bucket contains the given identifier. */
   bool contains(const Identifier &id) const;
+  NodeItem getNode(const Identifier &id) const;
   /** Adds or updates an node. */
   bool add(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** Adds a candidate node. */
@@ -219,6 +220,7 @@ public:
 
   bool empty() const;
   bool contains(const Identifier &id) const;
+  NodeItem getNode(const Identifier &id) const;
   /** Returns the number of nodes in the buckets. */
   size_t numNodes() const;
   /** Returns the list of all nodes in the buckets. */

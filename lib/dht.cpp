@@ -596,12 +596,24 @@ DHT::sendAnnouncement(const NodeItem &to, const Identifier &what) {
              << " @" << to.addr() << ":" << to.port(); */
   // Assemble & send message
   struct Message msg;
-  memcpy(msg.cookie, Identifier().data(), DHT_HASH_SIZE);
+  memcpy(msg.cookie, Identifier::create().data(), DHT_HASH_SIZE);
   memcpy(msg.payload.announce.what, what.data(), DHT_HASH_SIZE);
   memcpy(msg.payload.announce.who, _self.id().data(), DHT_HASH_SIZE);
   msg.payload.announce.type = MSG_ANNOUNCE;
   if (0 > _socket.writeDatagram((char *)&msg, 3*DHT_HASH_SIZE+1, to.addr(), to.port())) {
     logError() << "Failed to send Announce request to " << to.id()
+               << " @" << to.addr() << ":" << to.port();
+  }
+}
+
+void
+DHT::sendRendezvous(const Identifier &with, const NodeItem &to) {
+  Message msg;
+  memcpy(msg.cookie, Identifier::create().data(), DHT_HASH_SIZE);
+  memcpy(msg.payload.rendezvous.id, with.data(), DHT_HASH_SIZE);
+  if (DHT_RENDEZVOUS_MSG_SIZE != _socket.writeDatagram(
+        (char *)&msg, DHT_RENDEZVOUS_MSG_SIZE, to.addr(), to.port())) {
+    logError() << "DHT: Failed to send Rendezvous request to " << to.id() 
                << " @" << to.addr() << ":" << to.port();
   }
 }
@@ -1005,17 +1017,19 @@ DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddr
 }
 
 void
-DHT::_onProcessRendezvousRequest(Message &msg, size_t size, const QHostAddress &addr, uint16_t port) {
-  if (_self.id() == msg.payload.rendezvous.id) {
+DHT::_processRendezvousRequest(Message &msg, size_t size, const QHostAddress &addr, uint16_t port) {
+  if (_self.id() == Identifier(msg.payload.rendezvous.id)) {
     // If the rendezvous request addressed me -> response with a ping
-    sendPing(msg.payload.rendezvous.ip, ntohs(msg.payload.rendezvous.port));
-  } else if (_buckets.contains(msg.payload.rendezvous.id)) {
+    ping(msg.payload.rendezvous.ip, ntohs(msg.payload.rendezvous.port));
+  } else if (_buckets.contains(msg.payload.rendezvous.id)) {
     // If the rendezvous request is not addressed to me but to a node I know -> forward
     NodeItem node = _buckets.getNode(msg.payload.rendezvous.id);
-    memcpy(msg.payload.rendezvous.ip, addr.toIpv6Address().cm 16);
+    memcpy(msg.payload.rendezvous.ip, addr.toIPv6Address().c, 16);
     msg.payload.rendezvous.port = htons(port);
-    if (DHT_RENDEZVOUS_MSG_LEN != _socket.writeDatagram((char *)&msg, DHT_RENDEZVOUS_MSG_LEN, node.addr(), node.port())) {
-      logError() << "DHT: Cannot forward rendezvous request to " << node.addr() << ":" << addr.port(); 
+    if (DHT_RENDEZVOUS_MSG_SIZE != _socket.writeDatagram(
+          (char *)&msg, DHT_RENDEZVOUS_MSG_SIZE, node.addr(), node.port())) {
+      logError() << "DHT: Cannot forward rendezvous request to " << node.id()
+                 << " @" << node.addr() << ":" << node.port();
     }  
   }
   // silently ignore rendezvous requests to an unknown node.
