@@ -100,7 +100,7 @@ Identifier::toBase32() const {
       //  take the first (msb+1) bits from this byte
       val = (((uint8_t *)constData())[byte]<<(4-msb));
       // If there is a next byte
-      if ((byte+1)<size()) {
+      if ((byte+1) < size_t(size())) {
         // take the first (4-msb) bits from the
         val |= (((uint8_t *)constData())[byte+1]>>(4+msb));
       }
@@ -115,7 +115,7 @@ Identifier::fromBase32(const QString &base32) {
   Identifier id;
   // Get the number of chars to encode HASH as base32 (no padding, we know the length)
   size_t sc = ((DHT_HASH_SIZE*8/5) + (((DHT_HASH_SIZE*8)%5) ? 1 : 0));
-  if (base32.size() != sc) { return id; }
+  if (size_t(base32.size()) != sc) { return id; }
   id.reserve(DHT_HASH_SIZE); id.fill(0, DHT_HASH_SIZE);
   for (size_t i=0; i<sc; i++) {
     // Get byte and msb of the i-th 5-bit symbol in a byte.
@@ -128,7 +128,7 @@ Identifier::fromBase32(const QString &base32) {
       // But the first msb+1 bits of this value into buffer
       ((uint8_t *)id.constData())[byte] |= (val>>(4-msb));
       // If there is a next byte
-      if ((byte+1)<id.size()) {
+      if ((byte+1) < size_t(id.size())) {
         ((uint8_t *)id.constData())[byte+1] |= (val<<(4+msb));
       }
     }
