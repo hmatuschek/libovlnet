@@ -608,6 +608,7 @@ DHT::_onReadyRead() {
       int64_t size = _socket.readDatagram((char *) &msg, sizeof(Message), &addr, &port);
 
       Identifier cookie(msg.cookie);
+      // First, check if message belongs to a open stream
       if (_streams.contains(cookie)) {
         // Process streams
         _streams[cookie]->handleData(((uint8_t *)&msg)+DHT_HASH_SIZE, size-DHT_HASH_SIZE);
@@ -657,7 +658,6 @@ void
 DHT::_processPingResponse(
     const struct Message &msg, size_t size, PingRequest *req, const QHostAddress &addr, uint16_t port)
 {
-  //logDebug() << "Received Ping response from " << addr << ":" << port;
   // sinal success
   emit nodeReachable(NodeItem(msg.payload.ping.id, addr, port));
   // If the buckets are empty -> we are likely bootstrapping
@@ -666,6 +666,7 @@ DHT::_processPingResponse(
   // bucket if space is left
   _buckets.add(msg.payload.ping.id, addr, port);
   if (bootstrapping) {
+    emit connected();
     logDebug() << "Still boot strapping: Search for myself.";
     findNode(_self.id());
   }
@@ -675,27 +676,22 @@ void
 DHT::_processFindNodeResponse(
     const struct Message &msg, size_t size, FindNodeRequest *req, const QHostAddress &addr, uint16_t port)
 {
-  //logDebug() << "Received FindNode response from " << addr << ":" << port;
   // payload length must be a multiple of triple length
   if ( 0 == ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
     // unpack and update query
     size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
-    //logDebug() << "Received " << Ntriple << " nodes from "  << addr << ":" << port;
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
       NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip)),
                     ntohs(msg.payload.result.triples[i].port));
-      //logDebug() << " got: " << item.id() << " @" << item.addr() << ":" << ntohs(msg.payload.result.triples[i].port);
       // Add discovered node to buckets
-      _buckets.add(id, item.addr(), item.port());
+      _buckets.addCandidate(id, item.addr(), item.port());
       // Update node list of query
       req->query()->update(item);
     }
 
     // If the node was found -> signal success
     if (req->query()->found()) {
-      /*logDebug() << "Found node " << req->query()->first().id()
-                 << " @" << req->query()->first().addr() << ":" << req->query()->first().port(); */
       // Signal node found
       emit nodeFound(req->query()->first());
       // delete query
@@ -770,7 +766,7 @@ DHT::_processFindValueResponse(
       NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)* (msg.payload.result.triples[i].ip)),
                     ntohs(msg.payload.result.triples[i].port));
       // Add discovered node to buckets
-      _buckets.add(id, item.addr(), item.port());
+      _buckets.addCandidate(id, item.addr(), item.port());
       // Update node list of query
       req->query()->update(item);
     }
@@ -833,8 +829,8 @@ DHT::_processPingRequest(
     logError() << "Failed to send Ping response to " << addr << ":" << port;
   }
   // Add node to candidate nodes for the bucket table if not known already
-  if ((! _buckets.contains(msg.payload.ping.id)) && (10 > _candidates.size())) {
-    _candidates.push_back(PeerItem(addr, port));
+  if (! _buckets.contains(msg.payload.ping.id)) {
+    _buckets.addCandidate(msg.payload.ping.id, addr, port);
   }
 }
 
@@ -1063,7 +1059,7 @@ DHT::_onCheckRequestTimeout() {
 
 void
 DHT::_onCheckNodeTimeout() {
-  // Collect old nodes from buckets
+  // Collect nodes older than 15min from the buckets
   QList<NodeItem> oldNodes;
   _buckets.getOlderThan(15*60, oldNodes);
   // send a ping to all of them
@@ -1071,12 +1067,13 @@ DHT::_onCheckNodeTimeout() {
   for (; node != oldNodes.end(); node++) {
     ping(node->addr(), node->port());
   }
+
+  bool connected = (0 != _buckets.numNodes());
   // Remove dead nodes from the buckets
   _buckets.removeOlderThan(20*60);
-  // Send pings to candidates
-  while (_candidates.size()) {
-    ping(_candidates.first());
-    _candidates.pop_front();
+  // check if the last node was removed
+  if (connected && (0 == _buckets.numNodes())) {
+    emit disconnected();
   }
 }
 

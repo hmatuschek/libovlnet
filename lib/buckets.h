@@ -136,7 +136,7 @@ public:
     /** Empty constructor. */
     Item();
     /** Constructor from identifier, address, port and prefix. */
-    Item(const QHostAddress &addr, uint16_t port, size_t prefix);
+    Item(const QHostAddress &addr, uint16_t port, size_t prefix, const QDateTime &lastSeen=QDateTime());
     /** Copy constructor. */
     Item(const Item &other);
     /** Assignment operator. */
@@ -153,6 +153,7 @@ public:
     const QDateTime &lastSeen() const;
     /** Returns true if the entry is older than the specified seconds. */
     inline size_t olderThan(size_t seconds) const {
+      if (! _lastSeen.isValid()) { return true; }
       return (_lastSeen.addSecs(seconds) < QDateTime::currentDateTime());
     }
 
@@ -183,8 +184,10 @@ public:
   void nodes(QList<NodeItem> &lst) const;
   /** Returns @c true if the bucket contains the given identifier. */
   bool contains(const Identifier &id) const;
-  /** Add or updates an item. */
+  /** Adds or updates an node. */
   void add(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  /** Adds a candidate node. */
+  void addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** The prefix of the bucket. */
   size_t prefix() const;
 
@@ -220,8 +223,10 @@ public:
   size_t numNodes() const;
   /** Returns the list of all nodes in the buckets. */
   void nodes(QList<NodeItem> &lst) const;
-  /** Adds or updates an item. */
+  /** Adds or updates an node. */
   void add(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  /** Adds a candidate node. */
+  void addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** Collects the nearest known nodes. */
   void getNearest(const Identifier &id, QList<NodeItem> &best) const;
   /** Collects all nodes that are "older" than the specified age (in seconds). */

@@ -68,6 +68,10 @@ protected slots:
   void onNodeFound(const NodeItem &node);
   /** Get notified if a node cannot be found. */
   void onNodeNotFound(const Identifier &id, const QList<NodeItem> &best);
+  /** Get notified if the DHT connected to the network. */
+  void onDHTConnected();
+  /** Get notified if the DHT lost the connection to the network. */
+  void onDHTDisconnected();
 
 protected:
   /** The identity of this DHT node. */

@@ -92,6 +92,10 @@ public:
   void socketClosed(const Identifier &id);
 
 signals:
+  /** Gets emitted as the DHT node enters the network. */
+  void connected();
+  /** Gets emitted as the DHT node leaves the network. */
+  void disconnected();
   /** Gets emitted if a ping was replied. */
   void nodeReachable(const NodeItem &node);
   /** Gets emitted if the given node has been found. */
@@ -180,8 +184,6 @@ protected:
 
   /** The routing table. */
   Buckets _buckets;
-  /** A list of candidate peers to join the buckets. */
-  QList<PeerItem> _candidates;
 
   /** The key->value map of the received announcements. */
   QHash<Identifier, QHash<Identifier, AnnouncementItem> > _announcements;

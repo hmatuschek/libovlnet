@@ -289,8 +289,8 @@ Bucket::Item::Item()
   // pass...
 }
 
-Bucket::Item::Item(const QHostAddress &addr, uint16_t port, size_t prefix)
-  : _prefix(prefix), _peer(addr, port), _lastSeen(QDateTime::currentDateTime())
+Bucket::Item::Item(const QHostAddress &addr, uint16_t port, size_t prefix, const QDateTime &lastSeen)
+  : _prefix(prefix), _peer(addr, port), _lastSeen(lastSeen)
 {
   // pass...
 }
@@ -381,9 +381,18 @@ Bucket::add(const Identifier &id, const Item &item) {
 void
 Bucket::add(const Identifier &id, const QHostAddress &addr, uint16_t port) {
   if (contains(id) || (!full())) {
-    _triples[id] = Item(addr, port, (id-_self).leadingBit());
+    _triples[id] = Item(addr, port, (id-_self).leadingBit(), QDateTime::currentDateTime());
   }
 }
+
+void
+Bucket::addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port) {
+  if ((!contains(id)) && (!full())) {
+    // Add item with invalid timestamp -> it is a candidate and will be removed soon
+    _triples[id] = Item(addr, port, (id-_self).leadingBit(), QDateTime());
+  }
+}
+
 
 size_t
 Bucket::prefix() const {
@@ -515,6 +524,44 @@ Buckets::add(const Identifier &id, const QHostAddress &addr, uint16_t port) {
       size_t prefix = (id-_self).leadingBit();
       if (next->prefix() == prefix) { next->add(id, addr, port); }
       else { this->add(id, addr, port); }
+    }
+  }
+}
+
+void
+Buckets::addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port) {
+  // Do not add myself
+  if (id == _self) { return; }
+
+  // If there are no buckets -> create one.
+  if (empty()) {
+    _buckets.append(Bucket(_self));
+    _buckets.back().addCandidate(id, addr, port);
+    return;
+  }
+
+  // Find the bucket, the item belongs to
+  QList<Bucket>::iterator bucket = index(id);
+  // If node is known -> done
+  if (bucket->contains(id)) { return; }
+
+  if (! bucket->full()) {
+    // If the bucket is not full -> add
+    bucket->addCandidate(id, addr, port);
+  } else {
+    // If the item is new to the bucket and if the bucket is full
+    //  -> check if it can be splitted
+    QList<Bucket>::iterator next = bucket; next++;
+    if (next==_buckets.end()) {
+      Bucket newBucket(_self);
+      bucket->split(newBucket);
+      _buckets.insert(next, newBucket);
+      size_t prefix = (id-_self).leadingBit();
+      if (next->prefix() == prefix) {
+        next->addCandidate(id, addr, port);
+      } else {
+        addCandidate(id, addr, port);
+      }
     }
   }
 }

@@ -60,10 +60,11 @@ Application::Application(int &argc, char *argv[])
     return;
   }
 
-  // Create logger model
+  // Create log model
   _logModel = new LogModel();
   Logger::addHandler(_logModel);
 
+  // Create DHT instance
   _dht = new DHT(*_identity, this, QHostAddress::Any, 7742);
 
   // load a list of bootstrap servers.
@@ -73,9 +74,12 @@ Application::Application(int &argc, char *argv[])
     _dht->ping(hostport.first, hostport.second);
   }
 
+  // Create DHT status object
   _status = new DHTStatus(*this);
+  // Create buddy list model
   _buddies = new BuddyList(*this, vlfDir.canonicalPath()+"/buddies.json");
 
+  // Actions
   _search      = new QAction(QIcon("://icons/search.png"),    tr("Search..."), this);
   _searchWindow = 0;
   _showBuddies = new QAction(QIcon("://icons/people.png"),    tr("Contacts..."), this);
@@ -98,13 +102,19 @@ Application::Application(int &argc, char *argv[])
   ctx->addAction(_quit);
 
   _trayIcon = new QSystemTrayIcon();
-  _trayIcon->setIcon(QIcon("://icons/fork.png"));
+  if (_dht->numNodes()) {
+    _trayIcon->setIcon(QIcon("://icons/fork_green.png"));
+  } else {
+    _trayIcon->setIcon(QIcon("://icons/fork.png"));
+  }
   _trayIcon->setContextMenu(ctx);
   _trayIcon->show();
 
   QObject::connect(_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(onNodeFound(NodeItem)));
   QObject::connect(_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
                    this, SLOT(onNodeNotFound(Identifier,QList<NodeItem>)));
+  QObject::connect(_dht, SIGNAL(connected()), this, SLOT(onDHTConnected()));
+  QObject::connect(_dht, SIGNAL(disconnected()), this, SLOT(onDHTDisconnected()));
 
   QObject::connect(_bootstrap, SIGNAL(triggered()), this, SLOT(onBootstrap()));
   QObject::connect(_showBuddies, SIGNAL(triggered()), this, SLOT(onShowBuddies()));
@@ -359,4 +369,14 @@ Application::onNodeNotFound(const Identifier &id, const QList<NodeItem> &best) {
   // Free stream
   delete _pendingStreams[id];
   _pendingStreams.remove(id);
+}
+
+void
+Application::onDHTConnected() {
+  _trayIcon->setIcon(QIcon("://icons/fork_green.png"));
+}
+
+void
+Application::onDHTDisconnected() {
+  _trayIcon->setIcon(QIcon("://icons/fork.png"));
 }
