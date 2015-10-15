@@ -14,6 +14,7 @@ typedef enum {
   MSG_FIND_NODE,
   MSG_FIND_VALUE,
   MSG_START_STREAM,
+  MSG_RENDEZVOUS,
 } MessageType;
 
 /** Represents a triple of ID, IP address and port as transferred via UDP. */
@@ -61,7 +62,7 @@ struct __attribute__((packed)) Message
       char    id[DHT_HASH_SIZE];
       /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
        * attack. It ensures that the request has at least the same size as the response. The size
-       * of this field implicitly defines the number of triples returned by the remote node. */
+       * of this field implicitly defines the max. number of triples returned by the remote node. */
       char    dummy[DHT_MAX_TRIPLES*DHT_TRIPLE_SIZE-DHT_HASH_SIZE];
     } find_value;
 
@@ -78,6 +79,18 @@ struct __attribute__((packed)) Message
       uint8_t  pubkey[DHT_MAX_PUBKEY_SIZE];
     } start_stream;
 
+    struct __attribute__((packed)) {
+      uint8_t  type;  // == MSG_RENDEZVOUS
+      /** Specifies the ID of the node to date. */
+      char     id[DHT_HASH_SIZE];
+      /** Will be set by the rendezvous server to the source address of the reuquest sender, 
+       * before relaying it to the target. */
+      char     ip[16];
+      /** Will be set by the rendezvous server to the source port of the request sender, before 
+       * relaying it to the target. */ 
+      uint16_t port;
+    } rendezvous; 
+
     /** A stream datagram. */
     uint8_t datagram[DHT_MAX_DATA_SIZE];
   } payload;
@@ -89,6 +102,9 @@ Message::Message()
 {
   memset(this, 0, sizeof(Message));
 }
+
+#define DHT_RENDEZVOUS_MSG_SIZE (2*DHT_HASH_SIZE+19)
+
 
 
 class SearchQuery
@@ -638,8 +654,10 @@ DHT::_onReadyRead() {
           _processFindValueRequest(msg, size, addr, port);
         } else if ((size == (3*DHT_HASH_SIZE+1)) && (MSG_ANNOUNCE == msg.payload.announce.type)) {
           _processAnnounceRequest(msg, size, addr, port);
-        } else if ((size > (DHT_HASH_SIZE+3)) && (MSG_START_STREAM == msg.payload.announce.type)) {
+        } else if ((size > (DHT_HASH_SIZE+3)) && (MSG_START_STREAM == msg.payload.start_stream.type)) {
           _processStartStreamRequest(msg, size, addr, port);
+        } else if ((size == DHT_RENDEZVOUS_MSG_SIZE) && (MSG_RENDEZVOUS == msg.payload.rendezvous.type)) {
+          _processRendezvousRequest(msg, size, addr, port);
         } else {
           logInfo() << "Unknown request from " << addr << ":" << port
                     << " dropping " << (size-DHT_HASH_SIZE) << "b payload.";
@@ -984,6 +1002,23 @@ DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddr
   // Stream started..
   _streams[resp.cookie] = stream;
   _streamHandler->connectionStarted(stream);
+}
+
+void
+DHT::_onProcessRendezvousRequest(Message &msg, size_t size, const QHostAddress &addr, uint16_t port) {
+  if (_self.id() == msg.payload.rendezvous.id) {
+    // If the rendezvous request addressed me -> response with a ping
+    sendPing(msg.payload.rendezvous.ip, ntohs(msg.payload.rendezvous.port));
+  } else if (_buckets.contains(msg.payload.rendezvous.id)) {
+    // If the rendezvous request is not addressed to me but to a node I know -> forward
+    NodeItem node = _buckets.getNode(msg.payload.rendezvous.id);
+    memcpy(msg.payload.rendezvous.ip, addr.toIpv6Address().cm 16);
+    msg.payload.rendezvous.port = htons(port);
+    if (DHT_RENDEZVOUS_MSG_LEN != _socket.writeDatagram((char *)&msg, DHT_RENDEZVOUS_MSG_LEN, node.addr(), node.port())) {
+      logError() << "DHT: Cannot forward rendezvous request to " << node.addr() << ":" << addr.port(); 
+    }  
+  }
+  // silently ignore rendezvous requests to an unknown node.
 }
 
 void

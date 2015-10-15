@@ -152,6 +152,8 @@ private:
   /** Processes a StartStream request. */
   void _processStartStreamRequest(const Message &msg, size_t size,
                                   const QHostAddress &addr, uint16_t port);
+  /** Processes a Rendezvous request. */
+  void processRendezvousRequest(Message &msg, size_t size, const QHostAddress &addr, uint16_t port);
 
 private slots:
   /** Gets called on the reception of a UDP package. */
