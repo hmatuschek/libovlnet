@@ -373,16 +373,20 @@ Bucket::contains(const Identifier &id) const {
   return _triples.contains(id);
 }
 
-void
+bool
 Bucket::add(const Identifier &id, const Item &item) {
   _triples[id] = item;
+  return true;
 }
 
-void
+bool
 Bucket::add(const Identifier &id, const QHostAddress &addr, uint16_t port) {
+  bool isNew = !contains(id);
   if (contains(id) || (!full())) {
     _triples[id] = Item(addr, port, (id-_self).leadingBit(), QDateTime::currentDateTime());
+    return isNew;
   }
+  return false;
 }
 
 void
@@ -494,16 +498,15 @@ Buckets::contains(const Identifier &id) const {
   return false;
 }
 
-void
+bool
 Buckets::add(const Identifier &id, const QHostAddress &addr, uint16_t port) {
   // Do not add myself
-  if (id == _self) { return; }
+  if (id == _self) { return false; }
 
   // If there are no buckets -> create one.
   if (empty()) {
     _buckets.append(Bucket(_self));
-    _buckets.back().add(id, addr, port);
-    return;
+    return _buckets.back().add(id, addr, port);
   }
 
   // Find the bucket, the item belongs to
@@ -512,7 +515,7 @@ Buckets::add(const Identifier &id, const QHostAddress &addr, uint16_t port) {
   if (bucket->contains(id) || (! bucket->full())) {
     // If the bucket contains the item already or the bucket is not full
     //  -> update
-    bucket->add(id, addr, port);
+    return bucket->add(id, addr, port);
   } else {
     // If the item is new to the bucket and if the bucket is full
     //  -> check if it can be splitted
@@ -522,10 +525,14 @@ Buckets::add(const Identifier &id, const QHostAddress &addr, uint16_t port) {
       bucket->split(newBucket);
       _buckets.insert(next, newBucket);
       size_t prefix = (id-_self).leadingBit();
-      if (next->prefix() == prefix) { next->add(id, addr, port); }
-      else { this->add(id, addr, port); }
+      if (next->prefix() == prefix) {
+        return next->add(id, addr, port); }
+      else {
+        return this->add(id, addr, port);
+      }
     }
   }
+  return false;
 }
 
 void

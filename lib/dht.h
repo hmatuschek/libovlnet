@@ -96,6 +96,11 @@ signals:
   void connected();
   /** Gets emitted as the DHT node leaves the network. */
   void disconnected();
+  /** Gets emitted if a node leaves the buckets. */
+  void nodeLost(const Identifier &id);
+  /** Gets emitted if a node enters the bucketlist. */
+  void nodeAppeard(const NodeItem &node);
+
   /** Gets emitted if a ping was replied. */
   void nodeReachable(const NodeItem &node);
   /** Gets emitted if the given node has been found. */

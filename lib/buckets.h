@@ -185,7 +185,7 @@ public:
   /** Returns @c true if the bucket contains the given identifier. */
   bool contains(const Identifier &id) const;
   /** Adds or updates an node. */
-  void add(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  bool add(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** Adds a candidate node. */
   void addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** The prefix of the bucket. */
@@ -197,7 +197,7 @@ public:
 
 protected:
   /** Adds an item. */
-  void add(const Identifier &id, const Item &item);
+  bool add(const Identifier &id, const Item &item);
 
 protected:
   Identifier _self;
@@ -224,7 +224,7 @@ public:
   /** Returns the list of all nodes in the buckets. */
   void nodes(QList<NodeItem> &lst) const;
   /** Adds or updates an node. */
-  void add(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  bool add(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** Adds a candidate node. */
   void addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** Collects the nearest known nodes. */

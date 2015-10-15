@@ -658,13 +658,15 @@ void
 DHT::_processPingResponse(
     const struct Message &msg, size_t size, PingRequest *req, const QHostAddress &addr, uint16_t port)
 {
-  // sinal success
+  // signal success
   emit nodeReachable(NodeItem(msg.payload.ping.id, addr, port));
   // If the buckets are empty -> we are likely bootstrapping
   bool bootstrapping = _buckets.empty();
   // Given that this is a ping response -> add the node to the corresponding
   // bucket if space is left
-  _buckets.add(msg.payload.ping.id, addr, port);
+  if (_buckets.add(msg.payload.ping.id, addr, port)) {
+    emit nodeAppeard(NodeItem(msg.payload.ping.id, addr, port));
+  }
   if (bootstrapping) {
     emit connected();
     logDebug() << "Still boot strapping: Search for myself.";
@@ -1068,6 +1070,11 @@ DHT::_onCheckNodeTimeout() {
     ping(node->addr(), node->port());
   }
 
+  // Get disappeared nodes
+  oldNodes.clear(); _buckets.getOlderThan(20*60, oldNodes);
+  for (node = oldNodes.begin(); node != oldNodes.end(); node++) {
+    emit nodeLost(node->id());
+  }
   // are buckets non-empty (this node is connected to the network)
   bool connected = (0 != _buckets.numNodes());
   // Remove dead nodes from the buckets
