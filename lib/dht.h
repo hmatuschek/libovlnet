@@ -1,5 +1,5 @@
-#ifndef __VLF_DHT_H__
-#define __VLF_DHT_H__
+#ifndef __OVL_DHT_H__
+#define __OVL_DHT_H__
 
 #include "buckets.h"
 
@@ -22,7 +22,6 @@ class PingRequest;
 class FindNodeRequest;
 class FindValueRequest;
 class StartStreamRequest;
-
 class Identity;
 class SocketHandler;
 class SecureSocket;
@@ -35,7 +34,8 @@ class DHT: public QObject
 
 public:
   /** Constructor.
-   * @param id Specifies the identity of the node.
+   * @param id Weak reference to the identity of the node.
+   * @param streamHandler Specifies the socket-handler.
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
@@ -63,7 +63,7 @@ public:
 
   /** Returns the number of nodes in the buckets. */
   size_t numNodes() const;
-  /** Sends a ping request to the given peer. */
+  /** Sends a ping request to the given hostname and port. */
   void ping(const QString &addr, uint16_t port);
   /** Sends a ping request to the given peer. */
   void ping(const QHostAddress &addr, uint16_t port);
@@ -222,4 +222,4 @@ protected:
 
 
 
-#endif // __VLF_DHT_H__
+#endif // __OVL_DHT_H__

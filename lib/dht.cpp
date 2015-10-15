@@ -143,6 +143,13 @@ public:
 };
 
 
+class FindNeighboursQuery: public SearchQuery
+{
+public:
+  FindNeighboursQuery(const Identifier &self, const Identifier &id);
+};
+
+
 class Request
 {
 protected:
@@ -169,6 +176,7 @@ public:
   PingRequest();
 };
 
+
 class FindNodeRequest: public Request
 {
 public:
@@ -189,6 +197,7 @@ public:
 protected:
   FindValueQuery *_findValueQuery;
 };
+
 
 class StartStreamRequest: public Request
 {
@@ -280,6 +289,12 @@ FindNodeQuery::found() const {
 }
 
 FindValueQuery::FindValueQuery(const Identifier &self, const Identifier &id)
+  : SearchQuery(self, id)
+{
+  // pass...
+}
+
+FindNeighboursQuery::FindNeighboursQuery(const Identifier &self, const Identifier &id)
   : SearchQuery(self, id)
 {
   // pass...

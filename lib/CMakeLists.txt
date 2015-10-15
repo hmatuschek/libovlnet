@@ -4,7 +4,7 @@ set(ovl_SOURCES
 set(ovl_MOC_HEADERS 
     ntp.h dht.h pcp.h natpmp.h stream.h socks.h)
 set(ovl_HEADERS ${ovl_MOC_HEADERS}
-    buckets.h utils.h crypto.h logger.h)
+    ovlnet.h buckets.h utils.h crypto.h logger.h)
 
 qt5_wrap_cpp(ovl_MOC_SOURCES ${ovl_MOC_HEADERS})
 

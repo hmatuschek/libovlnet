@@ -181,9 +181,11 @@ void
 Application::onShowBuddies() {
   if (_buddyListWindow) {
     _buddyListWindow->activateWindow();
+    _buddyListWindow->raise();
   } else {
     _buddyListWindow = new BuddyListView(*this,  _buddies);
     _buddyListWindow->show();
+    _buddyListWindow->raise();
     QObject::connect(_buddyListWindow, SIGNAL(destroyed()),
                      this, SLOT(onBuddyListClosed()));
   }
@@ -198,9 +200,11 @@ void
 Application::onShowStatus() {
   if (_statusWindow) {
     _statusWindow->activateWindow();
+    _statusWindow->raise();
   } else {
     _statusWindow = new DHTStatusView(_status);
     _statusWindow->show();
+    _statusWindow->raise();
     QObject::connect(_statusWindow, SIGNAL(destroyed()),
                      this, SLOT(onStatusWindowClosed()));
   }
@@ -215,9 +219,11 @@ void
 Application::onShowLogWindow() {
   if (_logWindow) {
     _logWindow->activateWindow();
+    _logWindow->raise();
   } else {
     _logWindow = new LogWindow(_logModel);
     _logWindow->show();
+    _logWindow->raise();
     QObject::connect(_logWindow, SIGNAL(destroyed()),
                      this, SLOT(onLogWindowClosed()));
   }

@@ -66,6 +66,7 @@ public:
   static Identifier fromBase32(const QString &base32);
 };
 
+/** Logger output operation for identifier. */
 inline QTextStream &operator<<(QTextStream &stream, const Identifier &id) {
   stream << id.toBase32();
   return stream;
@@ -76,35 +77,48 @@ inline QTextStream &operator<<(QTextStream &stream, const Identifier &id) {
 class PeerItem
 {
 public:
+  /** Empty constructor. */
   PeerItem();
+  /** Constructor from address and port. */
   PeerItem(const QHostAddress &addr, uint16_t port);
+  /** Copy constructor. */
   PeerItem(const PeerItem &other);
-
+  /** Assignment operator. */
   PeerItem &operator=(const PeerItem &other);
 
+  /** Returns the address of the peer. */
   const QHostAddress &addr() const;
+  /** Returns the port of the peer. */
   uint16_t port() const;
 
 protected:
+  /** The address of the peer. */
   QHostAddress _addr;
+  /** The port of the peer. */
   uint16_t     _port;
 };
 
 
-/** Represents a node (ID + IP address + port) in the network. */
+/** Represents a node (ID + IP address + port, or ID + Peer) in the network. */
 class NodeItem: public PeerItem
 {
 public:
+  /** Empty constructor. */
   NodeItem();
+  /** Constructor from ID, address and port. */
   NodeItem(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  /** Constructor from ID and peer. */
   NodeItem(const Identifier &id, const PeerItem &peer);
+  /** Copy constructor. */
   NodeItem(const NodeItem &other);
-
+  /** Assignment operator. */
   NodeItem &operator=(const NodeItem &other);
 
+  /** Returns the identifier of the node. */
   const Identifier &id() const;
 
 protected:
+  /** The identifier of the node. */
   Identifier _id;
 };
 
