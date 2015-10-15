@@ -5,6 +5,7 @@
 #include <QSystemTrayIcon>
 #include <QAction>
 #include <QStringList>
+#include <QTimer>
 
 #include "lib/crypto.h"
 #include "lib/dht.h"
@@ -72,6 +73,8 @@ protected slots:
   void onDHTConnected();
   /** Get notified if the DHT lost the connection to the network. */
   void onDHTDisconnected();
+  /** Gets called periodically on connection loss to bootstrap a connection to the network. */
+  void onReconnect();
 
 protected:
   /** The identity of this DHT node. */
@@ -103,6 +106,9 @@ protected:
   QHash<Identifier, SecureSocket *> _pendingStreams;
   /** The system tray icon. */
   QSystemTrayIcon *_trayIcon;
+
+  /** Once the connection to the network is lost, try to reconnect every minute. */
+  QTimer _reconnectTimer;
 };
 
 #endif // APPLICATION_H

@@ -324,15 +324,15 @@ DHT::DHT(Identity &id, SocketHandler *streamHandler,
   // check request timeouts every 500ms
   _requestTimer.setInterval(500);
   _requestTimer.setSingleShot(false);
+  // Update statistics every 5 seconds
+  _statisticsTimer.setInterval(1000*5);
+  _statisticsTimer.setSingleShot(false);
   // check for dead nodes every minute
   _nodeTimer.setInterval(1000*60);
   _nodeTimer.setSingleShot(false);
   // check announcements every 5 minutes
   _announcementTimer.setInterval(1000*60*5);
   _announcementTimer.setSingleShot(false);
-  // Update statistics every 5 seconds
-  _statisticsTimer.setInterval(1000*5);
-  _statisticsTimer.setSingleShot(false);
 
   QObject::connect(&_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
   QObject::connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
@@ -1068,12 +1068,21 @@ DHT::_onCheckNodeTimeout() {
     ping(node->addr(), node->port());
   }
 
+  // are buckets non-empty (this node is connected to the network)
   bool connected = (0 != _buckets.numNodes());
   // Remove dead nodes from the buckets
   _buckets.removeOlderThan(20*60);
   // check if the last node was removed
   if (connected && (0 == _buckets.numNodes())) {
+    // If the last node was removed -> signal connection loss
     emit disconnected();
+  }
+
+  // Update neighbourhood
+  if (_buckets.numNodes()) {
+    // search for myself, this will certainly fail but results in a list
+    // of the closest nodes, which will be added to the buckets as candidates
+    findNode(_self.id());
   }
 }
 

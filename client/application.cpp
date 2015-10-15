@@ -24,7 +24,7 @@
 
 Application::Application(int &argc, char *argv[])
   : QApplication(argc, argv), _identity(0), _dht(0), _status(0), _buddies(0),
-    _bootstrapList()
+    _bootstrapList(), _reconnectTimer()
 {
   // Init PortAudio
   Pa_Initialize();
@@ -110,6 +110,13 @@ Application::Application(int &argc, char *argv[])
   _trayIcon->setContextMenu(ctx);
   _trayIcon->show();
 
+  // setup reconnect timer
+  _reconnectTimer.setInterval(1000*60);
+  _reconnectTimer.setSingleShot(false);
+  if (0 == _dht->numNodes()) {
+    _reconnectTimer.start();
+  }
+
   QObject::connect(_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(onNodeFound(NodeItem)));
   QObject::connect(_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
                    this, SLOT(onNodeNotFound(Identifier,QList<NodeItem>)));
@@ -122,6 +129,8 @@ Application::Application(int &argc, char *argv[])
   QObject::connect(_showStatus, SIGNAL(triggered()), this, SLOT(onShowStatus()));
   QObject::connect(_showLogWindow, SIGNAL(triggered()), this, SLOT(onShowLogWindow()));
   QObject::connect(_quit, SIGNAL(triggered()), this, SLOT(onQuit()));
+
+  QObject::connect(&_reconnectTimer, SIGNAL(timeout()), this, SLOT(onReconnect()));
 }
 
 Application::~Application() {
@@ -373,10 +382,23 @@ Application::onNodeNotFound(const Identifier &id, const QList<NodeItem> &best) {
 
 void
 Application::onDHTConnected() {
+  logInfo() << "Connected to overlay network.";
   _trayIcon->setIcon(QIcon("://icons/fork.png"));
+  _reconnectTimer.stop();
 }
 
 void
 Application::onDHTDisconnected() {
+  logInfo() << "Lost connection to overlay network.";
   _trayIcon->setIcon(QIcon("://icons/fork_gray.png"));
+  _reconnectTimer.start();
+}
+
+void
+Application::onReconnect() {
+  logInfo() << "Connect to overlay network...";
+  QPair<QString, uint16_t> hostport;
+  foreach (hostport, _bootstrapList) {
+    _dht->ping(hostport.first, hostport.second);
+  }
 }
