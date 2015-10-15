@@ -25,7 +25,7 @@ SocksConnection::close() {
  * Implementation of SocksService
  * ********************************************************************************************* */
 SocksService::SocksService(Application &app, const NodeItem &remote, uint16_t port, QObject *parent)
-  : QObject(parent), _application(app), _remote(remote), _server()
+  : QObject(parent), _application(app), _remote(remote), _server(), _connectionCount(0)
 {
   logDebug() << "Start SOCKS proxy service at localhost:" << port;
   // Bind socket to local port

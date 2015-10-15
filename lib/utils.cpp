@@ -109,7 +109,7 @@ RingBuffer::peek(size_t offset, uint8_t *buffer, size_t len) const {
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
   /// @bug tripple check
-  if ( ((offset+len) < _inptr) || ((offset+len) <= _buffer.size()) ) {
+  if ( ((offset+len) < _inptr) || ((offset+len) <= size_t(_buffer.size())) ) {
     memcpy(buffer, _buffer.constData()+offset, len);
     return len;
   }
@@ -173,7 +173,7 @@ RingBuffer::put(size_t offset, const uint8_t *buffer, size_t len) {
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
   /// @bug tripple check
-  if ( ((offset+len) <= _inptr) || ((offset+len) <= _buffer.size()) ) {
+  if ( ((offset+len) <= _inptr) || ((offset+len) <= size_t(_buffer.size())) ) {
     memcpy(_buffer.data()+offset, buffer, len);
     return len;
   }
@@ -233,23 +233,27 @@ PacketOutBuffer::write(const uint8_t *buffer, size_t len) {
 
 size_t
 PacketOutBuffer::ack(uint32_t sequence) {
-  size_t drop = 0;  // <- how many bytes are ACKed
+  size_t drop = 0, maxAge = 0;  // <- how many bytes are ACKed
   QList<Packet>::iterator packet = _packets.begin();
   for (; packet != _packets.end(); packet++) {
     // If sequence matches -> done
     if (packet->sequence() == sequence) {
       // Update the roundtrip
-      updateRoundtrip(packet->age());
+      maxAge = std::max(maxAge, packet->age());
+      updateRoundtrip(maxAge);
+      // update data ACKed
       drop += packet->length();
-      // drop data from the output buffer
+      // drop ACKed data from the output buffer
       _buffer.drop(drop);
-      // Erase all packets upto and including the matching one
-      // from the packet queue
+      // Erase all packets from the packet queue
+      // upto and including the matching one
       ++packet; _packets.erase(_packets.begin(), packet);
       // done
       return drop;
     }
+    // Update ACKed data and package age
     drop += packet->length();
+    maxAge = std::max(maxAge, packet->age());
   }
   return 0;
 }
@@ -273,18 +277,17 @@ PacketOutBuffer::resend(uint8_t *buffer, size_t &len, uint32_t &sequence) {
 
 void
 PacketOutBuffer::updateRoundtrip(size_t ms) {
-  _rt_sum += ms;
-  _rt_sumsq  += ms*ms;
-  _rt_count++;
-  // if sufficient data is available -> update timeout as mean + 3*sd (99% quantile)
-  if ((1<<5) == _rt_count) {
-    _rt_sum >>= 5;
-    _rt_sumsq  >>= 5;
-    logDebug() << "PacketOutBuffer: Update timeout from " << _timeout
-               << " to " << (_rt_sum + 3*std::sqrt(_rt_sumsq -_rt_sum*_rt_sum)) << ".";
+  // Update sums
+  _rt_sum += ms; _rt_sumsq  += ms*ms; _rt_count++;
+  // If sufficient data is available
+  //  -> update timeout as mean + 3*sd (99% quantile)
+  if ((1<<6) == _rt_count) {
+    // Integer division by (1<<6)=64
+    _rt_sum >>= 6; _rt_sumsq  >>= 6;
+    // compute new timeout
     _timeout = _rt_sum + 3*std::sqrt(_rt_sumsq -_rt_sum*_rt_sum);
-    _rt_sum = 0; _rt_sumsq = 0;
-    _rt_count = 0;
+    // reset counts and sums
+    _rt_sum = 0; _rt_sumsq = 0; _rt_count = 0;
   }
 }
 
