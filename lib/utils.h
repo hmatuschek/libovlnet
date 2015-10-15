@@ -98,6 +98,11 @@ public:
     inline void markResend() {
       _timestamp = QDateTime::currentDateTime();
     }
+    /** Returns the age of the packet. */
+    inline size_t age() const {
+      qint64 delta = _timestamp.msecsTo(QDateTime::currentDateTime());
+      return (delta<0) ? 0 : delta;
+    }
 
   protected:
     /** The sequence number of the packet. */
@@ -122,9 +127,15 @@ public:
   bool resend(uint8_t *buffer, size_t &len, uint32_t &sequence);
 
 protected:
+  void updateRoundtrip(size_t ms);
+
+protected:
   RingBuffer _buffer;
   uint32_t _nextSequence;
   QList<Packet> _packets;
+  uint64_t _rt_sum;
+  uint64_t _rt_sumsq;
+  size_t _rt_count;
   size_t _timeout;
 };
 

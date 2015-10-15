@@ -1,5 +1,6 @@
 #include "utils.h"
 #include "logger.h"
+#include <cmath>
 
 
 /* ********************************************************************************************* *
@@ -189,7 +190,8 @@ RingBuffer::put(size_t offset, const uint8_t *buffer, size_t len) {
  * Implementation of PacketOutBuffer
  * ********************************************************************************************* */
 PacketOutBuffer::PacketOutBuffer(size_t bufferSize, size_t timeout)
-  : _buffer(bufferSize), _nextSequence(0), _packets(), _timeout(timeout)
+  : _buffer(bufferSize), _nextSequence(0), _packets(), _rt_sum(0),
+    _rt_sumsq(0), _rt_count(0), _timeout(timeout)
 {
   // pass...
 }
@@ -236,6 +238,8 @@ PacketOutBuffer::ack(uint32_t sequence) {
   for (; packet != _packets.end(); packet++) {
     // If sequence matches -> done
     if (packet->sequence() == sequence) {
+      // Update the roundtrip
+      updateRoundtrip(packet->age());
       drop += packet->length();
       // drop data from the output buffer
       _buffer.drop(drop);
@@ -265,6 +269,23 @@ PacketOutBuffer::resend(uint8_t *buffer, size_t &len, uint32_t &sequence) {
     offset += packet->length();
   }
   return false;
+}
+
+void
+PacketOutBuffer::updateRoundtrip(size_t ms) {
+  _rt_sum += ms;
+  _rt_sumsq  += ms*ms;
+  _rt_count++;
+  // if sufficient data is available -> update timeout as mean + 3*sd (99% quantile)
+  if ((1<<5) == _rt_count) {
+    _rt_sum >>= 5;
+    _rt_sumsq  >>= 5;
+    logDebug() << "PacketOutBuffer: Update timeout from " << _timeout
+               << " to " << (_rt_sum + 3*std::sqrt(_rt_sumsq -_rt_sum*_rt_sum)) << ".";
+    _timeout = _rt_sum + 3*std::sqrt(_rt_sumsq -_rt_sum*_rt_sum);
+    _rt_sum = 0; _rt_sumsq = 0;
+    _rt_count = 0;
+  }
 }
 
 

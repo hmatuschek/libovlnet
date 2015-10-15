@@ -375,7 +375,7 @@ DHT::ping(const QHostAddress &addr, uint16_t port) {
   memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
   memcpy(msg.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
   msg.payload.ping.type = MSG_PING;
-  logDebug() << "Send ping to " << addr << ":" << port;
+  //logDebug() << "Send ping to " << addr << ":" << port;
   // send it
   if(0 > _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port)) {
     logError() << "Failed to send ping to " << addr << ":" << port;
@@ -384,7 +384,7 @@ DHT::ping(const QHostAddress &addr, uint16_t port) {
 
 void
 DHT::findNode(const Identifier &id) {
-  logDebug() << "Search for node " << id;
+  // logDebug() << "Search for node " << id;
   // Create a query instance
   FindNodeQuery *query = new FindNodeQuery(_self.id(), id);
   // Collect DHT_K nearest nodes
@@ -405,7 +405,7 @@ DHT::findNode(const Identifier &id) {
 
 void
 DHT::findValue(const Identifier &id) {
-  logDebug() << "Search for value " << id;
+  //logDebug() << "Search for value " << id;
   // Create a query instance
   FindValueQuery *query = new FindValueQuery(_self.id(), id);
   // Collect DHT_K nearest nodes
@@ -422,7 +422,7 @@ DHT::findValue(const Identifier &id) {
 
 void
 DHT::announce(const Identifier &id) {
-  logDebug() << "Announce data " << id << " to the world.";
+  //logDebug() << "Announce data " << id << " to the world.";
   _announcedData[id] = QDateTime();
   // lets search for the nodes closest to the data id
   findNode(id);
@@ -530,8 +530,8 @@ DHT::outRate() const {
  */
 void
 DHT::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
-  logDebug() << "Send FindNode request to " << to.id()
-             << " @" << to.addr() << ":" << to.port();
+  /*logDebug() << "Send FindNode request to " << to.id()
+             << " @" << to.addr() << ":" << to.port(); */
   // Construct request item
   FindNodeRequest *req = new FindNodeRequest(query);
   // Queue request
@@ -550,8 +550,8 @@ DHT::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
 
 void
 DHT::sendFindValue(const NodeItem &to, FindValueQuery *query) {
-  logDebug() << "Send FindValue request to " << to.id()
-             << " @" << to.addr() << ":" << to.port();
+  /*logDebug() << "Send FindValue request to " << to.id()
+             << " @" << to.addr() << ":" << to.port(); */
   // Construct request item
   FindValueRequest *req = new FindValueRequest(query);
   // Queue request
@@ -576,8 +576,8 @@ DHT::isPendingAnnouncement(const Identifier &id) const {
 
 void
 DHT::sendAnnouncement(const NodeItem &to, const Identifier &what) {
-  logDebug() << "Send Announcement of " << what << " to " << to.id()
-             << " @" << to.addr() << ":" << to.port();
+  /**logDebug() << "Send Announcement of " << what << " to " << to.id()
+             << " @" << to.addr() << ":" << to.port(); */
   // Assemble & send message
   struct Message msg;
   memcpy(msg.cookie, Identifier().data(), DHT_HASH_SIZE);
@@ -657,7 +657,7 @@ void
 DHT::_processPingResponse(
     const struct Message &msg, size_t size, PingRequest *req, const QHostAddress &addr, uint16_t port)
 {
-  logDebug() << "Received Ping response from " << addr << ":" << port;
+  //logDebug() << "Received Ping response from " << addr << ":" << port;
   // sinal success
   emit nodeReachable(NodeItem(msg.payload.ping.id, addr, port));
   // If the buckets are empty -> we are likely bootstrapping
@@ -675,17 +675,17 @@ void
 DHT::_processFindNodeResponse(
     const struct Message &msg, size_t size, FindNodeRequest *req, const QHostAddress &addr, uint16_t port)
 {
-  logDebug() << "Received FindNode response from " << addr << ":" << port;
+  //logDebug() << "Received FindNode response from " << addr << ":" << port;
   // payload length must be a multiple of triple length
   if ( 0 == ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
     // unpack and update query
     size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
-    logDebug() << "Received " << Ntriple << " nodes from "  << addr << ":" << port;
+    //logDebug() << "Received " << Ntriple << " nodes from "  << addr << ":" << port;
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
       NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip)),
                     ntohs(msg.payload.result.triples[i].port));
-      logDebug() << " got: " << item.id() << "@" << item.addr() << ":" << ntohs(msg.payload.result.triples[i].port);
+      //logDebug() << " got: " << item.id() << " @" << item.addr() << ":" << ntohs(msg.payload.result.triples[i].port);
       // Add discovered node to buckets
       _buckets.add(id, item.addr(), item.port());
       // Update node list of query
@@ -694,8 +694,8 @@ DHT::_processFindNodeResponse(
 
     // If the node was found -> signal success
     if (req->query()->found()) {
-      logDebug() << "Found node " << req->query()->first().id()
-                 << " @" << req->query()->first().addr() << ":" << req->query()->first().port();
+      /*logDebug() << "Found node " << req->query()->first().id()
+                 << " @" << req->query()->first().addr() << ":" << req->query()->first().port(); */
       // Signal node found
       emit nodeFound(req->query()->first());
       // delete query
@@ -729,8 +729,8 @@ DHT::_processFindNodeResponse(
     return;
   }
 
-  logDebug() << "Node " << req->query()->id() << " not found yet -> continue with "
-             << next.id() << " @" << next.addr() << ":" << next.port();
+  /*logDebug() << "Node " << req->query()->id() << " not found yet -> continue with "
+             << next.id() << " @" << next.addr() << ":" << next.port(); */
   // Send next request
   sendFindNode(next, req->query());
 }
@@ -821,14 +821,14 @@ void
 DHT::_processPingRequest(
     const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
-  logDebug() << "Received Ping request from " << addr << ":" << port;
+  //logDebug() << "Received Ping request from " << addr << ":" << port;
   // simply assemble a pong response including my own ID
   struct Message resp;
   memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
   memcpy(resp.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
   resp.payload.ping.type = MSG_PING;
   // send
-  logDebug() << "Send Ping response to " << addr << ":" << port;
+  //logDebug() << "Send Ping response to " << addr << ":" << port;
   if(0 > _socket.writeDatagram((char *) &resp, 2*DHT_HASH_SIZE+1, addr, port)) {
     logError() << "Failed to send Ping response to " << addr << ":" << port;
   }
@@ -852,15 +852,15 @@ DHT::_processFindNodeRequest(
   // Determine the number of nodes to reply
   int N = std::min(std::min(DHT_K, best.size()),
                    int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
-  logDebug() << "Assemble FindNode response (N req.: " << N << ")";
+  //logDebug() << "Assemble FindNode response (N req.: " << N << ")";
   // Add items
   QList<NodeItem>::iterator item = best.begin();
   for (int i = 0; (item!=best.end()) && (i<N); item++, i++) {
     memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
     memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
     resp.payload.result.triples[i].port = htons(item->port());
-    logDebug() << " add: " << item->id()
-               << "@" << item->addr() << ":" << ntohs(resp.payload.result.triples[i].port);
+    /*logDebug() << " add: " << item->id()
+               << "@" << item->addr() << ":" << ntohs(resp.payload.result.triples[i].port); */
   }
 
   // Compute size and send reponse
@@ -883,7 +883,7 @@ DHT::_processFindValueRequest(
     // Determine the number of nodes to reply
     int N = std::min(std::min(DHT_MAX_TRIPLES, owners.size()),
                      int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
-    logDebug() << "Assemble FindValue response (N req.: " << N << ")";
+    //logDebug() << "Assemble FindValue response (N req.: " << N << ")";
     QHash<Identifier, AnnouncementItem>::iterator item = owners.begin();
     for (int i = 0; (item!=owners.end()) && (i<N); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item.key().data(), DHT_HASH_SIZE);
@@ -982,7 +982,7 @@ DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddr
     delete stream; return;
   }
 
-  logDebug() << "Stream started.";
+  //logDebug() << "Stream started.";
   // Stream started..
   _streams[resp.cookie] = stream;
   _streamHandler->connectionStarted(stream);
@@ -1005,11 +1005,11 @@ DHT::_onCheckRequestTimeout() {
   QList<Request *>::iterator req = deadRequests.begin();
   for (; req != deadRequests.end(); req++) {
     if (MSG_PING == (*req)->type()) {
-      logInfo() << "Ping request timeout...";
+      logDebug() << "Ping request timeout...";
       // Just ignore
       delete *req;
     } else if (MSG_FIND_NODE == (*req)->type()) {
-      logInfo() << "FindNode request timeout...";
+      logDebug() << "FindNode request timeout...";
       FindNodeQuery *query = static_cast<FindNodeRequest *>(*req)->query();
       // Get next node to query
       NodeItem next;
@@ -1033,7 +1033,7 @@ DHT::_onCheckRequestTimeout() {
         sendFindNode(next, query); delete *req;
       }
     } else if (MSG_FIND_VALUE == (*req)->type()) {
-      logInfo() << "FindValue request timeout...";
+      logDebug() << "FindValue request timeout...";
       FindValueQuery *query = static_cast<FindValueRequest *>(*req)->query();
       // Get next node to query
       NodeItem next;
@@ -1049,7 +1049,7 @@ DHT::_onCheckRequestTimeout() {
         delete *req;
       }
     } else if (MSG_START_STREAM == (*req)->type()) {
-      logInfo() << "StartStream request timeout...";
+      logDebug() << "StartStream request timeout...";
       if (_streamHandler) {
         _streamHandler->connectionFailed(
               static_cast<StartStreamRequest *>(*req)->query());

@@ -3,7 +3,6 @@
 #include "dht.h"
 #include <netinet/in.h>
 
-
 /** The format of the stream messages. */
 struct __attribute__((packed)) Message {
   /** Possible stream message types. */
@@ -23,7 +22,7 @@ struct __attribute__((packed)) Message {
     /** The number of bytes the receiver is willing to accept. */
     uint32_t window;
     /** Payload. */
-    uint8_t  data[DHT_SEC_MAX_DATA_SIZE-5];
+    uint8_t  data[DHT_STREAM_MAX_DATA_SIZE];
   } payload;
 
   /** Constructor. */
@@ -37,8 +36,8 @@ struct __attribute__((packed)) Message {
  * Implementation of SecureStream
  * ******************************************************************************************** */
 SecureStream::SecureStream(DHT &dht, QObject *parent)
-  : QIODevice(parent), SecureSocket(dht), _inBuffer(16<<16), _outBuffer(16<<16, 2000), _closed(false),
-    _keepalive(), _packetTimer(), _timeout()
+  : QIODevice(parent), SecureSocket(dht), _inBuffer(16<<16), _outBuffer(16<<16, 2000),
+    _window(DHT_STREAM_MAX_DATA_SIZE), _closed(false), _keepalive(), _packetTimer(), _timeout()
 {
   // Setup keep-alive timer, gets started by open();
   _keepalive.setInterval(1000);
@@ -86,8 +85,6 @@ SecureStream::_onCheckPacketTimeout() {
   // Resent messages
   Message msg(Message::DATA); size_t len; uint32_t seq=0;
   if (_outBuffer.resend(msg.payload.data, len, seq)) {
-    /* logDebug() << "SecureStream: Resend packet SEQ=" << seq
-               << " (" << len <<"b)."; */
     msg.seq = htonl(seq);
     sendDatagram((const uint8_t *) &msg, len+5);
   }
@@ -130,8 +127,9 @@ SecureStream::bytesAvailable() const {
 }
 
 size_t
-SecureStream::outBufferFree() const {
-  return _outBuffer.free();
+SecureStream::canSend() const {
+  return std::min(_outBuffer.free(),
+                  std::min(_window, size_t(DHT_STREAM_MAX_DATA_SIZE)));
 }
 
 qint64
@@ -140,15 +138,15 @@ SecureStream::bytesToWrite() const {
   return _outBuffer.available() + QIODevice::bytesToWrite();
 }
 
-size_t
-SecureStream::inBufferFree() const {
-  return _inBuffer.free();
-}
-
 qint64
 SecureStream::writeData(const char *data, qint64 len) {
-  // Determine maximum data length
-  len = std::min(len, qint64(DHT_SEC_MAX_DATA_SIZE-5));
+  // Determine maximum data length as the minimum of
+  // maximum length (len), space in output buffer, window-size of the remote,
+  // and maximum payload length
+  len = std::min(len,
+                 std::min(qint64(_outBuffer.free()),
+                          std::min(qint64(_window),
+                                   qint64(DHT_SEC_MAX_DATA_SIZE-5))));
   // Pack message
   Message msg(Message::DATA);
   msg.seq = htonl(_outBuffer.sequence());
@@ -161,6 +159,8 @@ SecureStream::writeData(const char *data, qint64 len) {
   if( sendDatagram((const uint8_t *)&msg, len+5) ) {
     // reset keep-alive timer
     _keepalive.start();
+    // update remote window size
+    _window -= len;
     return len;
   }
   return -1;
@@ -187,22 +187,28 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     uint32_t seq = ntohl(msg->seq);
     bool ack = false;
     if (_inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5, ack)) {
-      // send ACK
+      // send ACK if needed
       if (ack) {
         //logDebug() << "SecureSocket: Send ACK=" << ack_seq;
         Message resp(Message::ACK);
+        // Set sequence
         resp.seq = htonl(seq);
+        // Send window size
+        resp.payload.window = htonl(uint32_t(_inBuffer.free()));
         if (! sendDatagram((const uint8_t*) &resp, 5)) {
           logWarning() << "SecureStream: Failed to send ACK.";
         }
+        // Signal new data available
+        emit readyRead();
       }
-      // Signal data available
-      emit readyRead();
     }
   } else if (Message::ACK == msg->type) {
     if (len!=5) { return; }
     size_t send = _outBuffer.ack(ntohl(msg->seq));
     if (0 != send) {
+      // Update remote window size
+      _window = ntohl(msg->payload.window);
+      // Signal data send
       emit bytesWritten(send);
     }
   } else if (Message::RESET == msg->type) {

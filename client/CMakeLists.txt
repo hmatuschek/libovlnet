@@ -19,9 +19,9 @@ INSTALL(TARGETS ovlclient DESTINATION bin)
 
 # Install logo and .desktop file under Linux:
 IF(UNIX AND NOT APPLE)
- INSTALL(FILES shared/icons/ovlclient.png
+ INSTALL(FILES ../shared/icons/ovlclient.png
          DESTINATION share/icons)
- INSTALL(FILES shared/ovlclient.desktop
+ INSTALL(FILES ../shared/ovlclient.desktop
          DESTINATION share/applications)
 ENDIF(UNIX AND NOT APPLE)
 

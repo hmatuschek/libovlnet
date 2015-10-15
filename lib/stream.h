@@ -6,6 +6,9 @@
 
 #include <QTimer>
 
+/** Specifies the maximum number of bytes that can be send with one packet. */
+#define DHT_STREAM_MAX_DATA_SIZE (DHT_SEC_MAX_DATA_SIZE-5)
+
 /** Implements a encrypted stream. While the @c SecureSocket implements encrypted datagrams
  * (UDP like), the secure stream implements an encrypted data stream (TCP like), handling packet
  * loss and maintaining the data order. */
@@ -27,14 +30,14 @@ public:
   bool open(OpenMode mode);
   /** Close the stream. */
   void close();
+
   /** Returns the number of bytes in the input buffer. */
   qint64 bytesAvailable() const;
-  /** Returns the number of free bytes in the output buffer. */
-  size_t outBufferFree() const;
+  /** Returns the number of bytes that can be send to the remote. The returned value is
+   * always <= @c DHT_STREAM_MAX_DATA_SIZE. */
+  size_t canSend() const;
   /** Returns the number of bytes in the output buffer. */
   qint64 bytesToWrite() const;
-  /** Returns the number of free bytes in the input buffer. */
-  size_t inBufferFree() const;
 
 protected:
   /** Gets called for every received decrypted datagram. */
@@ -57,6 +60,8 @@ protected:
   PacketInBuffer  _inBuffer;
   /** The output buffer. */
   PacketOutBuffer _outBuffer;
+  /** The window size of the remote. */
+  size_t _window;
   /** If @c true the stream has been closed. */
   bool _closed;
   /** Keep-alive timer. */
