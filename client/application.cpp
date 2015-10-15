@@ -103,9 +103,9 @@ Application::Application(int &argc, char *argv[])
 
   _trayIcon = new QSystemTrayIcon();
   if (_dht->numNodes()) {
-    _trayIcon->setIcon(QIcon("://icons/fork_green.png"));
-  } else {
     _trayIcon->setIcon(QIcon("://icons/fork.png"));
+  } else {
+    _trayIcon->setIcon(QIcon("://icons/fork_gray.png"));
   }
   _trayIcon->setContextMenu(ctx);
   _trayIcon->show();
@@ -373,10 +373,10 @@ Application::onNodeNotFound(const Identifier &id, const QList<NodeItem> &best) {
 
 void
 Application::onDHTConnected() {
-  _trayIcon->setIcon(QIcon("://icons/fork_green.png"));
+  _trayIcon->setIcon(QIcon("://icons/fork.png"));
 }
 
 void
 Application::onDHTDisconnected() {
-  _trayIcon->setIcon(QIcon("://icons/fork.png"));
+  _trayIcon->setIcon(QIcon("://icons/fork_gray.png"));
 }

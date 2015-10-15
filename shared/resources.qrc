@@ -2,11 +2,9 @@
     <qresource prefix="/">
         <file>icons/bootstrap.png</file>
         <file>icons/fork.png</file>
-        <file>icons/fork_green.png</file>
         <file>icons/message.png</file>
         <file>icons/people.png</file>
         <file>icons/person.png</file>
-        <file>icons/person_green.png</file>
         <file>icons/phone.png</file>
         <file>icons/quit.png</file>
         <file>icons/search.png</file>
@@ -20,5 +18,7 @@
         <file>icons/data-transfer-download.png</file>
         <file>icons/globe.png</file>
         <file>icons/list.png</file>
+        <file>icons/fork_gray.png</file>
+        <file>icons/person_gray.png</file>
     </qresource>
 </RCC>

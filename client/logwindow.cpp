@@ -93,6 +93,8 @@ LogWindow::LogWindow(LogModel *model)
   layout->addWidget(_table);
   layout->setContentsMargins(0,0,0,0);
   setLayout(layout);
+
+  _table->scrollToBottom();
 }
 
 void

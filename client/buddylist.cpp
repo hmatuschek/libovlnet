@@ -409,15 +409,15 @@ BuddyList::data(const QModelIndex &index, int role) const {
     Item *item = reinterpret_cast<Item *>(index.internalPointer());
     if (Node *node = dynamic_cast<Node *>(item)) {
       if (node->isReachable()) {
-        return QIcon("://icons/fork_green.png");
+        return QIcon("://icons/fork.png");
       }
-      return QIcon("://icons/fork.png");
+      return QIcon("://icons/fork_gray.png");
     }
     if (Buddy *buddy = dynamic_cast<Buddy *>(item)) {
       if (buddy->isReachable()) {
-        return QIcon("://icons/person_green.png");
+        return QIcon("://icons/person.png");
       }
-      return QIcon("://icons/person.png");
+      return QIcon("://icons/person_gray.png");
     }
   }
   return QVariant();

@@ -15,6 +15,7 @@
 SearchDialog::SearchDialog(DHT *dht, BuddyList *buddies, QWidget *parent)
   : QWidget(parent), _dht(dht), _buddies(buddies)
 {
+  setWindowTitle(tr("Overlay network node search"));
   setMinimumWidth(600);
   _query = new QLineEdit();
 
