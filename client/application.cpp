@@ -402,6 +402,10 @@ Application::onDHTDisconnected() {
 
 void
 Application::onReconnect() {
+  if (_dht->numNodes()) { onDHTConnected(); return;   logInfo() << "Connected to overlay network.";
+    _trayIcon->setIcon(QIcon("://icons/fork.png"));
+    _reconnectTimer.stop();
+  }
   logInfo() << "Connect to overlay network...";
   QPair<QString, uint16_t> hostport;
   foreach (hostport, _bootstrapList) {

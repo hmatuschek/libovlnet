@@ -16,7 +16,7 @@
 #include "logwindow.h"
 
 
-class Application : public QApplication, public SocketHandler
+class Application : public QApplication, public ServiceHandler
 {
   Q_OBJECT
 

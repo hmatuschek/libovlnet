@@ -338,7 +338,7 @@ StartStreamRequest::StartStreamRequest(uint16_t service, const Identifier &peer,
 /* ******************************************************************************************** *
  * Implementation of DHT
  * ******************************************************************************************** */
-DHT::DHT(Identity &id, SocketHandler *streamHandler,
+DHT::DHT(Identity &id, ServiceHandler *streamHandler,
          const QHostAddress &addr, quint16 port, QObject *parent)
   : QObject(parent), _self(id), _socket(), _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
     _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),

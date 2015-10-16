@@ -579,12 +579,12 @@ SecureSocket::sendNull() {
 /* ******************************************************************************************** *
  * Implementation of SocketHandler
  * ******************************************************************************************** */
-SocketHandler::SocketHandler()
+ServiceHandler::ServiceHandler()
 {
   // pass...
 }
 
-SocketHandler::~SocketHandler() {
+ServiceHandler::~ServiceHandler() {
   // pass...
 }
 

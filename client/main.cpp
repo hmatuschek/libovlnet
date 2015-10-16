@@ -8,8 +8,8 @@ int main(int argc, char *argv[]) {
   // Init weak RNG
   qsrand(time(0));
 
-  // Setup logger (default level = DEBUG, output = stderr)
-  Logger::addHandler(new IOLogHandler());
+  // Setup logger (output = stderr)
+  Logger::addHandler(new IOLogHandler(LogMessage::WARNING));
 
   Application app(argc, argv);
   app.exec();

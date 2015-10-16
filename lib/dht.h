@@ -23,7 +23,7 @@ class FindNodeRequest;
 class FindValueRequest;
 class StartStreamRequest;
 class Identity;
-class SocketHandler;
+class ServiceHandler;
 class SecureSocket;
 
 
@@ -39,7 +39,7 @@ public:
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
-  explicit DHT(Identity &id, SocketHandler *streamHandler=0,
+  explicit DHT(Identity &id, ServiceHandler *streamHandler=0,
                const QHostAddress &addr=QHostAddress::Any, quint16 port=7741, QObject *parent=0);
 
   /** Destructor. */
@@ -83,14 +83,20 @@ public:
   /** Announces a value. */
   void announce(const Identifier &id);
 
-  /** Retunrs the number of active streams. */
+  /** Retunrs the number of active connections. */
   size_t numStreams() const;
   /** Starts a secure connection.
-   * The ownership of the @c SecureSocket instance is passed to the DHT. */
+   * The ownership of the @c SecureSocket instance is passed to the DHT and will be deleted if the
+   * connection fails. If the connection is established, the ownership of the socket is passed to
+   * the serivce handler instance. */
   bool startStream(uint16_t service, const NodeItem &node, SecureSocket *stream);
   /** Unregister the socket with the DHT instance. */
   void socketClosed(const Identifier &id);
 
+  /** Starts a rendezvous with the give node.
+   * First the neighbours of the node are search and a rendezvous request will be send to each of
+   * the neighbours. */
+  bool rendezvous(const Identifier &id);
   /** Sends a rendezvous request for the given node ID to the specified nodes. */
   bool rendezvous(const Identifier &id, const QList<NodeItem> &vias);
   
@@ -206,7 +212,7 @@ protected:
   QHash<Identifier, Request *> _pendingRequests;
 
   /** Socket handler instance. */
-  SocketHandler *_streamHandler;
+  ServiceHandler *_streamHandler;
   /** The list of open connection. */
   QHash<Identifier, SecureSocket *> _streams;
 

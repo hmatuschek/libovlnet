@@ -8,7 +8,7 @@
 #include "sockswhitelist.h"
 
 
-class Application : public QCoreApplication, public SocketHandler
+class Application : public QCoreApplication, public ServiceHandler
 {
   Q_OBJECT
 

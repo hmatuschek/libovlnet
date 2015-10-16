@@ -160,9 +160,9 @@ protected:
 };
 
 
-/** Interface of a @c SecureSocket handler.
+/** Interface of a service handler.
  * Such a handler acts as a gate keeper and dispatcher for incomming and established
- * secure connections.
+ * secure connections (@c SecureSocket).
  *
  * On an incomming connection, first @c newSocket gets called. This method should create the
  * matching @c SecureSocket instance for the given service. Then the @c DHT instance will initiate
@@ -175,15 +175,15 @@ protected:
  * On an outgoing connection, e.g. by calling @c DHT::startStream, the DHT will try to establish
  * a secure connection. On success, @c connectionStarted will be called and @c connectionFailed
  * on error. Again, both methods transfer the ownership of the socket. */
-class SocketHandler
+class ServiceHandler
 {
 protected:
   /** Hidden constructor. */
-  SocketHandler();
+  ServiceHandler();
 
 public:
   /** Destructor. */
-  virtual ~SocketHandler();
+  virtual ~ServiceHandler();
 
   /** Needs to be implemented to construct a socket for the incomming connection to the given
    * service. */
