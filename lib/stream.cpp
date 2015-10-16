@@ -175,15 +175,19 @@ void
 SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   // Restart time-out timer
   _timeout.start();
+
   // Handle null-packets
   if (0 == len) { return; }
+
   // Unpack message
   const Message *msg = (const Message *)data;
+
   /*
    * dispatch by type
    */
   if (Message::DATA == msg->type) {
     if (len<5) { return; }
+    // Get sequence number of data packet
     uint32_t seq = ntohl(msg->seq);
     bool ack = false;
     if (_inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5, ack)) {
@@ -195,7 +199,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
         resp.seq = htonl(seq);
         // Send window size
         resp.payload.window = htonl(uint32_t(_inBuffer.free()));
-        if (! sendDatagram((const uint8_t*) &resp, 5)) {
+        if (! sendDatagram((const uint8_t*) &resp, 9)) {
           logWarning() << "SecureStream: Failed to send ACK.";
         }
         // Signal new data available
@@ -203,7 +207,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       }
     }
   } else if (Message::ACK == msg->type) {
-    if (len!=5) { return; }
+    if (len!=9) { return; }
     size_t send = _outBuffer.ack(ntohl(msg->seq));
     if (0 != send) {
       // Update remote window size

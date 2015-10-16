@@ -174,6 +174,11 @@ class PingRequest: public Request
 {
 public:
   PingRequest();
+  PingRequest(const Identifier &id);
+
+  inline const Identifier &id() const { return _id; }
+protected:
+  Identifier _id;
 };
 
 
@@ -311,7 +316,13 @@ Request::Request(MessageType type)
 }
 
 PingRequest::PingRequest()
-  : Request(MSG_PING)
+  : Request(MSG_PING), _id()
+{
+  // pass...
+}
+
+PingRequest::PingRequest(const Identifier &id)
+  : Request(MSG_PING), _id(id)
 {
   // pass...
 }
@@ -411,6 +422,29 @@ DHT::ping(const QHostAddress &addr, uint16_t port) {
   if(0 > _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port)) {
     logError() << "Failed to send ping to " << addr << ":" << port;
   }
+}
+
+void
+DHT::ping(const Identifier &id, const QHostAddress &addr, uint16_t port) {
+  // Create ping request
+  PingRequest *req = new PingRequest(id);
+  _pendingRequests.insert(req->cookie(), req);
+
+  // Assemble message
+  Message msg;
+  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
+  memcpy(msg.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
+  msg.payload.ping.type = MSG_PING;
+  //logDebug() << "Send ping to " << addr << ":" << port;
+  // send it
+  if(0 > _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port)) {
+    logError() << "Failed to send ping to " << addr << ":" << port;
+  }
+}
+
+void
+DHT::ping(const NodeItem &node) {
+  ping(node.id(), node.addr(), node.port());
 }
 
 void
@@ -1068,8 +1102,12 @@ DHT::_onCheckRequestTimeout() {
   for (; req != deadRequests.end(); req++) {
     if (MSG_PING == (*req)->type()) {
       logDebug() << "Ping request timeout...";
-      // Just ignore
-      delete *req;
+      PingRequest *ping = static_cast<PingRequest *>(*req);
+      // If the ping was send to a known node (known ID, and not to a peer)
+      if (! ping->id().isNull()) {
+        _buckets.pingLost(ping->id());
+      }
+      delete ping;
     } else if (MSG_FIND_NODE == (*req)->type()) {
       logDebug() << "FindNode request timeout...";
       FindNodeQuery *query = static_cast<FindNodeRequest *>(*req)->query();

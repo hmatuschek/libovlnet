@@ -284,28 +284,30 @@ AnnouncementItem::olderThan(size_t seconds) {
  * Implementation of Bucket::Item
  * ******************************************************************************************** */
 Bucket::Item::Item()
-  : _prefix(0), _peer(QHostAddress(), 0), _lastSeen()
+  : _prefix(0), _peer(QHostAddress(), 0), _lastSeen(), _lostPings(0)
 {
   // pass...
 }
 
 Bucket::Item::Item(const QHostAddress &addr, uint16_t port, size_t prefix, const QDateTime &lastSeen)
-  : _prefix(prefix), _peer(addr, port), _lastSeen(lastSeen)
+  : _prefix(prefix), _peer(addr, port), _lastSeen(lastSeen), _lostPings(0)
 {
   // pass...
 }
 
 Bucket::Item::Item(const Item &other)
-  : _prefix(other._prefix), _peer(other._peer), _lastSeen(other._lastSeen)
+  : _prefix(other._prefix), _peer(other._peer), _lastSeen(other._lastSeen),
+    _lostPings(other._lostPings)
 {
   // pass...
 }
 
 Bucket::Item &
 Bucket::Item::operator =(const Item &other) {
-  _prefix   = other._prefix;
-  _peer     = other._peer;
-  _lastSeen = other._lastSeen;
+  _prefix    = other._prefix;
+  _peer      = other._peer;
+  _lastSeen  = other._lastSeen;
+  _lostPings = other._lostPings;
   return *this;
 }
 
@@ -444,6 +446,13 @@ Bucket::getNearest(const Identifier &id, QList<NodeItem> &best) const {
 }
 
 void
+Bucket::pingLost(const Identifier &id) {
+  if (_triples.contains(id)) {
+    _triples[id].pingLost();
+  }
+}
+
+void
 Bucket::getOlderThan(size_t age, QList<NodeItem> &nodes) const {
   QHash<Identifier, Item>::const_iterator item = _triples.begin();
   for (; item != _triples.end(); item++) {
@@ -465,6 +474,11 @@ Bucket::removeOlderThan(size_t age) {
       item++;
     }
   }
+}
+
+void
+Bucket::removeNode(const Identifier &id) {
+  _triples.remove(id);
 }
 
 
@@ -614,6 +628,14 @@ Buckets::removeOlderThan(size_t seconds) {
   QList<Bucket>::iterator bucket = _buckets.begin();
   for (; bucket != _buckets.end(); bucket++) {
     bucket->removeOlderThan(seconds);
+  }
+}
+
+void
+Buckets::pingLost(const Identifier &id) {
+  QList<Bucket>::iterator bucket = _buckets.begin();
+  for (; bucket != _buckets.end(); bucket++) {
+    bucket->pingLost(id);
   }
 }
 

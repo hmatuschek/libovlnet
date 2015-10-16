@@ -80,7 +80,7 @@ RingBuffer::drop(size_t len) {
   if (((_inptr == _outptr) && (!_full)) || (0 == len)) {
     return 0;
   }
-  // Determine how many bytes to read
+  // Determine how many bytes to drop
   len = std::min(available(), len);
   if ((_outptr < _inptr) || (int(_outptr+len) <= _buffer.size())) {
     _outptr = ((_outptr + len) % _buffer.size());
@@ -88,8 +88,8 @@ RingBuffer::drop(size_t len) {
     return len;
   }
   // with wrap around:
-  size_t n= _buffer.size()-_outptr;
-  _outptr = len-n;
+  size_t n = _buffer.size()-_outptr;
+  _outptr = (len-n);
   _full = false;
   return len;
 }
@@ -108,7 +108,6 @@ RingBuffer::peek(size_t offset, uint8_t *buffer, size_t len) const {
   len = std::min(available()-offset, len);
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
-  /// @bug tripple check
   if ( ((offset+len) < _inptr) || ((offset+len) <= size_t(_buffer.size())) ) {
     memcpy(buffer, _buffer.constData()+offset, len);
     return len;
@@ -117,7 +116,7 @@ RingBuffer::peek(size_t offset, uint8_t *buffer, size_t len) const {
   // with wrap around
   size_t n = (_buffer.size()-offset);
   memcpy(buffer, _buffer.constData()+offset, n);
-  memcpy(buffer+n, _buffer.constData(), len-n);
+  memcpy(buffer+n, _buffer.constData(), (len-n));
   return len;
 }
 
@@ -172,15 +171,16 @@ RingBuffer::put(size_t offset, const uint8_t *buffer, size_t len) {
   len = std::min(available()-offset, len);
   // Compute offset w.r.t buffer index
   offset = (_outptr + offset) % _buffer.size();
-  /// @bug tripple check
   if ( ((offset+len) <= _inptr) || ((offset+len) <= size_t(_buffer.size())) ) {
     memcpy(_buffer.data()+offset, buffer, len);
     return len;
   }
- /// @bug tripple check
- // with wrap around
+  // with wrap around
+  // number of bytes until end
   size_t n = (_buffer.size()-offset);
+  // store first half
   memcpy(_buffer.data()+offset, buffer, n);
+  // store second half
   memcpy(_buffer.data(), buffer+n, len-n);
   return len;
 }
@@ -241,7 +241,7 @@ PacketOutBuffer::ack(uint32_t sequence) {
       // Update the roundtrip
       maxAge = std::max(maxAge, packet->age());
       updateRoundtrip(maxAge);
-      // update data ACKed
+      // update amount ACKed
       drop += packet->length();
       // drop ACKed data from the output buffer
       _buffer.drop(drop);
@@ -325,45 +325,47 @@ PacketInBuffer::read(uint8_t *buffer, size_t len) {
   return len;
 }
 
-// Retruns @c true if x is [a,b] % 2 ** 32
+// Retruns @c true if x is [a,b) mod (2 ^ 32)
 inline bool
 __inBetweenSeq(uint32_t x, uint32_t a, uint32_t b) {
-  return ( (a < b) ?
-             ( (a<=x) && (x<=b) ) :
-             ( ((a<=x) && (x<=std::numeric_limits<uint32_t>::max())) || (x<=b) ) );
+  return ( (a < b) ? ( (a<=x) && (x<=b) ) : ( (a>=x) || (x<b) ) );
 }
 
 bool
 PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len, bool &ack) {
-  // Compute the offset of where the packet should be stored in the buffer
-  size_t offset = (seq >= _nextSequence) ?
-        (seq - _nextSequence) :
-        (seq + (size_t(std::numeric_limits<uint32_t>::max())-_nextSequence+1));
+  // Compute the offset, where the packet should be stored in the buffer
+  // note that the wrap-around at (1<<32-1) is implicit
+  size_t offset = uint32_t(seq - _nextSequence);
   // Set no-ack
   ack = false;
   // Check if packet fits into buffer (somehow)
-  if ((_available+offset+len)>_buffer.size()) {
+  if ((_available+offset+len)>=_buffer.size()) {
     return false;
   }
-  // Allocate space in buffer if needed
+  // Allocate additional space in buffer if needed
   if ((_available+offset+len)>_buffer.available()) {
-    _buffer.allocate((_available+offset+len)-_buffer.available());
+    size_t req = (_available+offset+len)-_buffer.available();
+    if (req != _buffer.allocate(req)) {
+      logError() << "Oops: Cannot allocate " << req << "b.";
+    }
   }
   // put packet
   _buffer.put(offset, data, len);
   if (0 == _packets.size()) {
-    // Simply append
+    // if packet list is empty -> simply append
     _packets.append(QPair<uint32_t, size_t>(seq, len));
   } else {
-    // insort package sequence number
+    // insort package by sequence number
     uint32_t lastSeq = _nextSequence;
     QList< QPair<uint32_t, size_t> >::iterator item = _packets.begin();
     for (; item != _packets.end(); item++) {
       if (__inBetweenSeq(seq, lastSeq, item->first)) { break; }
+      lastSeq = item->first;
     }
+    // Insert packet before item
     _packets.insert(item, QPair<uint32_t, size_t>(seq, len));
   }
-  // ACK continous data (there is at least one element in the list)
+  // ACK continous data
   while ((_packets.size()) && (_nextSequence == _packets.front().first)) {
     // Enable ACK
     ack = true;

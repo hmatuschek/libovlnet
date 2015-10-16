@@ -69,6 +69,11 @@ public:
   void ping(const QHostAddress &addr, uint16_t port);
   /** Sends a ping request to the given peer. */
   void ping(const PeerItem &peer);
+  /** Sends a ping request to the given node. */
+  void ping(const Identifier &id, const QHostAddress &addr, uint16_t port);
+  /** Sends a ping request to the given node. */
+  void ping(const NodeItem &node);
+
   /** Starts the search for a node with the given identifier. */
   void findNode(const Identifier &id);
   /** Returns the list of all nodes in the buckets. */

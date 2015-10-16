@@ -166,18 +166,26 @@ public:
     /** The time of the item last seen. */
     const QDateTime &lastSeen() const;
     /** Returns true if the entry is older than the specified seconds. */
-    inline size_t olderThan(size_t seconds) const {
+    inline bool olderThan(size_t seconds) const {
       if (! _lastSeen.isValid()) { return true; }
       return (_lastSeen.addSecs(seconds) < QDateTime::currentDateTime());
     }
+    /** Returns the number of lost pings to this node. */
+    inline size_t lostPings() const {
+      return _lostPings;
+    }
+    inline void pingLost() { _lostPings++; }
 
   protected:
     /** The prefix -- index of the leading bit of the difference between this identifier and the
      * identifier of the node. */
     size_t       _prefix;
+    /** The address and port of the item. */
     PeerItem     _peer;
     /** The time, the item was last seen. */
     QDateTime    _lastSeen;
+    /** The number of times, a ping request was not answered. */
+    size_t       _lostPings;
   };
 
 public:
@@ -188,7 +196,9 @@ public:
 
   void getNearest(const Identifier &id, QList<NodeItem> &best) const;
   void getOlderThan(size_t age, QList<NodeItem> &nodes) const;
+
   void removeOlderThan(size_t age);
+  void removeNode(const Identifier &id);
 
   /** Returns @c true if the bucket is full. */
   bool full() const;
@@ -205,6 +215,8 @@ public:
   void addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** The prefix of the bucket. */
   size_t prefix() const;
+  /** Increments the ping-loss counter of the node. */
+  void pingLost(const Identifier &id);
 
   /** Splits the bucket at its prefix. Means all item with a higher prefix (smaller distance)
    * than the prefix of this bucket are moved to the new one. */
@@ -239,16 +251,20 @@ public:
   size_t numNodes() const;
   /** Returns the list of all nodes in the buckets. */
   void nodes(QList<NodeItem> &lst) const;
+  /** Collects the nearest known nodes. */
+  void getNearest(const Identifier &id, QList<NodeItem> &best) const;
+
   /** Adds or updates an node. */
   bool add(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** Adds a candidate node. */
   void addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port);
-  /** Collects the nearest known nodes. */
-  void getNearest(const Identifier &id, QList<NodeItem> &best) const;
+
   /** Collects all nodes that are "older" than the specified age (in seconds). */
   void getOlderThan(size_t seconds, QList<NodeItem> &nodes) const;
   /** Removes all nodes that are "older" than the specified age (in seconds). */
   void removeOlderThan(size_t seconds);
+
+  void pingLost(const Identifier &id);
 
 protected:
   /** Returns the bucket index, an item should be searched for. */
