@@ -3,7 +3,7 @@
 
 #include <QWidget>
 #include <QLabel>
-#include "socksservice.h"
+#include "lib/socks.h"
 
 class Application;
 
@@ -22,7 +22,7 @@ protected:
 
 protected:
   Application &_application;
-  SocksService _socks;
+  LocalSocksService _socks;
 
   QLabel *_info;
   QLabel *_connectionCount;

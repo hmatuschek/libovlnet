@@ -5,6 +5,7 @@
 #include "stream.h"
 
 #include <QTcpSocket>
+#include <QTcpServer>
 
 
 /** Implements a local enpoint of a SOCKS v4 or v5 connection (tunnel) that will be relayed to
@@ -28,6 +29,9 @@ public:
   /** Gets called once the connection to the remote node is established. */
   bool open(OpenMode mode);
 
+  /** Closes the connection and queues the connection instance for destruction. */
+  void close();
+
 protected slots:
   /** Gets called if data arrived from the client. */
   void _clientReadyRead();
@@ -48,6 +52,56 @@ protected slots:
 protected:
   /** The TCP connection to the client. */
   QTcpSocket *_inStream;
+};
+
+
+/** This class implements a simple local SOCKS v5 proxy server that relays the requests to another
+ * node providing the SOCKS service. The node is passed to the constructor.
+ * This class listen on a local TCP port (1080 by default) for incomming connections. Once a
+ * TCP connection is established, the remote node is contacted. If the connection to the remote
+ * node is established, the client (at the TCP connection) can use the remote node as a proxy. */
+class LocalSocksService : public QObject
+{
+  Q_OBJECT
+
+public:
+  /** Constructor.
+   * The constructor starts a TCP server bound to the localhost IPv4 address and listening on
+   * the specified port (1080 by default).
+   * @param dht Specifies the DHT node instance.
+   * @param remote The remote node to use as a proxy.
+   * @param port Specifies the local TCP port to listen for incomming connections.
+   * @param parent The optional QObject parent. */
+  explicit LocalSocksService(DHT &dht, const NodeItem &remote, uint16_t port=1080, QObject *parent = 0);
+
+  /** Destructor. */
+  virtual ~LocalSocksService();
+
+  /** Retruns true if the server is running. */
+  bool isListening() const;
+
+  /** Returns the current number of active proxy connections. */
+  size_t connectionCount() const;
+
+signals:
+  /** Gets emitted if the connection count changed. */
+  void connectionCountChanged(size_t count);
+
+protected slots:
+  /** Handles incomming TCP connections. */
+  void _onNewConnection();
+  /** Gets called if a TCP connection is closed. */
+  void _onConnectionClosed();
+
+protected:
+  /** A weak reference to the DHT node. */
+  DHT &_dht;
+  /** The remote node acting as a proxy. */
+  NodeItem _remote;
+  /** The local TCP server waiting for incomming connections. */
+  QTcpServer _server;
+  /** Holds the current connection count. */
+  size_t _connectionCount;
 };
 
 

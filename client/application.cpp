@@ -5,7 +5,7 @@
 #include "chatwindow.h"
 #include "callwindow.h"
 #include "filetransferdialog.h"
-#include "socksservice.h"
+#include "lib/socks.h"
 
 #include "lib/logger.h"
 
@@ -281,7 +281,7 @@ Application::connectionStarted(SecureSocket *stream) {
   SecureCall *call = 0;
   FileUpload *upload = 0;
   FileDownload *download = 0;
-  SocksConnection *socks = 0;
+  SOCKSLocalStream *socks = 0;
 
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     // start keep alive timer
@@ -299,7 +299,7 @@ Application::connectionStarted(SecureSocket *stream) {
   } else if (0 != (download = dynamic_cast<FileDownload *>(stream))) {
     // show download dialog
     (new FileDownloadDialog(download, *this))->show();
-  } else if (0 != (socks = dynamic_cast<SocksConnection *>(stream))) {
+  } else if (0 != (socks = dynamic_cast<SOCKSLocalStream *>(stream))) {
     // Simply open the stream
     socks->open(QIODevice::ReadWrite);
   } else {

@@ -3,10 +3,10 @@
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QCloseEvent>
-
+#include "application.h"
 
 SocksWindow::SocksWindow(Application &app, const NodeItem &node, QWidget *parent)
-  : QWidget(parent), _application(app), _socks(app, node)
+  : QWidget(parent), _application(app), _socks(app.dht(), node)
 {
   _info = new QLabel(tr("Started SOCKS proxy service."));
   if (!_socks.isListening()) {

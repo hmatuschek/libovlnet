@@ -1,6 +1,7 @@
 #include "socks.h"
 #include <netinet/in.h>
 #include <QHostInfo>
+#include "dht.h"
 
 
 /* ******************************************************************************************** *
@@ -40,6 +41,12 @@ SOCKSLocalStream::open(OpenMode mode) {
 
   // done
   return true;
+}
+
+void
+SOCKSLocalStream::close() {
+  SecureStream::close();
+  deleteLater();
 }
 
 void
@@ -106,6 +113,57 @@ SOCKSLocalStream::_remoteClosed() {
     _inStream->close();
   }
 }
+
+
+/* ********************************************************************************************* *
+ * Implementation of LocalSocksService
+ * ********************************************************************************************* */
+LocalSocksService::LocalSocksService(DHT &dht, const NodeItem &remote, uint16_t port, QObject *parent)
+  : QObject(parent), _dht(dht), _remote(remote), _server(), _connectionCount(0)
+{
+  logDebug() << "Start SOCKS proxy service at localhost:" << port;
+  // Bind socket to local port
+  if(! _server.listen(QHostAddress::LocalHost, port)) {
+    logError() << "SOCKS: Can not bind to localhost:" << port;
+  }
+  connect(&_server, SIGNAL(newConnection()), this, SLOT(_onNewConnection()));
+}
+
+LocalSocksService::~LocalSocksService() {
+  _server.close();
+}
+
+bool
+LocalSocksService::isListening() const {
+  return _server.isListening();
+}
+
+size_t
+LocalSocksService::connectionCount() const {
+  return _connectionCount;
+}
+
+void
+LocalSocksService::_onNewConnection() {
+  while (_server.hasPendingConnections()) {
+    // Get for each incomming connection -> create a separate stream to the remote
+    QTcpSocket *socket = _server.nextPendingConnection();
+    logDebug() << "New incomming SOCKS connection...";
+    SOCKSLocalStream *conn = new SOCKSLocalStream(_dht, socket);
+    connect(conn, SIGNAL(destroyed()), this, SLOT(_onConnectionClosed()));
+    _connectionCount++;
+    emit connectionCountChanged(_connectionCount);
+    _dht.startStream(5, _remote, conn);
+  }
+}
+
+void
+LocalSocksService::_onConnectionClosed() {
+  if (_connectionCount)
+    _connectionCount--;
+  emit connectionCountChanged(_connectionCount);
+}
+
 
 
 /* ******************************************************************************************** *

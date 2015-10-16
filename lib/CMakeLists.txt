@@ -8,10 +8,10 @@ set(ovl_HEADERS ${ovl_MOC_HEADERS}
 
 qt5_wrap_cpp(ovl_MOC_SOURCES ${ovl_MOC_HEADERS})
 
-add_library(ovl SHARED ${ovl_SOURCES} ${ovl_MOC_SOURCES} ${ovl_RCC_SOURCES})
-set_target_properties(ovl PROPERTIES MACOSX_RPATH "${CMAKE_INSTALL_RPATH}")
-set_target_properties(ovl PROPERTIES INSTALL_NAME_DIR ${CMAKE_INSTALL_FULL_LIBDIR})
-target_link_libraries(ovl ${LIBS})
+add_library(ovlnet SHARED ${ovl_SOURCES} ${ovl_MOC_SOURCES} ${ovl_RCC_SOURCES})
+set_target_properties(ovlnet PROPERTIES MACOSX_RPATH "${CMAKE_INSTALL_RPATH}")
+set_target_properties(ovlnet PROPERTIES INSTALL_NAME_DIR ${CMAKE_INSTALL_FULL_LIBDIR})
+target_link_libraries(ovlnet ${LIBS})
 
-install(TARGETS ovl DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS ovlnet DESTINATION ${CMAKE_INSTALL_LIBDIR})
 INSTALL_HEADERS_WITH_DIRECTORY("${ovl_HEADERS}" "${CMAKE_INSTALL_INCLUDEDIR}/libovlnet")
