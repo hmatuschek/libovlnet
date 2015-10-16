@@ -69,7 +69,7 @@ RingBuffer::read(uint8_t *buffer, size_t len) {
   // -> read first half up to buffer end
   size_t n = ( _buffer.size()-_outptr );
   memcpy(buffer, _buffer.data()+_outptr, n);
-  // Read second half
+  // -> read second half
   memcpy(buffer+n, _buffer.data(), nread-n);
   _outptr=(nread-n); _full=false;
   // then read second half
@@ -114,7 +114,6 @@ RingBuffer::peek(size_t offset, uint8_t *buffer, size_t len) const {
     memcpy(buffer, _buffer.constData()+offset, len);
     return len;
   }
-  /// @bug tripple check
   // with wrap around
   size_t n = (_buffer.size()-offset);
   memcpy(buffer, _buffer.constData()+offset, n);
@@ -134,7 +133,7 @@ RingBuffer::write(const uint8_t *buffer, size_t len) {
   if (0 == nwrite) { return 0; }
   if ((_inptr+nwrite) <= size_t(_buffer.size())) {
     // no wrap around
-    memcpy(_buffer.data(), buffer, nwrite);
+    memcpy(_buffer.data()+_inptr, buffer, nwrite);
     _inptr = (_inptr + nwrite) % _buffer.size();
     _full = (_inptr == _outptr);
     return nwrite;
