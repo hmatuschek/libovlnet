@@ -264,7 +264,10 @@ PacketOutBuffer::resend(uint8_t *buffer, size_t &len, uint32_t &sequence) {
   QList<Packet>::iterator packet = _packets.begin();
   for (; packet != _packets.end(); packet++) {
     if (packet->olderThan(_timeout)) {
-      _buffer.peek(offset, buffer, packet->length());
+      if (packet->length() != _buffer.peek(offset, buffer, packet->length())) {
+        logError() << "PacketOutBuffer: Cannot peek " << packet->length()
+                   << "b at " << offset;
+      }
       len = packet->length();
       sequence = packet->sequence();
       packet->markResend();
@@ -328,7 +331,7 @@ PacketInBuffer::read(uint8_t *buffer, size_t len) {
 // Retruns @c true if x is [a,b) mod (2 ^ 32)
 inline bool
 __inBetweenSeq(uint32_t x, uint32_t a, uint32_t b) {
-  return ( (a < b) ? ( (a<=x) && (x<=b) ) : ( (a>=x) || (x<b) ) );
+  return ( (a < b) ? ( (a<=x) && (x<b) ) : ( (a>=x) || (x<b) ) );
 }
 
 bool
@@ -346,25 +349,27 @@ PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len, bool &
   if ((_available+offset+len)>_buffer.available()) {
     size_t req = (_available+offset+len)-_buffer.available();
     if (req != _buffer.allocate(req)) {
-      logError() << "Oops: Cannot allocate " << req << "b.";
+      logError() << "PacketInBuffer: Cannot allocate " << req << "b.";
     }
   }
   // put packet
-  _buffer.put(offset, data, len);
-  if (0 == _packets.size()) {
-    // if packet list is empty -> simply append
-    _packets.append(QPair<uint32_t, size_t>(seq, len));
-  } else {
-    // insort package by sequence number
-    uint32_t lastSeq = _nextSequence;
-    QList< QPair<uint32_t, size_t> >::iterator item = _packets.begin();
-    for (; item != _packets.end(); item++) {
-      if (__inBetweenSeq(seq, lastSeq, item->first)) { break; }
-      lastSeq = item->first;
-    }
-    // Insert packet before item
-    _packets.insert(item, QPair<uint32_t, size_t>(seq, len));
+  if (len != _buffer.put(_available+offset, data, len)) {
+    logError() << "PacketInBuffer: Cannot put " << len
+               << "b at " << (_available+offset);
   }
+  if (_nextSequence != seq) {
+    logDebug() << "Received unexpected packet SEQ=" << seq;
+  }
+  // Update list of packets...
+  // insort package by sequence number
+  uint32_t lastSeq = _nextSequence;
+  QList< QPair<uint32_t, size_t> >::iterator item = _packets.begin();
+  while ( (item != _packets.end()) && (!__inBetweenSeq(seq, lastSeq, item->first))) {
+    // Iterate
+    lastSeq = item->first; item++;
+  }
+  // Insert packet before packet with next sequence
+  _packets.insert(item, QPair<uint32_t, size_t>(seq, len));
   // ACK continous data
   while ((_packets.size()) && (_nextSequence == _packets.front().first)) {
     // Enable ACK
