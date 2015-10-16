@@ -58,6 +58,26 @@ protected:
 };
 
 
+/** A ring buffer of size 64k (65536 bytes). This ring buffer can be implemented efficiently
+ * using 2-complement integer arithmetic of 16-bit integers. */
+class FixedBuffer
+{
+  inline FixedBuffer() : _inptr(0), _outptr(0), _full(false) { }
+
+  inline uint16_t available() const { return _full ? 0xffff : (_inptr-_outptr); }
+  inline uint16_t free() const { return _full ? 0x0000 : (_outptr-_inptr); }
+  inline uint16_t read(uint8_t buffer, uint16_t len) {
+    if ((_outptr==_inptr) && (!_full)) { return 0; }
+    len = std::min(len, available());
+  }
+
+protected:
+  uint8_t  _buffer[0xffff];
+  uint16_t _inptr;
+  uint16_t _outptr;
+  bool     _full;
+};
+
 class PacketOutBuffer
 {
 public:
