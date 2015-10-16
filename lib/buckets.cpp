@@ -401,6 +401,7 @@ void
 Bucket::addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port) {
   if ((!contains(id)) && (!full())) {
     // Add item with invalid timestamp -> it is a candidate and will be removed soon
+    // also items with invalid timestamp are not returned by a findNode request
     _triples[id] = Item(addr, port, (id-_self).leadingBit(), QDateTime());
   }
 }
@@ -431,6 +432,8 @@ void
 Bucket::getNearest(const Identifier &id, QList<NodeItem> &best) const {
   QHash<Identifier, Item>::const_iterator item = _triples.begin();
   for (; item != _triples.end(); item++) {
+    // Do not propergate hearsay! (exclude candidates from the list)
+    if (!item->lastSeen().isValid()) { continue; }
     // Perform an "insort" into best list
     Distance d = id - item.key();
     QList<NodeItem>::iterator node = best.begin();

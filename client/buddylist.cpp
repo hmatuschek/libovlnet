@@ -429,7 +429,8 @@ void
 BuddyList::_onNodeFound(const NodeItem &node) {
   // check if node belongs to a buddy
   if (! _nodes.contains(node.id())) { return; }
-  logDebug() << "Node " << node.id() << " found: Send ping request.";
+  logDebug() << "Node " << node.id() << " found @"
+             << node.addr() << ":" << node.port() << ": Send ping request.";
   // Send ping to node
   _application.dht().ping(node.addr(), node.port());
 }

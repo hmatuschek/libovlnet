@@ -6,6 +6,7 @@
 #include <QHeaderView>
 #include <QListView>
 #include <QCloseEvent>
+#include <QFileInfo>
 
 
 LogModel::LogModel(QObject *parent)
@@ -26,7 +27,7 @@ LogModel::rowCount(const QModelIndex &parent) const {
 
 int
 LogModel::columnCount(const QModelIndex &parent) const {
-  return 1;
+  return 2;
 }
 
 QVariant
@@ -35,6 +36,9 @@ LogModel::data(const QModelIndex &index, int role) const {
   if (index.row() >= _messages.size()) { return QVariant(); }
   if (Qt::DisplayRole == role) {
     if (0 == index.column()) {
+      QFileInfo info(_messages[index.row()].filename());
+      return QString("%1:%2").arg(info.fileName()).arg(_messages[index.row()].linenumber());
+    } else if (1 == index.column()) {
       return _messages[index.row()].message();
     }
   } else if (Qt::ForegroundRole == role) {
