@@ -336,7 +336,6 @@ bool
 PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len, bool &ack) {
   // Set no-ack
   ack = false;
-  if (seq != _nextSequence) { return false; }
   // Compute the offset, where the packet should be stored in the buffer
   // note that the wrap-around at (1<<32-1) is implicit
   size_t offset = uint32_t(seq - _nextSequence);
@@ -358,18 +357,13 @@ PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len, bool &
   }
   // Update list of packets...
   // insort package by sequence number
-  /*uint32_t lastSeq = _nextSequence;
+  uint32_t lastSeq = _nextSequence;
   QList< QPair<uint32_t, size_t> >::iterator item = _packets.begin();
   while ( (item != _packets.end()) && (!__inBetweenSeq(seq, lastSeq, item->first))) {
     // Iterate
     lastSeq = item->first; item++;
   }
-  _packets.insert(item, QPair<uint32_t, size_t>(seq, len)); */
-  if (0 != _packets.size()) {
-    logError() << "Ok, there seems to be a timing error! I need a buffer lock!!!";
-  }
-  // Insert packet before packet with next sequence
-  _packets.prepend(QPair<uint32_t, size_t>(seq, len));
+  _packets.insert(item, QPair<uint32_t, size_t>(seq, len));
   // ACK continous data
   while ((_packets.size()) && (_nextSequence == _packets.front().first)) {
     // Enable ACK
