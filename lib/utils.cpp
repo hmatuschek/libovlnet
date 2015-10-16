@@ -67,11 +67,13 @@ RingBuffer::read(uint8_t *buffer, size_t len) {
   }
   // with wrap around:
   // -> read first half up to buffer end
-  size_t n = _buffer.size()-_outptr;
+  size_t n = ( _buffer.size()-_outptr );
   memcpy(buffer, _buffer.data()+_outptr, n);
-  _outptr=0; _full=false;
+  // Read second half
+  memcpy(buffer+n, _buffer.data(), nread-n);
+  _outptr=(nread-n); _full=false;
   // then read second half
-  return read(buffer+n, nread-n)+n;
+  return nread;
 }
 
 size_t
@@ -130,7 +132,7 @@ RingBuffer::write(const uint8_t *buffer, size_t len) {
   // Determine number of bytes to write
   size_t nwrite = std::min(free(), len);
   if (0 == nwrite) { return 0; }
-  if (int(_inptr+nwrite) <= _buffer.size()) {
+  if ((_inptr+nwrite) <= size_t(_buffer.size())) {
     // no wrap around
     memcpy(_buffer.data(), buffer, nwrite);
     _inptr = (_inptr + nwrite) % _buffer.size();
@@ -140,9 +142,10 @@ RingBuffer::write(const uint8_t *buffer, size_t len) {
   // with wrap around
   size_t n = (_buffer.size()-_inptr);
   // fill-up buffer to end
-  memcpy(_buffer.data(), buffer, n);
-  _inptr = 0; _full = (_inptr == _outptr);
-  return ( write(buffer+n, nwrite-n) + n );
+  memcpy(_buffer.data()+_inptr, buffer, n);
+  memcpy(_buffer.data(), buffer+n, nwrite-n);
+  _inptr = (nwrite-n); _full = (_inptr==_outptr);
+  return nwrite;
 }
 
 size_t
@@ -264,11 +267,7 @@ PacketOutBuffer::resend(uint8_t *buffer, size_t &len, uint32_t &sequence) {
   QList<Packet>::iterator packet = _packets.begin();
   for (; packet != _packets.end(); packet++) {
     if (packet->olderThan(_timeout)) {
-      if (packet->length() != _buffer.peek(offset, buffer, packet->length())) {
-        logError() << "PacketOutBuffer: Cannot peek " << packet->length()
-                   << "b at " << offset;
-      }
-      len = packet->length();
+      len = _buffer.peek(offset, buffer, packet->length());
       sequence = packet->sequence();
       packet->markResend();
       return true;
@@ -336,18 +335,19 @@ __inBetweenSeq(uint32_t x, uint32_t a, uint32_t b) {
 
 bool
 PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len, bool &ack) {
+  // Set no-ack
+  ack = false;
+  if (seq != _nextSequence) { return false; }
   // Compute the offset, where the packet should be stored in the buffer
   // note that the wrap-around at (1<<32-1) is implicit
   size_t offset = uint32_t(seq - _nextSequence);
-  // Set no-ack
-  ack = false;
   // Check if packet fits into buffer (somehow)
   if ((_available+offset+len)>=_buffer.size()) {
     return false;
   }
   // Allocate additional space in buffer if needed
   if ((_available+offset+len)>_buffer.available()) {
-    size_t req = (_available+offset+len)-_buffer.available();
+    size_t req = ( (_available+offset+len)-_buffer.available() );
     if (req != _buffer.allocate(req)) {
       logError() << "PacketInBuffer: Cannot allocate " << req << "b.";
     }
@@ -357,19 +357,20 @@ PacketInBuffer::putPacket(uint32_t &seq, const uint8_t *data, size_t len, bool &
     logError() << "PacketInBuffer: Cannot put " << len
                << "b at " << (_available+offset);
   }
-  if (_nextSequence != seq) {
-    logDebug() << "Received unexpected packet SEQ=" << seq;
-  }
   // Update list of packets...
   // insort package by sequence number
-  uint32_t lastSeq = _nextSequence;
+  /*uint32_t lastSeq = _nextSequence;
   QList< QPair<uint32_t, size_t> >::iterator item = _packets.begin();
   while ( (item != _packets.end()) && (!__inBetweenSeq(seq, lastSeq, item->first))) {
     // Iterate
     lastSeq = item->first; item++;
   }
+  _packets.insert(item, QPair<uint32_t, size_t>(seq, len)); */
+  if (0 != _packets.size()) {
+    logError() << "Ok, there seems to be a timing error! I need a buffer lock!!!";
+  }
   // Insert packet before packet with next sequence
-  _packets.insert(item, QPair<uint32_t, size_t>(seq, len));
+  _packets.prepend(QPair<uint32_t, size_t>(seq, len));
   // ACK continous data
   while ((_packets.size()) && (_nextSequence == _packets.front().first)) {
     // Enable ACK

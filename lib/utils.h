@@ -1,9 +1,6 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "ntp.h"
-#include "pcp.h"
-#include "natpmp.h"
 #include "logger.h"
 
 #include <inttypes.h>
@@ -22,6 +19,7 @@ public:
   explicit RingBuffer(size_t size);
   /** Copy constructor. */
   RingBuffer(const RingBuffer &other);
+
   /** Number of bytes that can be read. */
   size_t available() const;
   /** Number of bytes that can be stored in the buffer. */
