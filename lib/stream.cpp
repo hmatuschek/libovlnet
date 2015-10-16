@@ -83,7 +83,8 @@ SecureStream::_onKeepAlive() {
 void
 SecureStream::_onCheckPacketTimeout() {
   // Resent messages
-  Message msg(Message::DATA); size_t len; uint32_t seq=0;
+  Message msg(Message::DATA);
+  size_t len=sizeof(msg.payload.data); uint32_t seq=0;
   if (_outBuffer.resend(msg.payload.data, len, seq)) {
     msg.seq = htonl(seq);
     sendDatagram((const uint8_t *) &msg, len+5);

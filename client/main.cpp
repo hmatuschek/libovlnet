@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
   qsrand(time(0));
 
   // Setup logger (output = stderr)
-  Logger::addHandler(new IOLogHandler(LogMessage::WARNING));
+  Logger::addHandler(new IOLogHandler(LogMessage::DEBUG));
 
   Application app(argc, argv);
   app.exec();
