@@ -1,12 +1,12 @@
 SET(OVL_DAEMON_SOURCES main.cpp echostream.cpp application.cpp qhal.cpp halchat.cpp
-    socksconnection.cpp)
-SET(OVL_DAEMON_MOC_HEADERS application.h halchat.h socksconnection.h)
-SET(OVL_DAEMON_HEADERS ${OVL_DAEMON_MOC_HEADERS} echostream.h qhal.h)
+    sockswhitelist.cpp)
+SET(OVL_DAEMON_MOC_HEADERS application.h halchat.h)
+SET(OVL_DAEMON_HEADERS ${OVL_DAEMON_MOC_HEADERS} echostream.h qhal.h sockswhitelist.h)
 
 qt5_wrap_cpp(OVL_DAEMON_MOC_SOURCES ${OVL_DAEMON_MOC_HEADERS})
 
 add_executable(ovldaemon ${OVL_DAEMON_SOURCES} ${OVL_DAEMON_MOC_SOURCES} ${OVL_DAEMON_RCC_SOURCES})
-target_link_libraries(ovldaemon ovl ${LIBS})
+target_link_libraries(ovldaemon ovlnet ${LIBS})
 
 INSTALL(TARGETS ovldaemon DESTINATION bin)
 

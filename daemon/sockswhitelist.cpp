@@ -1,15 +1,8 @@
-#include "socksconnection.h"
-#include "application.h"
+#include "sockswhitelist.h"
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonValue>
-
-
-SOCKSConnection::SOCKSConnection(Application &app, QObject *parent)
-  : SOCKSOutStream(app.dht(), parent), _application(app)
-{
-  // pass...
-}
+#include <QFile>
 
 
 SOCKSWhitelist::SOCKSWhitelist(const QString &filename)

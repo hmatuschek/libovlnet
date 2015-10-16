@@ -281,7 +281,7 @@ Application::connectionStarted(SecureSocket *stream) {
   SecureCall *call = 0;
   FileUpload *upload = 0;
   FileDownload *download = 0;
-  SOCKSLocalStream *socks = 0;
+  LocalSocksStream *socks = 0;
 
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     // start keep alive timer
@@ -299,7 +299,7 @@ Application::connectionStarted(SecureSocket *stream) {
   } else if (0 != (download = dynamic_cast<FileDownload *>(stream))) {
     // show download dialog
     (new FileDownloadDialog(download, *this))->show();
-  } else if (0 != (socks = dynamic_cast<SOCKSLocalStream *>(stream))) {
+  } else if (0 != (socks = dynamic_cast<LocalSocksStream *>(stream))) {
     // Simply open the stream
     socks->open(QIODevice::ReadWrite);
   } else {

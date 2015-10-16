@@ -12,7 +12,7 @@
  * another node which acts as the exit point. This class is simple, once the connection to the node
  * is established, the data to and from the local TCP connection is forwarded to the node,
  * including the SOCKS messages. It is the remote node that implements the actual SOCKS proxy. */
-class SOCKSLocalStream: public SecureStream
+class LocalSocksStream: public SecureStream
 {
   Q_OBJECT
 
@@ -22,9 +22,9 @@ public:
    * @param instream The local incomming TCP-SOCKS connection. The ownership of the socket is taken
    *        by the instance.
    * @param parent The optional QObject parent. */
-  SOCKSLocalStream(DHT &dht, QTcpSocket *instream, QObject *parent=0);
+  LocalSocksStream(DHT &dht, QTcpSocket *instream, QObject *parent=0);
   /** Destructor, closes the TCP and @c SecureStream connections. */
-  virtual ~SOCKSLocalStream();
+  virtual ~LocalSocksStream();
 
   /** Gets called once the connection to the remote node is established. */
   bool open(OpenMode mode);
@@ -109,7 +109,7 @@ protected:
  * Once the connection with the client is made, the SOCKS request is parsed and a connection
  * to the requested host is established. Any further data to and from the client is then
  * proxied to that host. */
-class SOCKSOutStream: public SecureStream
+class SocksOutStream: public SecureStream
 {
   Q_OBJECT
 
@@ -135,9 +135,9 @@ public:
   /** Constructor.
    * @param dht A weak reference to the local DHT node instance.
    * @param parent The optional QObject parent. */
-  SOCKSOutStream(DHT &dht, QObject *parent=0);
+  SocksOutStream(DHT &dht, QObject *parent=0);
   /** Destructor, also cloeses the connections. */
-  virtual ~SOCKSOutStream();
+  virtual ~SocksOutStream();
 
   /** Gets called once the connection to the peer node is established. */
   bool open(OpenMode mode);

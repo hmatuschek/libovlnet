@@ -1,9 +1,10 @@
 #include "sockswindow.h"
+#include "application.h"
 #include <QImage>
 #include <QPushButton>
 #include <QHBoxLayout>
 #include <QCloseEvent>
-#include "application.h"
+
 
 SocksWindow::SocksWindow(Application &app, const NodeItem &node, QWidget *parent)
   : QWidget(parent), _application(app), _socks(app.dht(), node)

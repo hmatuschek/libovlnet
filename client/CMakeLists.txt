@@ -12,7 +12,7 @@ qt5_wrap_cpp(VLF_CLIENT_MOC_SOURCES ${VLF_CLIENT_MOC_HEADERS})
 qt5_add_resources(VLF_CLIENT_RCC_SOURCES ../shared/resources.qrc)
 
 add_executable(ovlclient ${VLF_CLIENT_SOURCES} ${VLF_CLIENT_MOC_SOURCES} ${VLF_CLIENT_RCC_SOURCES})
-target_link_libraries(ovlclient ovl ${LIBS})
+target_link_libraries(ovlclient ovlnet ${LIBS})
 
 # Install binary
 INSTALL(TARGETS ovlclient DESTINATION bin)

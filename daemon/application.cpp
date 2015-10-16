@@ -2,7 +2,6 @@
 #include "echostream.h"
 #include "halchat.h"
 #include "lib/socks.h"
-#include "socksconnection.h"
 
 #include <QDir>
 #include <QFile>
@@ -50,7 +49,7 @@ Application::newSocket(uint16_t service) {
       return 0;
     }
     // create handler
-    return new SOCKSConnection(*this);
+    return new SocksOutStream(*_dht);
   }
   return 0;
 }
@@ -78,11 +77,11 @@ void
 Application::connectionStarted(SecureSocket *stream) {
   logDebug() << "Stream service " << stream << " started";
   HalChat *chat = 0;
-  SOCKSConnection *socks = 0;
+  SocksOutStream *socks = 0;
   if (0 != (chat = dynamic_cast<HalChat *>(stream))) {
     // start chat (keep alive messages etc. )
     chat->started();
-  } else if (0 != (socks = dynamic_cast<SOCKSConnection *>(stream))) {
+  } else if (0 != (socks = dynamic_cast<SocksOutStream *>(stream))) {
     // start SOCKS service.
     socks->open(QIODevice::ReadWrite);
   }

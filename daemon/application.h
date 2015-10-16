@@ -5,7 +5,7 @@
 #include "lib/crypto.h"
 #include "lib/dht.h"
 #include "qhal.h"
-#include "socksconnection.h"
+#include "sockswhitelist.h"
 
 
 class Application : public QCoreApplication, public SocketHandler

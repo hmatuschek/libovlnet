@@ -7,22 +7,22 @@
 /* ******************************************************************************************** *
  * Implementation of SOCKSInStream
  * ******************************************************************************************** */
-SOCKSLocalStream::SOCKSLocalStream(DHT &dht, QTcpSocket *instream, QObject *parent)
+LocalSocksStream::LocalSocksStream(DHT &dht, QTcpSocket *instream, QObject *parent)
   : SecureStream(dht, parent), _inStream(instream)
 {
   // Take ownership of TCP socket.
   _inStream->setParent(this);
 }
 
-SOCKSLocalStream::~SOCKSLocalStream() {
+LocalSocksStream::~LocalSocksStream() {
   _inStream->close();
   if (isOpen()) {
-    SOCKSLocalStream::close();
+    LocalSocksStream::close();
   }
 }
 
 bool
-SOCKSLocalStream::open(OpenMode mode) {
+LocalSocksStream::open(OpenMode mode) {
   if (! SecureStream::open(mode)) { return false; }
   logDebug() << "SOCKS in stream started.";
   // Connect to client signals
@@ -44,13 +44,13 @@ SOCKSLocalStream::open(OpenMode mode) {
 }
 
 void
-SOCKSLocalStream::close() {
+LocalSocksStream::close() {
   SecureStream::close();
   deleteLater();
 }
 
 void
-SOCKSLocalStream::_clientReadyRead() {
+LocalSocksStream::_clientReadyRead() {
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
   if (size_t len = std::min(canSend(), size_t(_inStream->bytesAvailable()))) {
     len = _inStream->read((char *)buffer, len);
@@ -59,7 +59,7 @@ SOCKSLocalStream::_clientReadyRead() {
 }
 
 void
-SOCKSLocalStream::_clientBytesWritten(qint64 bytes) {
+LocalSocksStream::_clientBytesWritten(qint64 bytes) {
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
   while (bytesAvailable()) {
     size_t len = std::min(size_t(DHT_STREAM_MAX_DATA_SIZE), size_t(bytesAvailable()));
@@ -71,13 +71,13 @@ SOCKSLocalStream::_clientBytesWritten(qint64 bytes) {
 }
 
 void
-SOCKSLocalStream::_clientDisconnected() {
+LocalSocksStream::_clientDisconnected() {
   logDebug() << "Client disconnected -> close SOCKS stream";
   close();
 }
 
 void
-SOCKSLocalStream::_clientError(QAbstractSocket::SocketError error) {
+LocalSocksStream::_clientError(QAbstractSocket::SocketError error) {
   logDebug() << "Client connection error: " << _inStream->errorString()
              << " -> close socks stream";
   _inStream->close();
@@ -85,7 +85,7 @@ SOCKSLocalStream::_clientError(QAbstractSocket::SocketError error) {
 }
 
 void
-SOCKSLocalStream::_remoteReadyRead() {
+LocalSocksStream::_remoteReadyRead() {
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
   while (bytesAvailable()) {
     size_t len = std::min(size_t(DHT_STREAM_MAX_DATA_SIZE), size_t(bytesAvailable()));
@@ -97,7 +97,7 @@ SOCKSLocalStream::_remoteReadyRead() {
 }
 
 void
-SOCKSLocalStream::_remoteBytesWritten(qint64 bytes) {
+LocalSocksStream::_remoteBytesWritten(qint64 bytes) {
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
   size_t len = std::min(this->canSend(), size_t(_inStream->bytesAvailable()));
   if (len) {
@@ -107,7 +107,7 @@ SOCKSLocalStream::_remoteBytesWritten(qint64 bytes) {
 }
 
 void
-SOCKSLocalStream::_remoteClosed() {
+LocalSocksStream::_remoteClosed() {
   if (_inStream && _inStream->isOpen()) {
     logDebug() << "SOCKS connection closed -> close client connection.";
     _inStream->close();
@@ -149,7 +149,7 @@ LocalSocksService::_onNewConnection() {
     // Get for each incomming connection -> create a separate stream to the remote
     QTcpSocket *socket = _server.nextPendingConnection();
     logDebug() << "New incomming SOCKS connection...";
-    SOCKSLocalStream *conn = new SOCKSLocalStream(_dht, socket);
+    LocalSocksStream *conn = new LocalSocksStream(_dht, socket);
     connect(conn, SIGNAL(destroyed()), this, SLOT(_onConnectionClosed()));
     _connectionCount++;
     emit connectionCountChanged(_connectionCount);
@@ -169,14 +169,14 @@ LocalSocksService::_onConnectionClosed() {
 /* ******************************************************************************************** *
  * Implementation of SOCKSOutStream
  * ******************************************************************************************** */
-SOCKSOutStream::SOCKSOutStream(DHT &dht, QObject *parent)
+SocksOutStream::SocksOutStream(DHT &dht, QObject *parent)
   : SecureStream(dht, parent), _state(RX_VERSION), _outStream(0),
     _nAuthMeth(0), _authMeth(), _addr(), _nHostName(0), _hostName(), _port(0)
 {
   // pass...
 }
 
-SOCKSOutStream::~SOCKSOutStream() {
+SocksOutStream::~SocksOutStream() {
   if (isOpen()) {
     close();
   }
@@ -188,7 +188,7 @@ SOCKSOutStream::~SOCKSOutStream() {
 }
 
 bool
-SOCKSOutStream::open(OpenMode mode) {
+SocksOutStream::open(OpenMode mode) {
   if (! SecureStream::open(mode)) {  return false; }
 
   // Connect to client signals
@@ -205,7 +205,7 @@ SOCKSOutStream::open(OpenMode mode) {
 
 
 void
-SOCKSOutStream::_clientParse() {
+SocksOutStream::_clientParse() {
   while (bytesAvailable()) {
     /*
      * Dispatch by state.
@@ -315,7 +315,7 @@ SOCKSOutStream::_clientParse() {
 }
 
 void
-SOCKSOutStream::_remoteConnected() {
+SocksOutStream::_remoteConnected() {
   if (CONNECTING == _state) {
     logDebug() << "SOCKS: Remote " << _addr << ":" << _port << " connected -> start proxy session";
     // connect proxy client
@@ -361,7 +361,7 @@ SOCKSOutStream::_remoteConnected() {
 }
 
 void
-SOCKSOutStream::_remoteReadyRead() {
+SocksOutStream::_remoteReadyRead() {
   // As long as there is data to read from the remote socket,
   // the connection is established and there is space left in the output buffer.
   while (_outStream->bytesAvailable() && (CONNECTED == _state) && canSend()) {
@@ -378,7 +378,7 @@ SOCKSOutStream::_remoteReadyRead() {
 }
 
 void
-SOCKSOutStream::_remoteBytesWritten(qint64 bytes) {
+SocksOutStream::_remoteBytesWritten(qint64 bytes) {
   // As long as there is data left send by the client
   while (this->bytesAvailable()) {
     uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
@@ -393,7 +393,7 @@ SOCKSOutStream::_remoteBytesWritten(qint64 bytes) {
 }
 
 void
-SOCKSOutStream::_remoteReadChannelFinished() {
+SocksOutStream::_remoteReadChannelFinished() {
   logDebug() << "Remote transmission finished -> try to finish client data-transmission.";
   logDebug() << " " << (_outStream->bytesAvailable() + bytesToWrite()) << " not send to client yet.";
   logDebug() << " " << (_outStream->bytesToWrite() + bytesAvailable()) << " not send to remote yet.";
@@ -406,7 +406,7 @@ SOCKSOutStream::_remoteReadChannelFinished() {
 }
 
 void
-SOCKSOutStream::_remoteDisconnected() {
+SocksOutStream::_remoteDisconnected() {
   logInfo() << "SOCKS: Remote connection closed -> close proxy stream.";
   if (CLOSING != _state) {
     close();
@@ -414,7 +414,7 @@ SOCKSOutStream::_remoteDisconnected() {
 }
 
 void
-SOCKSOutStream::_remoteError(QAbstractSocket::SocketError error) {
+SocksOutStream::_remoteError(QAbstractSocket::SocketError error) {
   logInfo() << "SOCKS: Remote connection error: " << _outStream->errorString();
   logDebug() << " " << (_outStream->bytesAvailable() + bytesToWrite())
              << " (" << bytesToWrite() << ") not send to client yet.";
@@ -427,7 +427,7 @@ SOCKSOutStream::_remoteError(QAbstractSocket::SocketError error) {
 }
 
 void
-SOCKSOutStream::_clientReadyRead() {
+SocksOutStream::_clientReadyRead() {
   while (bytesAvailable() && (CONNECTED == _state)) {
     uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
     int len = read((char *) buffer, DHT_STREAM_MAX_DATA_SIZE);
@@ -440,7 +440,7 @@ SOCKSOutStream::_clientReadyRead() {
 }
 
 void
-SOCKSOutStream::_clientBytesWritten(qint64 bytes) {
+SocksOutStream::_clientBytesWritten(qint64 bytes) {
   while (_outStream->bytesAvailable())  {
     if (CLOSING == _state) {
       logDebug() << "SOCKS: Connection closing -> send "
@@ -464,7 +464,7 @@ SOCKSOutStream::_clientBytesWritten(qint64 bytes) {
 }
 
 void
-SOCKSOutStream::_clientClosed() {
+SocksOutStream::_clientClosed() {
   if (_outStream && _outStream->isOpen()) {
     logDebug() << "SOCKS: Connection to client closed: Close remote connection.";
     _outStream->close();
