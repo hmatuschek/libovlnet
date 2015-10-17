@@ -198,13 +198,13 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     resp.seq = htonl(_inBuffer.nextSequence());
     // Send window size
     resp.payload.window = htons(_inBuffer.window());
-    if (! sendDatagram((const uint8_t*) &resp, 9)) {
+    if (! sendDatagram((const uint8_t*) &resp, 7)) {
       logWarning() << "SecureStream: Failed to send ACK.";
     }
     // Signal new data available (if any)
     if (rxlen) { emit readyRead(); }
   } else if (Message::ACK == msg->type) {
-    if (len!=9) { return; }
+    if (len!=7) { return; }
     size_t send = _outBuffer.ack(ntohl(msg->seq));
     if (send) {
       // Update remote window size
