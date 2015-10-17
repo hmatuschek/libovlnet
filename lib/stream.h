@@ -275,7 +275,7 @@ public:
   uint32_t nextSequence() const { return _nextSequence; }
 
   uint32_t write(const uint8_t *buffer, uint32_t len) {
-    len = _buffer.write(buffer, len);
+    len = _buffer.write(buffer, std::min(uint32_t(_window), len));
     if (len) {
       _packets.append(Packet(len));
       _nextSequence += len;
@@ -431,8 +431,6 @@ protected:
   StreamInBuffer  _inBuffer;
   /** The output buffer. */
   StreamOutBuffer _outBuffer;
-  /** The window size of the remote. */
-  uint16_t _window;
   /** If @c true the stream has been closed. */
   bool _closed;
   /** Keep-alive timer. */

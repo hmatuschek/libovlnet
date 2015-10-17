@@ -37,7 +37,7 @@ struct __attribute__((packed)) Message {
  * ******************************************************************************************** */
 SecureStream::SecureStream(DHT &dht, QObject *parent)
   : QIODevice(parent), SecureSocket(dht), _inBuffer(), _outBuffer(2000),
-    _window(0xffff), _closed(false), _keepalive(), _packetTimer(), _timeout()
+    _closed(false), _keepalive(), _packetTimer(), _timeout()
 {
   // Setup keep-alive timer, gets started by open();
   _keepalive.setInterval(1000);
@@ -132,11 +132,9 @@ SecureStream::bytesAvailable() const {
 
 size_t
 SecureStream::canSend() const {
-  logDebug() << "SecureStream: Can send (buffer=" << _outBuffer.free()
-             << ", window=" << _window << ")";
+  logDebug() << "SecureStream: Can send (buffer=" << _outBuffer.free() << ")";
   return std::min(_outBuffer.free(),
-                  std::min(uint32_t(_window),
-                           uint32_t(DHT_STREAM_MAX_DATA_SIZE)));
+                  uint32_t(DHT_STREAM_MAX_DATA_SIZE));
 }
 
 qint64
@@ -167,8 +165,6 @@ SecureStream::writeData(const char *data, qint64 len) {
   if( sendDatagram((const uint8_t *)&msg, len+5) ) {
     // reset keep-alive timer
     _keepalive.start();
-    // update remote window size
-    _window -= len;
     return len;
   }
   return -1;
@@ -220,8 +216,6 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     uint32_t send = _outBuffer.ack(ntohl(msg->seq), ntohs(msg->payload.window));
     logDebug() << "Secure stream ACKed " << send << "b.";
     if (send) {
-      // Update remote window size
-      _window = ntohs(msg->payload.window);
       // Signal data send
       emit bytesWritten(send);
     }
