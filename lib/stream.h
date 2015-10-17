@@ -59,7 +59,7 @@ public:
   inline uint32_t drop(uint32_t len) {
     // If empty or no byte requested -> done
     if (((_outptr==_inptr) && (!_full)) || (0 == len)) { return 0; }
-    len = std::min(uint32_t(_outptr)+len, available())-_outptr;
+    len = std::min(len, available());
     _outptr += len;
     _full = false;
     return len;
@@ -298,6 +298,7 @@ public:
         _update_rt(_packets.first().age());
         _packets.clear();
       }
+      logDebug() << "StreamOutBuffer: Clear buffer holding " << _buffer.available() << "b.";
       return _buffer.drop(_buffer.available());
     }
     // Find the ACKed byte
@@ -314,8 +315,9 @@ public:
     // Check how much of the last packet was ACKed
     uint32_t left = (_firstSequence+drop+item->length())-seq;
     if (left) {
-      logDebug() << "StreamOutBuffer: ACK " << (item->length()-left)
-                 << "b of buffer len=" << item->length();
+      logDebug() << "StreamOutBuffer: Parial ACK of packet "  << (_firstSequence+drop)
+                 << ", dropping " << (item->length()-left)
+                 << "b of packet len=" << item->length();
       // Handle partial ACK of packet
       drop += ( item->length()-left );
       item->leave(left);
