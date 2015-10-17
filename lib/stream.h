@@ -298,9 +298,10 @@ public:
     // Find the ACKed byte
     uint32_t drop = 0; uint32_t maxrt = 0;
     QList<Packet>::iterator item = _packets.begin();
-    while (! _in_packet(seq, _firstSequence+drop, item->length())) {
+    while ((item != _packets.end()) && (!_in_packet(seq, _firstSequence+drop, item->length()))) {
       drop += item->length();
       maxrt = std::max(maxrt, item->age());
+      item++;
     }
     if (_packets.end() == item) { return 0; }
     // Update timeout
