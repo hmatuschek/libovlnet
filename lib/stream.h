@@ -25,7 +25,8 @@ public:
 
   /** Returns the number of free bytes (available for writing). */
   inline uint32_t free() const {
-    return (_full ? 0 : (_outptr-_inptr));
+    if ((!_full) && (_outptr==_inptr)) { return 0x10000; }
+    return (_outptr-_inptr);
   }
 
   /** Reads some segement without removing it from the buffer. */
