@@ -88,7 +88,9 @@ SecureStream::_onCheckPacketTimeout() {
   if (_outBuffer.resend(msg.payload.data, len, seq)) {
     logDebug() << "SecureStream: Resend packet SEQ=" << seq;
     msg.seq = htonl(seq);
-    sendDatagram((const uint8_t *) &msg, len+5);
+    if ((len+5) != sendDatagram((const uint8_t *) &msg, len+5)) {
+      logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
+    }
   }
 }
 
@@ -167,7 +169,6 @@ SecureStream::writeData(const char *data, qint64 len) {
     _keepalive.start();
     // update remote window size
     _window -= len;
-
     return len;
   }
   return -1;
