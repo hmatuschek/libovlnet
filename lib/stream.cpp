@@ -192,6 +192,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     // Get sequence number of data packet
     uint32_t seq = ntohl(msg->seq);
     uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
+    logDebug() << "SecureStream: Got data SEQ=" << seq << ", LEN=" << (len-5);
     //logDebug() << "SecureSocket: Send ACK=" << ack_seq;
     Message resp(Message::ACK);
     // Set sequence
@@ -205,6 +206,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     if (rxlen) { emit readyRead(); }
   } else if (Message::ACK == msg->type) {
     if (len!=7) { return; }
+    logDebug() << "SecureStream: Got ACK SEQ=" << ntohl(msg->seq);
     size_t send = _outBuffer.ack(ntohl(msg->seq));
     if (send) {
       // Update remote window size
@@ -214,6 +216,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     }
   } else if (Message::RESET == msg->type) {
     if (len!=1) { return; }
+    logDebug() << "SecureStream: Got RST.";
     _closed = true;
     emit readChannelFinished();
     close();
