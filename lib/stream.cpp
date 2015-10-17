@@ -197,8 +197,8 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     // Get sequence number of data packet
     uint32_t seq = ntohl(msg->seq);
     uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
-    logDebug() << "SecureStream: Got data SEQ=" << seq << ", LEN=" << (len-5);
-    //logDebug() << "SecureSocket: Send ACK=" << ack_seq;
+    logDebug() << "SecureStream: Got data SEQ=" << seq << ", LEN=" << (len-5)
+               << ", RX=" << rxlen;
     Message resp(Message::ACK);
     // Set sequence
     resp.seq = htonl(_inBuffer.nextSequence());
@@ -206,6 +206,9 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     resp.payload.window = htons(_inBuffer.window());
     if (! sendDatagram((const uint8_t*) &resp, 7)) {
       logWarning() << "SecureStream: Failed to send ACK.";
+    } else {
+      logDebug() << "SecureStream: Send ACK, SEQ=" << _inBuffer.nextSequence()
+                 << ", WIN=" << _inBuffer.window();
     }
     // Signal new data available (if any)
     if (rxlen) { emit readyRead(); }
@@ -214,6 +217,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     logDebug() << "SecureStream: Got ACK SEQ=" << ntohl(msg->seq)
                << ", WIN=" << ntohs(msg->payload.window);
     uint32_t send = _outBuffer.ack(ntohl(msg->seq));
+    logDebug() << "Secure stream ACKed " << send << "b.";
     if (send) {
       // Update remote window size
       _window = ntohs(msg->payload.window);

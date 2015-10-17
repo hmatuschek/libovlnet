@@ -61,6 +61,7 @@ public:
     if (((_outptr==_inptr) && (!_full)) || (0 == len)) { return 0; }
     len = std::min(uint32_t(_outptr)+len, available())-_outptr;
     _outptr += len;
+    _full = false;
     return len;
   }
 
