@@ -314,6 +314,8 @@ public:
     // Check how much of the last packet was ACKed
     uint32_t left = (_firstSequence+drop+item->length())-seq;
     if (left) {
+      logDebug() << "StreamOutBuffer: ACK " << (item->length()-left)
+                 << "b of buffer len=" << item->length();
       // Handle partial ACK of packet
       drop += ( item->length()-left );
       item->leave(left);
@@ -327,6 +329,7 @@ public:
     _window        = window;
     // Erase everything upto but not including the given item
     _packets.erase(item);
+    logDebug() << "StreamOutBuffer: Drop " << drop << "b from buffer.";
     // Return number of bytes ACKed
     return _buffer.drop(drop);
   }
