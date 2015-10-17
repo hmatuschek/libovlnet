@@ -265,6 +265,7 @@ public:
   StreamOutBuffer(uint64_t timeout);
 
   inline uint32_t free() const {
+    if (_buffer.available() > _window) { return 0; }
     return (_window-_buffer.available());
   }
 
