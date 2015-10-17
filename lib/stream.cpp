@@ -86,7 +86,7 @@ SecureStream::_onCheckPacketTimeout() {
   Message msg(Message::DATA);
   size_t len=sizeof(msg.payload.data); uint32_t seq=0;
   if (_outBuffer.resend(msg.payload.data, len, seq)) {
-    logDebug() << "SecureStream: Resend packet SEQ=" << seq;
+    logDebug() << "SecureStream: Resend packet SEQ=" << seq << ", LEN=" << len;
     msg.seq = htonl(seq);
     if ((len+5) != sendDatagram((const uint8_t *) &msg, len+5)) {
       logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
@@ -133,7 +133,7 @@ SecureStream::bytesAvailable() const {
 size_t
 SecureStream::canSend() const {
   logDebug() << "SecureStream: Can send (buffer=" << _outBuffer.free()
-             << ", window=" << _window;
+             << ", window=" << _window << ")";
   return std::min(_outBuffer.free(),
                   std::min(uint32_t(_window),
                            uint32_t(DHT_STREAM_MAX_DATA_SIZE)));
