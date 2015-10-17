@@ -217,7 +217,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     if (len!=7) { return; }
     logDebug() << "SecureStream: Got ACK SEQ=" << ntohl(msg->seq)
                << ", WIN=" << ntohs(msg->payload.window);
-    uint32_t send = _outBuffer.ack(ntohl(msg->seq));
+    uint32_t send = _outBuffer.ack(ntohl(msg->seq), ntohs(msg->payload.window));
     logDebug() << "Secure stream ACKed " << send << "b.";
     if (send) {
       // Update remote window size
@@ -261,7 +261,7 @@ StreamInBuffer::StreamInBuffer()
  * Implementation of StreamInBuffer
  * ********************************************************************************************* */
 StreamOutBuffer::StreamOutBuffer(uint64_t timeout)
-  : _buffer(), _firstSequence(0), _nextSequence(0), _packets()
+  : _buffer(), _firstSequence(0), _nextSequence(0), _window(0xffff), _packets(), _timeout(timeout)
 {
 
 }

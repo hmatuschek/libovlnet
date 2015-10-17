@@ -265,7 +265,7 @@ public:
   StreamOutBuffer(uint64_t timeout);
 
   inline uint32_t free() const {
-    return _buffer.free();
+    return _window;
   }
 
   inline uint32_t bytesToWrite() const {
@@ -285,11 +285,12 @@ public:
 
   /** ACKs the given sequence number and returns the number of bytes removed from the output
    * buffer. */
-  uint32_t ack(uint32_t seq) {
+  uint32_t ack(uint32_t seq, uint16_t window) {
     // If the complete packetbuffer is ACKed
     if (_nextSequence == seq) {
       // Drop complete buffer
       _firstSequence = _nextSequence;
+      _window        = window;
       if (_packets.size()) {
         _update_rt(_packets.first().age());
         _packets.clear();
@@ -320,6 +321,7 @@ public:
     }
     // Update first sequence
     _firstSequence = seq;
+    _window        = window;
     // Erase everything upto but not including the given item
     _packets.erase(item);
     // Return number of bytes ACKed
@@ -369,6 +371,7 @@ protected:
   FixedBuffer   _buffer;
   uint32_t      _firstSequence;
   uint32_t      _nextSequence;
+  uint16_t      _window;
   QList<Packet> _packets;
   uint64_t      _rt_sum;
   uint64_t      _rt_sumsq;
