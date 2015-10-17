@@ -20,7 +20,7 @@ struct __attribute__((packed)) Message {
   /** The message payload, either some data if type=DATA or the window size if type=ACK. */
   union {
     /** The number of bytes the receiver is willing to accept. */
-    uint32_t window;
+    uint16_t window;
     /** Payload. */
     uint8_t  data[DHT_STREAM_MAX_DATA_SIZE];
   } payload;
@@ -37,7 +37,7 @@ struct __attribute__((packed)) Message {
  * ******************************************************************************************** */
 SecureStream::SecureStream(DHT &dht, QObject *parent)
   : QIODevice(parent), SecureSocket(dht), _inBuffer(), _outBuffer(2000),
-    _window(0x10000), _closed(false), _keepalive(), _packetTimer(), _timeout()
+    _window(0xffff), _closed(false), _keepalive(), _packetTimer(), _timeout()
 {
   // Setup keep-alive timer, gets started by open();
   _keepalive.setInterval(1000);
@@ -131,7 +131,8 @@ SecureStream::bytesAvailable() const {
 size_t
 SecureStream::canSend() const {
   return std::min(_outBuffer.free(),
-                  std::min(_window, uint32_t(DHT_STREAM_MAX_DATA_SIZE)));
+                  std::min(uint32_t(_window),
+                           uint32_t(DHT_STREAM_MAX_DATA_SIZE)));
 }
 
 qint64
@@ -147,8 +148,7 @@ SecureStream::writeData(const char *data, qint64 len) {
   // and maximum payload length
   len = std::min(len,
                  std::min(qint64(_outBuffer.free()),
-                          std::min(qint64(_window),
-                                   qint64(DHT_SEC_MAX_DATA_SIZE-5))));
+                          qint64(DHT_STREAM_MAX_DATA_SIZE)));
   // Pack message
   Message msg(Message::DATA);
   msg.seq = htonl(_outBuffer.nextSequence());
@@ -197,7 +197,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     // Set sequence
     resp.seq = htonl(_inBuffer.nextSequence());
     // Send window size
-    resp.payload.window = htonl(uint32_t(_inBuffer.window()));
+    resp.payload.window = htons(_inBuffer.window());
     if (! sendDatagram((const uint8_t*) &resp, 9)) {
       logWarning() << "SecureStream: Failed to send ACK.";
     }
@@ -208,7 +208,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     size_t send = _outBuffer.ack(ntohl(msg->seq));
     if (send) {
       // Update remote window size
-      _window = ntohl(msg->payload.window);
+      _window = ntohs(msg->payload.window);
       // Signal data send
       emit bytesWritten(send);
     }

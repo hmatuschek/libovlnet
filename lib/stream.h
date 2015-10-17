@@ -109,24 +109,31 @@ protected:
 };
 
 
+/** Implements the input buffer of a TCP like stream. */
 class StreamInBuffer
 {
 public:
+  /** Constructor. */
   StreamInBuffer();
 
+  /** Returns the number of bytes available for reading. */
   inline uint32_t available() const {
     return _available;
   }
 
+  /** Returns the next expected sequence number. */
   uint32_t nextSequence() const {
     return _nextSequence;
   }
 
+  /** Returns the number of bytes starting at the next expected sequence number (@c nextSequece)
+   * the buffer will accept. */
   uint16_t window() const {
     if (0==_available) { return 0xffff; }
     return (0x10000-_available);
   }
 
+  /** Reads some available data. */
   uint32_t read(uint8_t *buffer, uint32_t len) {
     len = std::min(len, _available);
     len = _buffer.read(buffer, len);
@@ -134,6 +141,7 @@ public:
     return len;
   }
 
+  /** Updates the internal buffer with the given data at the specified sequence number. */
   uint32_t putPacket(uint32_t seq, const uint8_t *data, uint32_t len) {
     // check if seq fits into window (buffer), if not -> done
     if (!_in_window(seq)) { return 0; }
@@ -175,24 +183,31 @@ public:
   }
 
 protected:
+  /** Returns @c true if @c seq is within the interval [a,b) modulo 2^32. */
   static inline bool _in_between(uint32_t seq, uint32_t a, uint32_t b) {
     return ( (a<b) ? ((a<=seq) && (seq<b)) : ((a<=seq) || (seq<b)) );
   }
 
+  /** Returns @c true if the sequence number is within the reception window. */
   bool _in_window(uint32_t seq) {
     uint32_t a = _nextSequence;
     uint32_t b = (_nextSequence+window());
     return _in_between(seq, a, b);
   }
 
+  /** Returns @c true if the sequence number is within the given packet (sequence, len). */
   static inline bool _in_packet(uint32_t seq, const QPair<uint32_t, uint32_t> &packet) {
     return _in_between(seq, packet.first, packet.first+packet.second);
   }
 
 protected:
+  /** The input buffer. */
   FixedBuffer _buffer;
+  /** The number of bytes available for reading. */
   uint32_t _available;
+  /** The next sequence number. */
   uint32_t _nextSequence;
+  /** The received packets (sequence, length). */
   QVector< QPair<uint32_t, uint32_t> > _packets;
 };
 
@@ -410,7 +425,7 @@ protected:
   /** The output buffer. */
   StreamOutBuffer _outBuffer;
   /** The window size of the remote. */
-  uint32_t _window;
+  uint16_t _window;
   /** If @c true the stream has been closed. */
   bool _closed;
   /** Keep-alive timer. */
