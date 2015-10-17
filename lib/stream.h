@@ -40,7 +40,7 @@ public:
     // Get offset in terms of buffer index
     offset += _outptr;
     // read first half (at maximum up to the end of the buffer)
-    uint32_t n = std::min(uint32_t(offset)+len, 0x10000U)-offset;
+    uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U)-offset );
     memcpy(buffer, _buffer+offset, n);
     // read remaining bytes (wrap-around)
     memcpy(buffer+n, _buffer, len-n);
@@ -52,6 +52,7 @@ public:
   inline uint32_t read(uint8_t *buffer, uint32_t len) {
     len = peek(0, buffer, len);
     _outptr += len;
+    if (len) { _full=false; }
     return len;
   }
 
@@ -72,11 +73,11 @@ public:
     // If offset is larger than the available bytes -> done
     if (offset>=available()) { return 0; }
     // Determine howmany bytes to put
-    len = std::min(offset+len, available())-offset;
+    len = std::min(uint32_t(offset)+len, available())-offset;
     // Get offset in terms of buffer index
     offset += _outptr;
     // put first half (at maximum up to the end of the buffer)
-    uint32_t n = std::min(uint32_t(offset)+len, 0x10000U)-offset;
+    uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U)-offset );
     memcpy(_buffer+offset, data, n);
     // put remaining bytes (wrap-around)
     memcpy(_buffer, data+n, len-n);
