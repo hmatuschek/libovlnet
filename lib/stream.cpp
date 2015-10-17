@@ -130,6 +130,8 @@ SecureStream::bytesAvailable() const {
 
 size_t
 SecureStream::canSend() const {
+  logDebug() << "SecureStream: Can send (buffer=" << _outBuffer.free()
+             << ", window=" << _window;
   return std::min(_outBuffer.free(),
                   std::min(uint32_t(_window),
                            uint32_t(DHT_STREAM_MAX_DATA_SIZE)));
@@ -154,6 +156,8 @@ SecureStream::writeData(const char *data, qint64 len) {
   msg.seq = htonl(_outBuffer.nextSequence());
   // put in output buffer
   len = _outBuffer.write((const uint8_t *)data, len);
+  logDebug() << "SecureStream: Send DATA, SEQ=" << ntohl(msg.seq)
+             << ", LEN=" << len;
   if (0 >= len) { return len; }
   // store in message
   memcpy(msg.payload.data, data, len);
@@ -163,6 +167,7 @@ SecureStream::writeData(const char *data, qint64 len) {
     _keepalive.start();
     // update remote window size
     _window -= len;
+
     return len;
   }
   return -1;
@@ -206,8 +211,9 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     if (rxlen) { emit readyRead(); }
   } else if (Message::ACK == msg->type) {
     if (len!=7) { return; }
-    logDebug() << "SecureStream: Got ACK SEQ=" << ntohl(msg->seq);
-    size_t send = _outBuffer.ack(ntohl(msg->seq));
+    logDebug() << "SecureStream: Got ACK SEQ=" << ntohl(msg->seq)
+               << ", WIN=" << ntohs(msg->payload.window);
+    uint32_t send = _outBuffer.ack(ntohl(msg->seq));
     if (send) {
       // Update remote window size
       _window = ntohs(msg->payload.window);
