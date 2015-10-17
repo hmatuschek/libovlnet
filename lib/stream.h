@@ -287,6 +287,8 @@ public:
   /** ACKs the given sequence number and returns the number of bytes removed from the output
    * buffer. */
   uint32_t ack(uint32_t seq, uint16_t window) {
+    logDebug() << "StreamOutBuffer: ACK SEQ=" << seq << ", WIN=" << window
+               << " some data between [" << _firstSequence << ", " << _nextSequence <<").";
     // If the complete packetbuffer is ACKed
     if (_nextSequence == seq) {
       // Drop complete buffer
