@@ -211,20 +211,23 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     if (rxlen) { emit readyRead(); }
   } else if (Message::ACK == msg->type) {
     if (len!=7) { return; }
-    logDebug() << "SecureStream: Got ACK SEQ=" << ntohl(msg->seq)
+    uint32_t seq = ntohl(msg->seq);
+    logDebug() << "SecureStream: Got ACK SEQ=" << seq
                << ", WIN=" << ntohs(msg->payload.window);
-    uint32_t send = _outBuffer.ack(ntohl(msg->seq), ntohs(msg->payload.window));
-    logDebug() << "Secure stream ACKed " << send << "b.";
+    uint32_t send = _outBuffer.ack(seq, ntohs(msg->payload.window));
+    logDebug() << "SecureStream: ACKed " << send << "b.";
     if (send) {
       // Signal data send
       emit bytesWritten(send);
     } else {
+      // If nothing has been ACKed and ACK seq == first byte of output buffer
+      // -> resend requested packet.
       if (_outBuffer.firstSequence() == ntohl(msg->seq)) {
-        // Resent requested message
+        // -> resent requested message
         Message msg(Message::DATA);
         size_t len=sizeof(msg.payload.data); uint32_t seq=0;
         if (_outBuffer.resendFirst(msg.payload.data, len, seq)) {
-          logDebug() << "SecureStream: Resend packet SEQ=" << seq << ", LEN=" << len;
+          logDebug() << "SecureStream: Resend requested packet SEQ=" << seq << ", LEN=" << len;
           msg.seq = htonl(seq);
           if (!sendDatagram((const uint8_t *) &msg, len+5)) {
             logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
