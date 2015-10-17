@@ -265,7 +265,7 @@ public:
   StreamOutBuffer(uint64_t timeout);
 
   inline uint32_t free() const {
-    return _window;
+    return (_window-_buffer.available());
   }
 
   inline uint32_t bytesToWrite() const {
@@ -275,7 +275,7 @@ public:
   uint32_t nextSequence() const { return _nextSequence; }
 
   uint32_t write(const uint8_t *buffer, uint32_t len) {
-    len = _buffer.write(buffer, std::min(uint32_t(_window), len));
+    len = _buffer.write(buffer, std::min(free(), len));
     if (len) {
       _packets.append(Packet(len));
       _nextSequence += len;
