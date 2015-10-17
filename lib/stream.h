@@ -315,6 +315,7 @@ public:
       item->leave(left);
     } else {
       // If packet is ACKed completely
+      drop += item->length();
       item++;
     }
     // Update first sequence
