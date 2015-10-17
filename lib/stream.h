@@ -20,13 +20,13 @@ public:
 
   /** Returns the number of bytes available for reading. */
   inline uint32_t available() const {
-    return (_full ? 0x10000 : (_inptr-_outptr));
+    return (_full ? 0x10000 : uint16_t(_inptr-_outptr));
   }
 
   /** Returns the number of free bytes (available for writing). */
   inline uint32_t free() const {
     if ((!_full) && (_outptr==_inptr)) { return 0x10000; }
-    return (_outptr-_inptr);
+    return uint16_t(_outptr-_inptr);
   }
 
   /** Reads some segement without removing it from the buffer. */
