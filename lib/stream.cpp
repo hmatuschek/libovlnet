@@ -218,6 +218,19 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     if (send) {
       // Signal data send
       emit bytesWritten(send);
+    } else {
+      if (_outBuffer.firstSequence() == ntohl(msg->seq)) {
+        // Resent requested message
+        Message msg(Message::DATA);
+        size_t len=sizeof(msg.payload.data); uint32_t seq=0;
+        if (_outBuffer.resendFirst(msg.payload.data, len, seq)) {
+          logDebug() << "SecureStream: Resend packet SEQ=" << seq << ", LEN=" << len;
+          msg.seq = htonl(seq);
+          if (!sendDatagram((const uint8_t *) &msg, len+5)) {
+            logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
+          }
+        }
+      }
     }
   } else if (Message::RESET == msg->type) {
     if (len!=1) { return; }

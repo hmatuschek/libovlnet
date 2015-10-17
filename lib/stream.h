@@ -274,6 +274,7 @@ public:
     return _buffer.available();
   }
 
+  uint32_t firstSequence() const { return _firstSequence; }
   uint32_t nextSequence() const { return _nextSequence; }
 
   uint32_t write(const uint8_t *buffer, uint32_t len) {
@@ -349,6 +350,16 @@ public:
       }
       offset += packet->length();
       sequence += packet->length();
+    }
+    return false;
+  }
+
+  bool resendFirst(uint8_t *buffer, size_t &len, uint32_t &sequence) {
+    if (_packets.size()) {
+      sequence = _firstSequence;
+      len = _buffer.peek(0, buffer, _packets.front().length());
+      _packets.front().markResend();
+      return true;
     }
     return false;
   }
