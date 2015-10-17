@@ -88,7 +88,7 @@ SecureStream::_onCheckPacketTimeout() {
   if (_outBuffer.resend(msg.payload.data, len, seq)) {
     logDebug() << "SecureStream: Resend packet SEQ=" << seq << ", LEN=" << len;
     msg.seq = htonl(seq);
-    if ((len+5) != sendDatagram((const uint8_t *) &msg, len+5)) {
+    if (!sendDatagram((const uint8_t *) &msg, len+5)) {
       logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
     }
   }
