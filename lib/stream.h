@@ -329,7 +329,8 @@ public:
     _window        = window;
     // Erase everything upto but not including the given item
     _packets.erase(item);
-    logDebug() << "StreamOutBuffer: Drop " << drop << "b from buffer.";
+    logDebug() << "StreamOutBuffer: Drop " << drop << "b from buffer holding "
+               << _buffer.available() << "b.";
     // Return number of bytes ACKed
     return _buffer.drop(drop);
   }
