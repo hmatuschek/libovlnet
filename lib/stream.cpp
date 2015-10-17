@@ -18,7 +18,7 @@ struct __attribute__((packed)) Message {
   /** The sequential number. */
   uint32_t seq;
   /** The message payload, either some data if type=DATA or the window size if type=ACK. */
-  union {
+  union __attribute__ ((packed)) {
     /** The number of bytes the receiver is willing to accept. */
     uint16_t window;
     /** Payload. */
