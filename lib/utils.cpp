@@ -329,7 +329,7 @@ PacketInBuffer::read(uint8_t *buffer, size_t len) {
 // Retruns @c true if x is [a,b) mod (2 ^ 32)
 inline bool
 __inBetweenSeq(uint32_t x, uint32_t a, uint32_t b) {
-  return ( (a < b) ? ( (a<=x) && (x<b) ) : ( (a>=x) || (x<b) ) );
+  return ( (a < b) ? ( (a<=x) && (x<b) ) : ( (a<=x) || (x<b) ) );
 }
 
 bool

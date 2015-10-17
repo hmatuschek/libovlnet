@@ -36,8 +36,8 @@ struct __attribute__((packed)) Message {
  * Implementation of SecureStream
  * ******************************************************************************************** */
 SecureStream::SecureStream(DHT &dht, QObject *parent)
-  : QIODevice(parent), SecureSocket(dht), _inBuffer(16<<16), _outBuffer(16<<16, 2000),
-    _window(DHT_STREAM_MAX_DATA_SIZE), _closed(false), _keepalive(), _packetTimer(), _timeout()
+  : QIODevice(parent), SecureSocket(dht), _inBuffer(), _outBuffer(2000),
+    _window(0x10000), _closed(false), _keepalive(), _packetTimer(), _timeout()
 {
   // Setup keep-alive timer, gets started by open();
   _keepalive.setInterval(1000);
@@ -131,13 +131,13 @@ SecureStream::bytesAvailable() const {
 size_t
 SecureStream::canSend() const {
   return std::min(_outBuffer.free(),
-                  std::min(_window, size_t(DHT_STREAM_MAX_DATA_SIZE)));
+                  std::min(_window, uint32_t(DHT_STREAM_MAX_DATA_SIZE)));
 }
 
 qint64
 SecureStream::bytesToWrite() const {
   // IO device buffer + internal packet-buffer
-  return _outBuffer.available() + QIODevice::bytesToWrite();
+  return _outBuffer.bytesToWrite() + QIODevice::bytesToWrite();
 }
 
 qint64
@@ -151,7 +151,7 @@ SecureStream::writeData(const char *data, qint64 len) {
                                    qint64(DHT_SEC_MAX_DATA_SIZE-5))));
   // Pack message
   Message msg(Message::DATA);
-  msg.seq = htonl(_outBuffer.sequence());
+  msg.seq = htonl(_outBuffer.nextSequence());
   // put in output buffer
   len = _outBuffer.write((const uint8_t *)data, len);
   if (0 >= len) { return len; }
@@ -191,27 +191,22 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     if (len<5) { return; }
     // Get sequence number of data packet
     uint32_t seq = ntohl(msg->seq);
-    bool ack = false;
-    if (_inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5, ack)) {
-      // send ACK if needed
-      if (ack) {
-        //logDebug() << "SecureSocket: Send ACK=" << ack_seq;
-        Message resp(Message::ACK);
-        // Set sequence
-        resp.seq = htonl(seq);
-        // Send window size
-        resp.payload.window = htonl(uint32_t(_inBuffer.free()));
-        if (! sendDatagram((const uint8_t*) &resp, 9)) {
-          logWarning() << "SecureStream: Failed to send ACK.";
-        }
-        // Signal new data available
-        emit readyRead();
-      }
+    uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
+    //logDebug() << "SecureSocket: Send ACK=" << ack_seq;
+    Message resp(Message::ACK);
+    // Set sequence
+    resp.seq = htonl(_inBuffer.nextSequence());
+    // Send window size
+    resp.payload.window = htonl(uint32_t(_inBuffer.window()));
+    if (! sendDatagram((const uint8_t*) &resp, 9)) {
+      logWarning() << "SecureStream: Failed to send ACK.";
     }
+    // Signal new data available (if any)
+    if (rxlen) { emit readyRead(); }
   } else if (Message::ACK == msg->type) {
     if (len!=9) { return; }
     size_t send = _outBuffer.ack(ntohl(msg->seq));
-    if (0 != send) {
+    if (send) {
       // Update remote window size
       _window = ntohl(msg->payload.window);
       // Signal data send
@@ -226,3 +221,34 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     logError() << "Unknown datagram received: type=" << msg->type << ".";
   }
 }
+
+
+/* ********************************************************************************************* *
+ * Implementation of FixedBuffer
+ * ********************************************************************************************* */
+FixedBuffer::FixedBuffer()
+  : _inptr(0), _outptr(0), _full(false)
+{
+  // pass...
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of StreamInBuffer
+ * ********************************************************************************************* */
+StreamInBuffer::StreamInBuffer()
+  : _buffer(), _available(0), _nextSequence(0), _packets()
+{
+  // pass...
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of StreamInBuffer
+ * ********************************************************************************************* */
+StreamOutBuffer::StreamOutBuffer(uint64_t timeout)
+  : _buffer(), _firstSequence(0), _nextSequence(0), _packets()
+{
+
+}
+
