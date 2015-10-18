@@ -363,6 +363,10 @@ DHT::DHT(Identity &id, ServiceHandler *streamHandler,
     return;
   }
 
+  // Connect to error slot
+  connect(&_socket, SIGNAL(error(QAbstractSocket::SocketError)),
+          this,SLOT(_onSocketError(QAbstractSocket::SocketError)));
+
   // check request timeouts every 500ms
   _requestTimer.setInterval(500);
   _requestTimer.setSingleShot(false);
@@ -731,6 +735,11 @@ DHT::_onReadyRead() {
 void
 DHT::_onBytesWritten(qint64 n) {
   _bytesSend += n;
+}
+
+void
+DHT::_onSocketError(QAbstractSocket::SocketError error) {
+  logError() << "DHT: Socket error: " << error << ": " << _socket.errorString();
 }
 
 void
