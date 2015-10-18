@@ -78,8 +78,19 @@ SecureStream::open(OpenMode mode) {
 
 void
 SecureStream::_onKeepAlive() {
-  // send "keep-alive" ping
-  sendNull();
+  // send "keep-alive" ping (ACK _inbuffer.nextSequence)
+  Message resp(Message::ACK);
+  // Set sequence
+  resp.seq = htonl(_inBuffer.nextSequence());
+  // Send window size
+  resp.payload.window = htons(_inBuffer.window());
+  if (! sendDatagram((const uint8_t*) &resp, 7)) {
+    logWarning() << "SecureStream: Failed to send ACK.";
+  } else {
+    logDebug() << "SecureStream: Send ACK, SEQ=" << _inBuffer.nextSequence()
+               << ", WIN=" << _inBuffer.window();
+    _keepalive.start();
+  }
 }
 
 void
@@ -206,20 +217,22 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
     logDebug() << "SecureStream: Got data SEQ=" << seq << ", LEN=" << (len-5)
                << ", RX=" << rxlen;
-    Message resp(Message::ACK);
-    // Set sequence
-    resp.seq = htonl(_inBuffer.nextSequence());
-    // Send window size
-    resp.payload.window = htons(_inBuffer.window());
-    if (! sendDatagram((const uint8_t*) &resp, 7)) {
-      logWarning() << "SecureStream: Failed to send ACK.";
-    } else {
-      logDebug() << "SecureStream: Send ACK, SEQ=" << _inBuffer.nextSequence()
-                 << ", WIN=" << _inBuffer.window();
-      _keepalive.start();
+    if (rxlen) {
+      Message resp(Message::ACK);
+      // Set sequence
+      resp.seq = htonl(_inBuffer.nextSequence());
+      // Send window size
+      resp.payload.window = htons(_inBuffer.window());
+      if (! sendDatagram((const uint8_t*) &resp, 7)) {
+        logWarning() << "SecureStream: Failed to send ACK.";
+      } else {
+        logDebug() << "SecureStream: Send ACK, SEQ=" << _inBuffer.nextSequence()
+                   << ", WIN=" << _inBuffer.window();
+        _keepalive.start();
+      }
+      // Signal new data available (if any)
+      emit readyRead();
     }
-    // Signal new data available (if any)
-    if (rxlen) { emit readyRead(); }
   } else if (Message::ACK == msg->type) {
     if (len!=7) {
       logWarning() << "Received invalid ACK packet LEN=" << len << ".";

@@ -173,6 +173,7 @@ public:
     // The number of bytes that got available by this packet
     uint32_t newbytes = 0;
     // store in buffer
+    logDebug() << "StreamInBuffer: Put " << len << "b at " << offset << ".";
     if (0 == (len = _buffer.put(offset, data, len)) ) {
       return 0;
     }
@@ -181,6 +182,9 @@ public:
       _nextSequence += len;
       _available    += len;
       newbytes      += len;
+      logDebug() << "StreamInBuffer: ACK " << len
+                 << "b from packet SEQ=" << seq
+                 << ", LEN=" << len;
     } else if (0 == _packets.size()) {
       _packets.append(QPair<uint32_t, uint32_t>(seq, len));
     } else {
@@ -194,9 +198,13 @@ public:
     }
     // Update _nextSequence
     while ( (_packets.size()) && _in_packet(_nextSequence, _packets.first())) {
-      _nextSequence = (_packets.first().first+_packets.first().second);
-      _available += (_packets.first().second - (_nextSequence-_packets.first().first));
-      newbytes   += (_packets.first().second - (_nextSequence-_packets.first().first));
+      uint32_t acked = ((_packets.first().first+_packets.first().second)-_nextSequence);
+      logDebug() << "StreamInBuffer: ACK " << acked
+                 << "b from packet SEQ=" << _packets.first().first
+                 << ", LEN=" << _packets.first().second;
+      _nextSequence  = (_packets.first().first+_packets.first().second);
+      _available    += acked;
+      newbytes      += acked;
       _packets.pop_front();
     }
     return newbytes;
