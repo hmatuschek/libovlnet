@@ -117,16 +117,19 @@ SecureStream::_onTimeOut() {
 
 void
 SecureStream::close() {
-  // Make sure the stream does not get notified anymore.
-  _dht.socketClosed(id());
-  // close QIODevice
-  QIODevice::close();
   // Stop keep alive timer
   _keepalive.stop();
   // Stop packet timer.
   _packetTimer.stop();
   // Stop timeout timer
   _timeout.stop();
+
+  // Make sure the stream does not get notified anymore.
+  _dht.socketClosed(id());
+
+  // close QIODevice
+  QIODevice::close();
+
   // Send reset packet
   if (! _closed) {
     logDebug() << "SecureStream: Close connection, send RST.";
@@ -197,6 +200,11 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   // Handle null-packets
   if (0 == len) {
     logDebug() << "Received null.";
+    return;
+  }
+
+  if (len > sizeof(Message)) {
+    logDebug() << "Received invalid packet, LEN=" << len;
     return;
   }
 

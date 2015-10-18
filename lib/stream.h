@@ -247,7 +247,7 @@ public:
 
   inline uint32_t free() const {
     if (_buffer.available() > _window) { return 0; }
-    return (_window-_buffer.available());
+    return std::min(_buffer.free(), (_window-_buffer.available()));
   }
 
   inline uint32_t bytesToWrite() const {
