@@ -94,17 +94,17 @@ SecureStream::_onKeepAlive() {
 
 void
 SecureStream::_onCheckPacketTimeout() {
+  if (! _outBuffer.timeout()) { return; }
   // Resent messages
   Message msg(Message::DATA);
   uint16_t len=sizeof(msg.payload.data); uint32_t seq=0;
-  if (_outBuffer.resend(msg.payload.data, len, seq)) {
-    logDebug() << "SecureStream: Resend packet SEQ=" << seq << ", LEN=" << len;
-    msg.seq = htonl(seq);
-    if (!sendDatagram((const uint8_t *) &msg, len+5)) {
-      logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
-    } else {
-      _keepalive.start();
-    }
+  _outBuffer.resend(msg.payload.data, len, seq);
+  logDebug() << "SecureStream: Resend packet SEQ=" << seq << ", LEN=" << len;
+  msg.seq = htonl(seq);
+  if (!sendDatagram((const uint8_t *) &msg, len+5)) {
+    logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
+  } else {
+    _keepalive.start();
   }
 }
 
@@ -252,14 +252,13 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
         // -> resent requested message
         Message resp(Message::DATA);
         uint16_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
-        if (_outBuffer.resend(resp.payload.data, len, seq)) {
-          logDebug() << "SecureStream: Resend requested packet SEQ=" << seq << ", LEN=" << len;
-          resp.seq = htonl(seq);
-          if (!sendDatagram((const uint8_t *) &resp, len+5)) {
-            logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
-          } else {
-            _keepalive.start();
-          }
+        _outBuffer.resend(resp.payload.data, len, seq);
+        logDebug() << "SecureStream: Resend requested packet SEQ=" << seq << ", LEN=" << len;
+        resp.seq = htonl(seq);
+        if (!sendDatagram((const uint8_t *) &resp, len+5)) {
+          logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
+        } else {
+          _keepalive.start();
         }
       }
     }

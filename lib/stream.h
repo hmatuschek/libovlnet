@@ -298,14 +298,14 @@ public:
     return ((age>0) ? age : 0);
   }
 
-  bool resend(uint8_t *buffer, uint16_t &len, uint32_t &sequence) {
-    if (age() > _timeout) {
-      sequence = _firstSequence; size_t offset = 0;
-      len = _buffer.peek(offset, buffer, std::min(_window, len));
-      _timestamp = QDateTime::currentDateTime();
-      return true;
-    }
-    return false;
+  inline bool timeout() const {
+    return (age() > _timeout);
+  }
+
+  void resend(uint8_t *buffer, uint16_t &len, uint32_t &sequence) {
+    sequence = _firstSequence; size_t offset = 0;
+    len = _buffer.peek(offset, buffer, std::min(_window, len));
+    _timestamp = QDateTime::currentDateTime();
   }
 
 protected:
