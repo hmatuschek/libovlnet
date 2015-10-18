@@ -408,6 +408,7 @@ protected:
       _rt_sum >>= 6; _rt_sumsq  >>= 6;
       // compute new timeout
       _timeout = _rt_sum + 3*std::sqrt(_rt_sumsq -_rt_sum*_rt_sum);
+      logDebug() << "StreamOutBuffer: Updated timeout to " << _timeout << "ms.";
       // reset counts and sums
       _rt_sum = 0; _rt_sumsq = 0; _rt_count = 0;
     }
