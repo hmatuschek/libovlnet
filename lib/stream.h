@@ -162,17 +162,20 @@ public:
   uint32_t putPacket(uint32_t seq, const uint8_t *data, uint32_t len) {
     // check if seq fits into window [_nextSequence+0xffff-available), if not -> done
     if (!_in_window(seq)) { return 0; }
-    // Compute offset w.r.t. buffer-start where to store the data
-    uint32_t offset = _available + (seq - _nextSequence);
+    // Compute offset w.r.t. buffer-start, where to store the data
+    uint32_t offset = _available + uint32_t(seq - _nextSequence);
+    if (offset >= 0x10000) { return 0; }
     // Check if some space must be allocated
     if ((offset+len)>_buffer.available()) {
       // Get as much as possible
-      len = _buffer.allocate((offset+len)-_buffer.available());
+      _buffer.allocate((offset+len)-_buffer.available());
     }
     // The number of bytes that got available by this packet
     uint32_t newbytes = 0;
     // store in buffer
-    len = _buffer.put(offset, data, len);
+    if (0 == (len = _buffer.put(offset, data, len)) ) {
+      return 0;
+    }
     // If seq is the expected one -> update
     if (_nextSequence == seq) {
       _nextSequence += len;
