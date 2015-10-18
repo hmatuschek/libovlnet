@@ -96,7 +96,7 @@ void
 SecureStream::_onCheckPacketTimeout() {
   // Resent messages
   Message msg(Message::DATA);
-  size_t len=sizeof(msg.payload.data); uint32_t seq=0;
+  uint16_t len=sizeof(msg.payload.data); uint32_t seq=0;
   if (_outBuffer.resend(msg.payload.data, len, seq)) {
     logDebug() << "SecureStream: Resend packet SEQ=" << seq << ", LEN=" << len;
     msg.seq = htonl(seq);
@@ -251,7 +251,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       if (_outBuffer.firstSequence() == ntohl(msg->seq)) {
         // -> resent requested message
         Message resp(Message::DATA);
-        size_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
+        uint16_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
         if (_outBuffer.resend(resp.payload.data, len, seq)) {
           logDebug() << "SecureStream: Resend requested packet SEQ=" << seq << ", LEN=" << len;
           resp.seq = htonl(seq);
