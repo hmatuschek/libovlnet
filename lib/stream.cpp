@@ -89,7 +89,6 @@ SecureStream::_onKeepAlive() {
   } else {
     logDebug() << "SecureStream: Send ACK, SEQ=" << _inBuffer.nextSequence()
                << ", WIN=" << _inBuffer.window();
-    _keepalive.start();
   }
 }
 
