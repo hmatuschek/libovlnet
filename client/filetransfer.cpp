@@ -12,12 +12,13 @@ struct __attribute__((packed)) FileTransferMessage {
       uint64_t fileSize;
       uint8_t  filename[FILETRANSFER_MAX_FILENAME_LEN];
     } request;
-    struct __attribute__((packed)){
+    struct __attribute__((packed)) {
       uint32_t seq;
       uint8_t  data[FILETRANSFER_MAX_DATA_LEN];
     } data;
-    struct __attribute__((packed)){
+    struct __attribute__((packed)) {
       uint32_t seq;
+      uint16_t window;
     } ack;
   } payload;
 
@@ -36,7 +37,7 @@ typedef enum {
  * ********************************************************************************************* */
 FileUpload::FileUpload(Application &app, const QString &filename, size_t fileSize, QObject *parent)
   : QObject(parent), SecureSocket(app.dht()), _application(app), _state(INITIALIZED),
-    _packetBuffer(1<<16, 2000), _fileName(filename), _fileSize(fileSize)
+    _packetBuffer(2000), _fileName(filename), _fileSize(fileSize)
 {
   // pass...
 }
@@ -84,9 +85,11 @@ FileUpload::handleDatagram(const uint8_t *data, size_t len) {
     if (len<5) { return; }
     // Get sequence number
     uint32_t seq = qFromBigEndian(msg->payload.ack.seq);
+    // Get window
+    uint16_t window = qFromBigEndian(msg->payload.ack.window);
     // ack some packets.
-    size_t send = 0;
-    if (0 != (send = _packetBuffer.ack(seq))) {
+    uint32_t send = 0;
+    if (0 != (send = _packetBuffer.ack(seq, window))) {
       emit bytesWritten(send);
     }
   }
@@ -164,7 +167,7 @@ FileUpload::write(const uint8_t *buffer, size_t size) {
     return 0;
   }
   // get current sequence number
-  uint32_t sequence = _packetBuffer.sequence();
+  uint32_t sequence = _packetBuffer.nextSequence();
   // put into packet buffer
   size = _packetBuffer.write(buffer, size);
   // Assemble message
@@ -172,7 +175,6 @@ FileUpload::write(const uint8_t *buffer, size_t size) {
   msg.type = DATA;
   msg.payload.data.seq = qToBigEndian(quint32(sequence));
   memcpy(msg.payload.data.data, buffer, size);
-  logDebug() << "Send" << size << "bytes data.";
   sendDatagram((uint8_t *)&msg, size+5);
   return size;
 }
@@ -183,7 +185,7 @@ FileUpload::write(const uint8_t *buffer, size_t size) {
  * ********************************************************************************************* */
 FileDownload::FileDownload(Application &app, QObject *parent)
   : QObject(parent), SecureSocket(app.dht()), _application(app),
-    _state(INITIALIZED), _fileSize(0), _packetBuffer(1<<16)
+    _state(INITIALIZED), _fileSize(0), _packetBuffer()
 {
 
 }
@@ -251,6 +253,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
     // resend ACK
     FileTransferMessage resp;
     resp.type = ACK; resp.payload.ack.seq = 0;
+    resp.payload.ack.window = qToBigEndian(_packetBuffer.window());
     sendDatagram((uint8_t *) &resp, 5);
     return;
   }
@@ -268,18 +271,15 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
     // check length
     if (len<5) { return; }
     uint32_t seq = qFromBigEndian(msg->payload.data.seq);
-    bool ack = false;
     logDebug() << "Received" << (len-5) << "bytes data with seq" << seq;
-    if (_packetBuffer.putPacket(seq, msg->payload.data.data, len-5, ack)) {
-      if (ack) {
-        // Send ACK for returned seq number
-        FileTransferMessage resp;
-        resp.type = ACK; resp.payload.ack.seq = qToBigEndian(quint32(seq));
-        sendDatagram((uint8_t *) &resp, 5);
-        logDebug() << "Send ACK for seq" << seq;
-        emit readyRead();
-      }
-    }
+    uint32_t send = _packetBuffer.putPacket(seq, msg->payload.data.data, len-5);
+    // Send ACK for returned seq number
+    FileTransferMessage resp;
+    resp.type = ACK;
+    resp.payload.ack.seq = qToBigEndian(_packetBuffer.nextSequence());
+    resp.payload.ack.window = qToBigEndian(_packetBuffer.window());
+    sendDatagram((uint8_t *) &resp, 5);
+    if (send) { emit readyRead(); }
     return;
   }
 }

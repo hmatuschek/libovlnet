@@ -2,9 +2,9 @@
 #define STREAM_H
 
 #include "crypto.h"
-#include "utils.h"
-
+#include <cmath>
 #include <QTimer>
+
 
 /** Specifies the maximum number of bytes that can be send with one packet. */
 #define DHT_STREAM_MAX_DATA_SIZE (DHT_SEC_MAX_DATA_SIZE-5)

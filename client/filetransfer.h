@@ -3,7 +3,7 @@
 
 #include <QObject>
 #include "lib/crypto.h"
-#include "lib/utils.h"
+#include "lib/stream.h"
 
 // Forward declarations
 class Application;
@@ -51,7 +51,7 @@ protected:
   /** Current state of the transmission. */
   State _state;
   /** A transmission packet buffer. */
-  PacketOutBuffer _packetBuffer;
+  StreamOutBuffer _packetBuffer;
   /** The name of the file to transmit. */
   QString _fileName;
   /** The size of the file to transmit. */
@@ -96,7 +96,7 @@ protected:
   Application &_application;
   State _state;
   size_t _fileSize;
-  PacketInBuffer _packetBuffer;
+  StreamInBuffer _packetBuffer;
 };
 
 #endif // FILETRANSFER_H
