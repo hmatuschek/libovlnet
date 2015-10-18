@@ -160,8 +160,13 @@ public:
 
   /** Updates the internal buffer with the given data at the specified sequence number. */
   uint32_t putPacket(uint32_t seq, const uint8_t *data, uint32_t len) {
-    // check if seq fits into window [_nextSequence+0xffff-available), if not -> done
-    if (!_in_window(seq)) { return 0; }
+    // check if seq fits into window [_nextSequence, _nextSequence+window()), if not -> done
+    if (!_in_window(seq)) {
+      logDebug() << "StreamInBuffer: Packet SEQ=" << seq
+                 << ", LEN=" << len << " not i window ["
+                 << _nextSequence << ", " << uint32_t(_nextSequence+window()) << ")";
+      return 0;
+    }
     // Compute offset w.r.t. buffer-start, where to store the data
     uint32_t offset = _available + uint32_t(seq - _nextSequence);
     if (offset >= 0x10000) { return 0; }
