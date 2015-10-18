@@ -86,24 +86,18 @@ SecureStream::_onKeepAlive() {
   resp.payload.window = htons(_inBuffer.window());
   if (! sendDatagram((const uint8_t*) &resp, 7)) {
     logWarning() << "SecureStream: Failed to send ACK.";
-  } else {
-    logDebug() << "SecureStream: Send ACK, SEQ=" << _inBuffer.nextSequence()
-               << ", WIN=" << _inBuffer.window();
   }
 }
 
 void
 SecureStream::_onCheckPacketTimeout() {
-  if (! _outBuffer.timeout()) { return; }
+  if ((! _outBuffer.timeout()) || (!_outBuffer.bytesToWrite()) ) { return; }
   // Resent messages
   Message msg(Message::DATA);
   uint16_t len=sizeof(msg.payload.data); uint32_t seq=0;
   _outBuffer.resend(msg.payload.data, len, seq);
-  logDebug() << "SecureStream: Resend packet SEQ=" << seq << ", LEN=" << len;
   msg.seq = htonl(seq);
-  if (!sendDatagram((const uint8_t *) &msg, len+5)) {
-    logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
-  } else {
+  if (sendDatagram((const uint8_t *) &msg, len+5)) {
     _keepalive.start();
   }
 }
@@ -149,7 +143,6 @@ SecureStream::bytesAvailable() const {
 
 size_t
 SecureStream::canSend() const {
-  logDebug() << "SecureStream: Can send (buffer=" << _outBuffer.free() << ")";
   return std::min(_outBuffer.free(),
                   uint32_t(DHT_STREAM_MAX_DATA_SIZE));
 }
@@ -173,8 +166,6 @@ SecureStream::writeData(const char *data, qint64 len) {
   msg.seq = htonl(_outBuffer.nextSequence());
   // put in output buffer
   len = _outBuffer.write((const uint8_t *)data, len);
-  logDebug() << "SecureStream: Send DATA, SEQ=" << ntohl(msg.seq)
-             << ", LEN=" << len;
   if (0 >= len) { return len; }
   // store in message
   memcpy(msg.payload.data, data, len);
@@ -197,59 +188,35 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   // Restart time-out timer
   _timeout.start();
 
-  // Handle null-packets
-  if (0 == len) {
-    logDebug() << "Received null.";
-    return;
-  }
-
-  if (len > sizeof(Message)) {
-    logDebug() << "Received invalid packet, LEN=" << len;
-    return;
-  }
+  // Ignore null-packets
+  if (0 == len) { return; }
 
   // Unpack message
+  if (len > sizeof(Message)) { return; }
   const Message *msg = (const Message *)data;
 
   /*
    * dispatch by type
    */
   if (Message::DATA == msg->type) {
-    if (len<5) {
-      logWarning() << "Received invalid DATA packet LEN=" << len << ".";
-      return;
-    }
+    if (len<5) { return; }
     // Get sequence number of data packet
     uint32_t seq = ntohl(msg->seq);
     uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
-    logDebug() << "SecureStream: Got data SEQ=" << seq << ", LEN=" << (len-5)
-               << ", RX=" << rxlen << ", avaliable=" << _inBuffer.available();
     if (rxlen) {
       Message resp(Message::ACK);
       // Set sequence
       resp.seq = htonl(_inBuffer.nextSequence());
       // Send window size
       resp.payload.window = htons(_inBuffer.window());
-      if (! sendDatagram((const uint8_t*) &resp, 7)) {
-        logWarning() << "SecureStream: Failed to send ACK.";
-      } else {
-        logDebug() << "SecureStream: Send ACK, SEQ=" << _inBuffer.nextSequence()
-                   << ", WIN=" << _inBuffer.window();
-        _keepalive.start();
-      }
+      if (sendDatagram((const uint8_t*) &resp, 7)) { _keepalive.start(); }
       // Signal new data available (if any)
       emit readyRead();
     }
   } else if (Message::ACK == msg->type) {
-    if (len!=7) {
-      logWarning() << "Received invalid ACK packet LEN=" << len << ".";
-      return;
-    }
+    if (len!=7) { return; }
     uint32_t seq = ntohl(msg->seq);
-    logDebug() << "SecureStream: Got ACK SEQ=" << seq
-               << ", WIN=" << ntohs(msg->payload.window);
     uint32_t send = _outBuffer.ack(seq, ntohs(msg->payload.window));
-    logDebug() << "SecureStream: ACKed " << send << "b.";
     if (send) {
       // Signal data send
       emit bytesWritten(send);
@@ -261,18 +228,12 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
         Message resp(Message::DATA);
         uint16_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
         _outBuffer.resend(resp.payload.data, len, seq);
-        logDebug() << "SecureStream: Resend requested packet SEQ=" << seq << ", LEN=" << len;
         resp.seq = htonl(seq);
-        if (!sendDatagram((const uint8_t *) &resp, len+5)) {
-          logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
-        } else {
-          _keepalive.start();
-        }
+        if (sendDatagram((const uint8_t *) &resp, len+5)) { _keepalive.start(); }
       }
     }
   } else if (Message::RESET == msg->type) {
     if (len!=1) { return; }
-    logDebug() << "SecureStream: Got RST.";
     _closed = true;
     emit readChannelFinished();
     close();

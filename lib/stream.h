@@ -161,12 +161,7 @@ public:
   /** Updates the internal buffer with the given data at the specified sequence number. */
   uint32_t putPacket(uint32_t seq, const uint8_t *data, uint32_t len) {
     // check if seq fits into window [_nextSequence, _nextSequence+window()), if not -> done
-    if (!_in_window(seq)) {
-      logDebug() << "StreamInBuffer: Packet SEQ=" << seq
-                 << ", LEN=" << len << " not i window ["
-                 << _nextSequence << ", " << uint32_t(_nextSequence+window()) << ")";
-      return 0;
-    }
+    if (!_in_window(seq)) { return 0; }
     // Compute offset w.r.t. buffer-start, where to store the data
     uint32_t offset = _available + uint32_t(seq - _nextSequence);
     if (offset >= 0x10000) { return 0; }
@@ -176,10 +171,7 @@ public:
       _buffer.allocate((offset+len)-_buffer.available());
     }
     // store in buffer
-    logDebug() << "StreamInBuffer: Put " << len << "b at " << offset << ".";
-    if (0 == (len = _buffer.put(offset, data, len)) ) {
-      return 0;
-    }
+    if (0 == (len = _buffer.put(offset, data, len)) ) { return 0; }
     // Store packet
     if (0 == _packets.size()) {
       _packets.append(QPair<uint32_t, uint32_t>(seq, len));
@@ -196,9 +188,6 @@ public:
     uint32_t newbytes = 0;
     while ( (_packets.size()) && _in_packet(_nextSequence, _packets.first())) {
       uint32_t acked = ((_packets.first().first+_packets.first().second)-_nextSequence);
-      logDebug() << "StreamInBuffer: ACK " << acked
-                 << "b from packet SEQ=" << _packets.first().first
-                 << ", LEN=" << _packets.first().second;
       _nextSequence  = (_packets.first().first+_packets.first().second);
       _available    += acked;
       newbytes      += acked;
@@ -272,8 +261,6 @@ public:
   /** ACKs the given sequence number and returns the number of bytes removed from the output
    * buffer. */
   uint32_t ack(uint32_t seq, uint16_t window) {
-    logDebug() << "StreamOutBuffer: ACK SEQ=" << seq << ", WIN=" << window
-               << " some data between [" << _firstSequence << ", " << _nextSequence <<").";
     // Find the ACKed byte
     uint32_t drop = 0;
     if (_in_between(seq, _firstSequence, _nextSequence)) {
@@ -284,8 +271,6 @@ public:
       _firstSequence = seq;
       _window        = window;
     }
-    logDebug() << "StreamOutBuffer: Drop " << drop << "b from buffer holding "
-               << _buffer.available() << "b.";
     // Return number of bytes ACKed
     return _buffer.drop(drop);
   }
@@ -324,7 +309,6 @@ protected:
       _rt_sum >>= 6; _rt_sumsq  >>= 6;
       // compute new timeout
       _timeout = _rt_sum + 3*std::sqrt(_rt_sumsq -_rt_sum*_rt_sum);
-      logDebug() << "StreamOutBuffer: Updated timeout to " << _timeout << "ms.";
       // reset counts and sums
       _rt_sum = 0; _rt_sumsq = 0; _rt_count = 0;
     }

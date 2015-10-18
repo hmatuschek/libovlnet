@@ -6,9 +6,9 @@
 #include "portaudio.h"
 
 /** Specifies the number of frames per datagram. */
-#define VLF_CALL_NUM_FRAMES 960
+#define DHT_CALL_NUM_FRAMES 960
 /** Specifies the maximum size of the datagram payload (encoded audio). */
-#define VLF_CALL_MAX_BUFFER_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-24)
+#define DHT_CALL_MAX_BUFFER_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-24)
 
 #include <QObject>
 
@@ -85,7 +85,7 @@ protected:
   /** The amount of data held by the input buffer. */
   size_t      _inBufferSize;
   /** Holds @c _inBufferSize bytes of encoded audio received from the peer. */
-  uint8_t     *_inBuffer[VLF_CALL_MAX_BUFFER_SIZE];
+  uint8_t     *_inBuffer[DHT_CALL_MAX_BUFFER_SIZE];
   /** The current output frame number. */
   uint32_t    _outFrameNumber;
 };
