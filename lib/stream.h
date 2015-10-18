@@ -277,22 +277,11 @@ public:
   uint32_t ack(uint32_t seq, uint16_t window) {
     logDebug() << "StreamOutBuffer: ACK SEQ=" << seq << ", WIN=" << window
                << " some data between [" << _firstSequence << ", " << _nextSequence <<").";
-    // If the complete packetbuffer is ACKed
-    if (_nextSequence == seq) {
-      // Drop complete buffer
-      _firstSequence = _nextSequence;
-      _window        = window;
-      int64_t age = _timestamp.msecsTo(QDateTime::currentDateTime());
-      _update_rt((age>0) ? age : 0);
-      _timestamp = QDateTime::currentDateTime();
-      return _buffer.drop(_buffer.available());
-    }
     // Find the ACKed byte
     uint32_t drop = 0;
     if (_in_between(seq, _firstSequence, _nextSequence)) {
       drop  = uint32_t(_nextSequence-_firstSequence);
-      int64_t age = _timestamp.msecsTo(QDateTime::currentDateTime());
-      _update_rt((age>0) ? age : 0);
+      _update_rt(age());
       _timestamp = QDateTime::currentDateTime();
       // Update first sequence
       _firstSequence = seq;
@@ -304,9 +293,13 @@ public:
     return _buffer.drop(drop);
   }
 
-  bool resend(uint8_t *buffer, size_t &len, uint32_t &sequence) {
+  inline uint64_t age() const {
     int64_t age = _timestamp.msecsTo(QDateTime::currentDateTime());
-    if (age > _timeout) {
+    return ((age>0) ? age : 0);
+  }
+
+  bool resend(uint8_t *buffer, size_t &len, uint32_t &sequence) {
+    if (age() > _timeout) {
       sequence = _firstSequence; size_t offset = 0;
       len = _buffer.peek(offset, buffer, _window);
       _timestamp = QDateTime::currentDateTime();
