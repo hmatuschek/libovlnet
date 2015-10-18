@@ -4,7 +4,8 @@
 #include <netinet/in.h>
 
 /** The format of the stream messages. */
-struct __attribute__((packed)) Message {
+struct __attribute__((packed)) Message
+{
   /** Possible stream message types. */
   typedef enum {
     DATA = 0,  ///< A data packet.
@@ -27,7 +28,8 @@ struct __attribute__((packed)) Message {
 
   /** Constructor. */
   inline Message(Flags type) {
-    memset(this, 0, sizeof(Message)); this->type = type;
+    memset(this, 0, sizeof(Message));
+    this->type = type;
   }
 };
 
@@ -90,6 +92,8 @@ SecureStream::_onCheckPacketTimeout() {
     msg.seq = htonl(seq);
     if (!sendDatagram((const uint8_t *) &msg, len+5)) {
       logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
+    } else {
+      _keepalive.start();
     }
   }
 }
@@ -181,7 +185,10 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   _timeout.start();
 
   // Handle null-packets
-  if (0 == len) { return; }
+  if (0 == len) {
+    logDebug() << "Received null.";
+    return;
+  }
 
   // Unpack message
   const Message *msg = (const Message *)data;
@@ -190,7 +197,10 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
    * dispatch by type
    */
   if (Message::DATA == msg->type) {
-    if (len<5) { return; }
+    if (len<5) {
+      logWarning() << "Received invalid DATA packet LEN=" << len << ".";
+      return;
+    }
     // Get sequence number of data packet
     uint32_t seq = ntohl(msg->seq);
     uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
@@ -206,11 +216,15 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     } else {
       logDebug() << "SecureStream: Send ACK, SEQ=" << _inBuffer.nextSequence()
                  << ", WIN=" << _inBuffer.window();
+      _keepalive.start();
     }
     // Signal new data available (if any)
     if (rxlen) { emit readyRead(); }
   } else if (Message::ACK == msg->type) {
-    if (len!=7) { return; }
+    if (len!=7) {
+      logWarning() << "Received invalid ACK packet LEN=" << len << ".";
+      return;
+    }
     uint32_t seq = ntohl(msg->seq);
     logDebug() << "SecureStream: Got ACK SEQ=" << seq
                << ", WIN=" << ntohs(msg->payload.window);
@@ -231,6 +245,8 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
           resp.seq = htonl(seq);
           if (!sendDatagram((const uint8_t *) &resp, len+5)) {
             logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
+          } else {
+            _keepalive.start();
           }
         }
       }
