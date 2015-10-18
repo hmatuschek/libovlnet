@@ -280,7 +280,7 @@ public:
     // Find the ACKed byte
     uint32_t drop = 0;
     if (_in_between(seq, _firstSequence, _nextSequence)) {
-      drop  = uint32_t(_nextSequence-_firstSequence);
+      drop  = uint32_t(seq-_firstSequence);
       _update_rt(age());
       _timestamp = QDateTime::currentDateTime();
       // Update first sequence
