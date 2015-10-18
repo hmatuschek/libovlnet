@@ -561,7 +561,12 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
     return false;
   txlen += enclen;
   // Send datagram
-  if (txlen != _socket->writeDatagram((const char *)msg, txlen, _peer.addr(), _peer.port()))
+  int64_t send = _socket->writeDatagram((const char *)msg, txlen, _peer.addr(), _peer.port());
+  if (0 > send) {
+    logError() << "SecureSocket: Cannot send datagram: " << _socket->errorString();
+    return false;
+  }
+  if (txlen != send)
     return false;
   // Update seq
   _outSeq += txlen;

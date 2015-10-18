@@ -224,12 +224,12 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       // -> resend requested packet.
       if (_outBuffer.firstSequence() == ntohl(msg->seq)) {
         // -> resent requested message
-        Message msg(Message::DATA);
-        size_t len=sizeof(msg.payload.data); uint32_t seq=0;
-        if (_outBuffer.resendFirst(msg.payload.data, len, seq)) {
+        Message resp(Message::DATA);
+        size_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
+        if (_outBuffer.resendFirst(resp.payload.data, len, seq)) {
           logDebug() << "SecureStream: Resend requested packet SEQ=" << seq << ", LEN=" << len;
-          msg.seq = htonl(seq);
-          if (!sendDatagram((const uint8_t *) &msg, len+5)) {
+          resp.seq = htonl(seq);
+          if (!sendDatagram((const uint8_t *) &resp, len+5)) {
             logWarning() << "SecureStream: Cannot resend packet SEQ=" << seq;
           }
         }
@@ -271,8 +271,9 @@ StreamInBuffer::StreamInBuffer()
  * Implementation of StreamInBuffer
  * ********************************************************************************************* */
 StreamOutBuffer::StreamOutBuffer(uint64_t timeout)
-  : _buffer(), _firstSequence(0), _nextSequence(0), _window(0xffff), _packets(), _timeout(timeout)
+  : _buffer(), _firstSequence(0), _nextSequence(0), _window(0xffff), _packets(),
+    _rt_sum(0), _rt_sumsq(0), _rt_count(0), _timeout(timeout)
 {
-
+  // pass...
 }
 

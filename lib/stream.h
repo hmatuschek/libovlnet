@@ -20,11 +20,15 @@ public:
 
   /** Returns the number of bytes available for reading. */
   inline uint32_t available() const {
+    // If full -> 2^16, else (inptr-outptr) modulo 2^16.
+    // The latter works even if outptr > inptr.
     return (_full ? 0x10000 : uint16_t(_inptr-_outptr));
   }
 
   /** Returns the number of free bytes (available for writing). */
   inline uint32_t free() const {
+    // If empty -> 2^16, else (outptr-inptr) modulo 2^16.
+    // The latter works even if inptr > outptr.
     if ((!_full) && (_outptr==_inptr)) { return 0x10000; }
     return uint16_t(_outptr-_inptr);
   }
@@ -37,10 +41,10 @@ public:
     if (offset>=available()) { return 0; }
     // Determine howmany bytes to read
     len = std::min(uint32_t(offset)+len, available())-offset;
-    // Get offset in terms of buffer index
+    // Get offset in terms of buffer index == (offset+_outptr) modulo 2^16
     offset += _outptr;
     // read first half (at maximum up to the end of the buffer)
-    uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U)-offset );
+    uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U) - offset );
     memcpy(buffer, _buffer+offset, n);
     // read remaining bytes (wrap-around)
     memcpy(buffer+n, _buffer, len-n);
@@ -50,19 +54,22 @@ public:
 
   /** Reads from the ring buffer. */
   inline uint32_t read(uint8_t *buffer, uint32_t len) {
+    // Read some data from the buffer
     len = peek(0, buffer, len);
-    _outptr += len;
-    if (len) { _full=false; }
-    return len;
+    // Drop some data
+    return drop(len);
   }
 
   /** Drops some data from the ring-buffer. */
   inline uint32_t drop(uint32_t len) {
     // If empty or no byte requested -> done
     if (((_outptr==_inptr) && (!_full)) || (0 == len)) { return 0; }
+    // Get bytes to drop
     len = std::min(len, available());
+    // drop data
     _outptr += len;
-    _full = false;
+    // Update _full flag
+    if (len) { _full = false; }
     return len;
   }
 
@@ -77,7 +84,7 @@ public:
     // Get offset in terms of buffer index
     offset += _outptr;
     // put first half (at maximum up to the end of the buffer)
-    uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U)-offset );
+    uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U) - offset );
     memcpy(_buffer+offset, data, n);
     // put remaining bytes (wrap-around)
     memcpy(_buffer, data+n, len-n);
@@ -87,22 +94,29 @@ public:
 
   /** Allocates some space at the end of the ring-buffer. */
   inline uint32_t allocate(uint32_t len) {
+    // Howmany bytes can be allocated
     len = std::min(len, free());
+    // Allocate data
     _inptr += len;
+    // Update full ptr;
     _full = (_inptr == _outptr);
+    // done.
     return len;
   }
 
   /** Appends some data to the ring buffer. */
   inline uint32_t write(const uint8_t *buffer, uint32_t len) {
+    // Where to put the data
     uint32_t offset = available();
+    // Allocate some space
     len = allocate(len);
+    // store data
     return put(offset, buffer, len);
   }
 
 protected:
   /** The actual buffer. */
-  uint8_t  _buffer[0xffff];
+  uint8_t  _buffer[0x10000];
   /** Write pointer. */
   uint16_t _inptr;
   /** Read pointer. */
@@ -129,11 +143,11 @@ public:
     return _nextSequence;
   }
 
-  /** Returns the number of bytes starting at the next expected sequence number (@c nextSequece)
+  /** Returns the number of bytes starting at the next expected sequence number (@c nextSequence)
    * the buffer will accept. */
   uint16_t window() const {
-    if (0==_available) { return 0xffff; }
-    return (0x10000-_available);
+    if (0xffff < _available) { return 0; }
+    return (0xffff-_available);
   }
 
   /** Reads some available data. */
@@ -146,7 +160,7 @@ public:
 
   /** Updates the internal buffer with the given data at the specified sequence number. */
   uint32_t putPacket(uint32_t seq, const uint8_t *data, uint32_t len) {
-    // check if seq fits into window (buffer), if not -> done
+    // check if seq fits into window [_nextSequence+0xffff-available), if not -> done
     if (!_in_window(seq)) { return 0; }
     // Compute offset w.r.t. buffer-start where to store the data
     uint32_t offset = _available + (seq - _nextSequence);
