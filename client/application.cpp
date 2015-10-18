@@ -62,7 +62,7 @@ Application::Application(int &argc, char *argv[])
 
   // Create log model
   _logModel = new LogModel();
-  Logger::addHandler(_logModel);
+  //Logger::addHandler(_logModel);
 
   // Create DHT instance
   _dht = new DHT(*_identity, this, QHostAddress::Any, 7742);

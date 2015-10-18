@@ -186,7 +186,7 @@ private slots:
   /** Gets called when some data has been send. */
   void _onBytesWritten(qint64 n);
   /** Gets called on socket errors. */
-  void _onSocketError(QAbstractSocket::SocketError error);
+  void _onSocketError(QAbstractSocket::SocketState error);
 
 protected:
   /** The identifier of the node. */

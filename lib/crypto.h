@@ -17,7 +17,7 @@ class DHT;
 
 
 /** Maximum unencrypted payload per message. */
-#define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-20)
+#define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-DHT_HASH_SIZE-4)
 
 
 /** Represents the identity of a node. A node is unquely identified by its keypair. The private key

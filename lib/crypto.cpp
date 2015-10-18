@@ -540,6 +540,10 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
     logDebug() << "Failed to decrypt message" << seq;
     return;
   }
+  if (rxlen > DHT_SEC_MAX_DATA_SIZE) {
+    logError() << "Fatal: Decrypted data larger than MAX_SEC_DATA_SIZE!"
+               << " LEN=" << rxlen << ">" << DHT_SEC_MAX_DATA_SIZE;
+  }
   // Forward decrypted data
   this->handleDatagram(_inBuffer, rxlen);
 }

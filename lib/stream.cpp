@@ -189,7 +189,7 @@ SecureStream::writeData(const char *data, qint64 len) {
 
 qint64
 SecureStream::readData(char *data, qint64 maxlen) {
-  return _inBuffer.read((uint8_t *)data, maxlen);
+  return _inBuffer.read((uint8_t *)data, std::min(maxlen, qint64(0x10000)));
 }
 
 void
@@ -223,7 +223,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     uint32_t seq = ntohl(msg->seq);
     uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
     logDebug() << "SecureStream: Got data SEQ=" << seq << ", LEN=" << (len-5)
-               << ", RX=" << rxlen;
+               << ", RX=" << rxlen << ", avaliable=" << _inBuffer.available();
     if (rxlen) {
       Message resp(Message::ACK);
       // Set sequence
@@ -288,7 +288,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
 FixedBuffer::FixedBuffer()
   : _inptr(0), _outptr(0), _full(false)
 {
-  // pass...
+  _buffer = (uint8_t *)malloc(0x10000);
 }
 
 
