@@ -263,7 +263,7 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
  * Implementation of SecureSocket
  * ******************************************************************************************** */
 SecureSocket::SecureSocket(DHT &dht)
-  : _dht(dht), _sessionKeyPair(0), _peerPubKey(0), _streamId(), _socket(0)
+  : _dht(dht), _sessionKeyPair(0), _peerPubKey(0), _streamId(Identifier::create()), _socket(0)
 {
   // pass...
 }

@@ -53,8 +53,10 @@ void
 LocalSocksStream::_clientReadyRead() {
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
   int64_t len = std::min(canSend(), size_t(DHT_STREAM_MAX_DATA_SIZE));
+  len = _inStream->read((char *)buffer, len);
   if (len) {
-    len = _inStream->read((char *)buffer, len);
+    logDebug() << "LocalSocksStream: Send " << QByteArray((char *)buffer, len).toHex()
+               << ", len=" << len;
     this->write((const char *)buffer, len);
   }
 }

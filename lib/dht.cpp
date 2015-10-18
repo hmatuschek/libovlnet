@@ -342,7 +342,7 @@ FindValueRequest::FindValueRequest(FindValueQuery *query)
 StartStreamRequest::StartStreamRequest(uint16_t service, const Identifier &peer, SecureSocket *stream)
   : Request(MSG_START_STREAM), _service(service), _peer(peer), _stream(stream)
 {
-  // pass...
+  _cookie = stream->id();
 }
 
 
@@ -500,7 +500,8 @@ DHT::announce(const Identifier &id) {
 bool
 DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
   if (0 == _streamHandler) { delete stream; return false; }
-  logDebug() << "Send start secure connection to " << node.id()
+  logDebug() << "Send start secure connection id=" << stream->id()
+             << " to " << node.id()
              << " @" << node.addr() << ":" << node.port();
   if (! stream) { delete stream; return false; }
   StartStreamRequest *req = new StartStreamRequest(service, node.id(), stream);
@@ -520,11 +521,12 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
 
   // add to pending request list & send it
   _pendingRequests.insert(req->cookie(), req);
-  if (keyLen == _socket.writeDatagram((char *)&msg, keyLen, node.addr(), node.port())) {
-    return true;
+  if (keyLen != _socket.writeDatagram((char *)&msg, keyLen, node.addr(), node.port())) {
+    // one error
+    _pendingRequests.remove(req->cookie());
+    delete stream; delete req; return false;
   }
-  _pendingRequests.remove(req->cookie());
-  delete stream; delete req; return false;
+  return true;
 }
 
 void
