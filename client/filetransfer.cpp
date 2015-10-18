@@ -63,7 +63,7 @@ FileUpload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _application.dht().socketClosed(_streamId);
+      _application.dht().socketClosed(id());
       emit closed();
     }
     return;
@@ -139,18 +139,16 @@ FileUpload::sendRequest() {
 
 void
 FileUpload::stop() {
-  if (_socket) {
-    // (re-) send RESET message
-    FileTransferMessage msg;
-    msg.type = RESET;
-    sendDatagram((const uint8_t *) &msg, 1);
-  }
+  // (re-) send RESET message
+  FileTransferMessage msg;
+  msg.type = RESET;
+  sendDatagram((const uint8_t *) &msg, 1);
   // Emit "closed" only once.
   if (TERMINATED != _state) {
     _state = TERMINATED;
     emit closed();
     // signal DHT to close stream
-    _application.dht().socketClosed(_streamId);
+    _application.dht().socketClosed(id());
   }
 }
 
@@ -225,7 +223,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _application.dht().socketClosed(_streamId);
+      _application.dht().socketClosed(id());
       emit closed();
     }
     return;
@@ -307,16 +305,14 @@ FileDownload::accept() {
 
 void
 FileDownload::stop() {
-  if (_socket) {
-    FileTransferMessage msg;
-    msg.type = RESET;
-    sendDatagram((uint8_t *) &msg, 1);
-  }
+  FileTransferMessage msg;
+  msg.type = RESET;
+  sendDatagram((uint8_t *) &msg, 1);
   // Emit "closed" only once.
   if (TERMINATED != _state) {
     _state = TERMINATED;
     // signal DHT to close stream
-    _application.dht().socketClosed(_streamId);
+    _application.dht().socketClosed(id());
     emit closed();
   }
 }

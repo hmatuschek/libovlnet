@@ -12,6 +12,10 @@
 
 #include <openssl/evp.h>
 
+// Forward decl.
+class DHT;
+
+
 /** Maximum unencrypted payload per message. */
 #define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-20)
 
@@ -62,7 +66,7 @@ protected:
   Identifier _fingerprint;
 };
 
-class DHT;
+
 
 /** Represents a simple encrypted datagram socket between two nodes. */
 class SecureSocket
@@ -134,6 +138,8 @@ protected:
 protected:
   /** A weak reference to the DHT instance. */
   DHT &_dht;
+
+private:
   /** The ECDH key pair of this node for the session. */
   EVP_PKEY *_sessionKeyPair;
   /** Public session key provided by the peer. */

@@ -453,7 +453,7 @@ protected:
   /** Write some data into the output buffer. */
   qint64 writeData(const char *data, qint64 len);
 
-protected slots:
+private slots:
   /** Gets called periodically to keep the connection alive. */
   void _onKeepAlive();
   /** Gets called periodically to check of a packet time-out. */
@@ -461,7 +461,7 @@ protected slots:
   /** Gets called if the connection time-out. */
   void _onTimeOut();
 
-protected:
+private:
   /** The input buffer. */
   StreamInBuffer  _inBuffer;
   /** The output buffer. */
