@@ -243,51 +243,6 @@ protected:
 class StreamOutBuffer
 {
 public:
-  /** Represents a packet that has been send to the remote host. */
-  class Packet
-  {
-  public:
-    /** Empty constructor. */
-    inline Packet() : _length(0), _timestamp() { }
-    /** Constructor.
-     * @param seq Specifies the sequence number of the packet.
-     * @param len Specifies the length of the packet. */
-    inline Packet(size_t len) : _length(len), _timestamp(QDateTime::currentDateTime()) { }
-    /** Copy constructor. */
-    inline Packet(const Packet &other) : _length(other._length), _timestamp(other._timestamp) { }
-    /** Assignement operator. */
-    inline Packet &operator=(const Packet &other) {
-      _length = other._length;
-      _timestamp = other._timestamp;
-      return *this;
-    }
-
-    /** Returns the length of the packet. */
-    inline size_t length() const { return _length; }
-    inline size_t leave(size_t len) { return (_length = std::min(len, _length));}
-
-    /** Returns @c true if the packet is older than the specified number of milliseconds. */
-    inline bool olderThan(size_t ms) const {
-      return (_timestamp.addMSecs(ms)<QDateTime::currentDateTime());
-    }
-    /** Mark the packet as resend (updates the timestamp). */
-    inline void markResend() {
-      _timestamp = QDateTime::currentDateTime();
-    }
-    /** Returns the age of the packet. */
-    inline uint32_t age() const {
-      qint64 delta = _timestamp.msecsTo(QDateTime::currentDateTime());
-      return (delta<0) ? 0 : delta;
-    }
-
-  protected:
-    /** The length of the packet. */
-    size_t    _length;
-    /** The timestamp of the packet. */
-    QDateTime _timestamp;
-  };
-
-public:
   StreamOutBuffer(uint64_t timeout);
 
   inline uint32_t free() const {
@@ -302,10 +257,16 @@ public:
   uint32_t firstSequence() const { return _firstSequence; }
   uint32_t nextSequence() const { return _nextSequence; }
 
+  bool timestamp(uint64_t ms) {
+    return (_timestamp.addMSecs(ms) < QDateTime::currentDateTime());
+  }
+
   uint32_t write(const uint8_t *buffer, uint32_t len) {
     len = _buffer.write(buffer, std::min(free(), len));
     if (len) {
-      _packets.append(Packet(len));
+      if (_firstSequence == _nextSequence) {
+        _timestamp = QDateTime::currentDateTime();
+      }
       _nextSequence += len;
     }
     return len;
@@ -321,43 +282,22 @@ public:
       // Drop complete buffer
       _firstSequence = _nextSequence;
       _window        = window;
-      if (_packets.size()) {
-        _update_rt(_packets.first().age());
-        _packets.clear();
-      }
-      logDebug() << "StreamOutBuffer: Clear buffer holding " << _buffer.available() << "b.";
+      int64_t age = _timestamp.msecsTo(QDateTime::currentDateTime());
+      _update_rt((age>0) ? age : 0);
+      _timestamp = QDateTime::currentDateTime();
       return _buffer.drop(_buffer.available());
     }
     // Find the ACKed byte
-    uint32_t drop = 0; uint32_t maxrt = 0;
-    QList<Packet>::iterator item = _packets.begin();
-    while ((item != _packets.end()) && (!_in_packet(seq, _firstSequence+drop, item->length()))) {
-      drop += item->length();
-      maxrt = std::max(maxrt, item->age());
-      item++;
+    uint32_t drop = 0;
+    if (_in_between(seq, _firstSequence, _nextSequence)) {
+      drop  = uint32_t(_nextSequence-_firstSequence);
+      int64_t age = _timestamp.msecsTo(QDateTime::currentDateTime());
+      _update_rt((age>0) ? age : 0);
+      _timestamp = QDateTime::currentDateTime();
+      // Update first sequence
+      _firstSequence = seq;
+      _window        = window;
     }
-    if (_packets.end() == item) { return 0; }
-    // Update timeout
-    _update_rt(std::max(maxrt, item->age()));
-    // Check how much of the last packet was ACKed
-    uint32_t left = (_firstSequence+drop+item->length())-seq;
-    if (left) {
-      logDebug() << "StreamOutBuffer: Parial ACK of packet "  << (_firstSequence+drop)
-                 << ", dropping " << (item->length()-left)
-                 << "b of packet len=" << item->length();
-      // Handle partial ACK of packet
-      drop += ( item->length()-left );
-      item->leave(left);
-    } else {
-      // If packet is ACKed completely
-      drop += item->length();
-      item++;
-    }
-    // Update first sequence
-    _firstSequence = seq;
-    _window        = window;
-    // Erase everything upto but not including the given item
-    _packets.erase(item);
     logDebug() << "StreamOutBuffer: Drop " << drop << "b from buffer holding "
                << _buffer.available() << "b.";
     // Return number of bytes ACKed
@@ -365,25 +305,11 @@ public:
   }
 
   bool resend(uint8_t *buffer, size_t &len, uint32_t &sequence) {
-    sequence = _firstSequence; size_t offset = 0;
-    QList<Packet>::iterator packet = _packets.begin();
-    for (; packet != _packets.end(); packet++) {
-      if (packet->olderThan(_timeout)) {
-        len = _buffer.peek(offset, buffer, packet->length());
-        packet->markResend();
-        return true;
-      }
-      offset += packet->length();
-      sequence += packet->length();
-    }
-    return false;
-  }
-
-  bool resendFirst(uint8_t *buffer, size_t &len, uint32_t &sequence) {
-    if (_packets.size()) {
-      sequence = _firstSequence;
-      len = _buffer.peek(0, buffer, _packets.front().length());
-      _packets.front().markResend();
+    int64_t age = _timestamp.msecsTo(QDateTime::currentDateTime());
+    if (age > _timeout) {
+      sequence = _firstSequence; size_t offset = 0;
+      len = _buffer.peek(offset, buffer, _window);
+      _timestamp = QDateTime::currentDateTime();
       return true;
     }
     return false;
@@ -419,7 +345,7 @@ protected:
   uint32_t      _firstSequence;
   uint32_t      _nextSequence;
   uint16_t      _window;
-  QList<Packet> _packets;
+  QDateTime     _timestamp;
   uint64_t      _rt_sum;
   uint64_t      _rt_sumsq;
   uint64_t      _rt_count;

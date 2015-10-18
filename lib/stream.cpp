@@ -252,7 +252,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
         // -> resent requested message
         Message resp(Message::DATA);
         size_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
-        if (_outBuffer.resendFirst(resp.payload.data, len, seq)) {
+        if (_outBuffer.resend(resp.payload.data, len, seq)) {
           logDebug() << "SecureStream: Resend requested packet SEQ=" << seq << ", LEN=" << len;
           resp.seq = htonl(seq);
           if (!sendDatagram((const uint8_t *) &resp, len+5)) {
@@ -299,7 +299,7 @@ StreamInBuffer::StreamInBuffer()
  * Implementation of StreamInBuffer
  * ********************************************************************************************* */
 StreamOutBuffer::StreamOutBuffer(uint64_t timeout)
-  : _buffer(), _firstSequence(0), _nextSequence(0), _window(0xffff), _packets(),
+  : _buffer(), _firstSequence(0), _nextSequence(0), _window(0xffff), _timestamp(),
     _rt_sum(0), _rt_sumsq(0), _rt_count(0), _timeout(timeout)
 {
   // pass...
