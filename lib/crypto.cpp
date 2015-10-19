@@ -456,6 +456,8 @@ SecureSocket::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   // Check arguments
   if ((!in) || (!out)) { return -1; }
 
+  logDebug() << "SecureSocket::encrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
+
   int len1=0, len2=0;
   // Append seq to shared IV
   *((uint32_t *)(_sharedIV+16)) = seq;
@@ -485,7 +487,7 @@ SecureSocket::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   return len1+len2;
 
 error:
-  logDebug() << "SecureSocket::decrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
+  logDebug() << "SecureSocket::encrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
   ERR_load_crypto_strings();
   unsigned long e = 0;
   while ( 0 != (e = ERR_get_error()) ) {
@@ -554,7 +556,7 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
   const uint8_t *tag = data; data += 16;
   int rxlen = 0;
   // Decrypt message
-  if (0 > (rxlen = decrypt(seq, data, len-4, _inBuffer, tag))) {
+  if (0 > (rxlen = decrypt(seq, data, len-20, _inBuffer, tag))) {
     logDebug() << "Failed to decrypt message " << seq;
     return;
   }
@@ -576,9 +578,8 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   memcpy(ptr, _streamId.data(), DHT_HASH_SIZE);
   ptr += DHT_HASH_SIZE; txlen += DHT_HASH_SIZE;
   // store sequence number
-  *((uint32_t *)ptr) = htonl(_outSeq);
-  txlen += 4; ptr += 4;
-  uint8_t *tag = ptr; ptr += 16;
+  *((uint32_t *)ptr) = htonl(_outSeq); txlen += 4; ptr += 4;
+  uint8_t *tag = ptr; ptr += 16; txlen += 16;
   // store encrypted data if there is any
   if ( (len <= 0) || (0 > (enclen = encrypt(_outSeq, data, len, ptr, tag))) )
     return false;
