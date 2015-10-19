@@ -51,23 +51,28 @@ LocalSocksStream::close() {
 
 void
 LocalSocksStream::_clientReadyRead() {
-  // Keep my output buffer limited to 1Mb.
-  if ((1<<20)<_inStream->bytesToWrite()) { return; }
-  // Forward some data
-  qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
-                        (1<<20)-_inStream->bytesToWrite());
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
-  if (0 < (len = _inStream->read((char *)buffer, len))) {
-    this->write((const char *)buffer, len);
+  // Keep my output buffer limited to 1Mb.
+  while ( _inStream->bytesAvailable() && ((1<<20)>bytesToWrite())) {
+    qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
+                          (1<<20)-_inStream->bytesToWrite());
+    // Read from client
+    if (0 < (len = _inStream->read((char *)buffer, len))) {
+      // Forward to SOCKS server
+      write((const char *)buffer, len);
+    }
   }
 }
 
 void
 LocalSocksStream::_clientBytesWritten(qint64 bytes) {
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
-  while (bytesAvailable()) {
-    qint64 len = read((char *)buffer, DHT_STREAM_MAX_DATA_SIZE);
-    if (0 < len) { _inStream->write((const char *)buffer, len); }
+  while (bytesAvailable() && ((1<<20)>_inStream->bytesToWrite())) {
+    qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
+                          (1<<20)-_inStream->bytesToWrite());
+    if (0 < (len = read((char *)buffer, len))) {
+      _inStream->write((const char *)buffer, len);
+    }
   }
 }
 
@@ -88,22 +93,29 @@ LocalSocksStream::_clientError(QAbstractSocket::SocketError error) {
 void
 LocalSocksStream::_remoteReadyRead() {
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
-  while (bytesAvailable()) {
-    qint64 len = read((char *)buffer, DHT_STREAM_MAX_DATA_SIZE);
-    if (0 < len) { _inStream->write((const char *)buffer, len); }
+  while (bytesAvailable() && ((1<<20)>_inStream->bytesToWrite())) {
+    qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
+                          (1<<20)-_inStream->bytesToWrite());
+    // Read some data from the SOCKS server
+    if (0 < (len = read((char *)buffer, len))) {
+      // Forward it to the client
+      _inStream->write((const char *)buffer, len);
+    }
   }
 }
 
 void
 LocalSocksStream::_remoteBytesWritten(qint64 bytes) {
-  // Keep my output buffer limited to 1Mb.
-  if ((1<<20)<_inStream->bytesToWrite()) { return; }
-  // Forward some data
-  qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
-                        (1<<20)-_inStream->bytesToWrite());
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
-  if (0 < (len = _inStream->read((char *)buffer, len))) {
-    this->write((const char *)buffer, len);
+  // Keep my output buffer limited to 1Mb.
+  while (_inStream->bytesAvailable() && ((1<<20)>bytesToWrite())) {
+    qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
+                          (1<<20)-_inStream->bytesToWrite());
+    // Read from client
+    if (0 < (len = _inStream->read((char *)buffer, len))) {
+      // Forward to SOCKS server
+      write((const char *)buffer, len);
+    }
   }
 }
 
@@ -363,32 +375,31 @@ SocksOutStream::_remoteConnected() {
 
 void
 SocksOutStream::_remoteReadyRead() {
+  uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
   // As long as there is data to read from the remote socket,
   // the connection is established and there is space left in the output buffer.
-  while (_outStream->bytesAvailable() && (CONNECTED == _state) && ((1<<20)>=bytesToWrite())) {
-    uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
-    int len = std::min(((1<<20)-bytesToWrite()),
-                       qint64(DHT_STREAM_MAX_DATA_SIZE));
-    len = _outStream->read((char *) buffer, len);
-    if (len != this->write((const char *)buffer, len)) {
-      logError() << "SOCKS: Dataloss: Remote (" << len
-                 <<"b) -> Remote. => Close connection.";
-      close(); return;
+  while (_outStream->bytesAvailable() && ((1<<20)>bytesToWrite())) {
+    qint64 len = std::min((1<<20)-bytesToWrite(),
+                          qint64(DHT_STREAM_MAX_DATA_SIZE));
+    // Read from remote
+    if (0 < (len = _outStream->read((char *) buffer, len))) {
+      // send to client
+      this->write((const char *)buffer, len);
     }
   }
 }
 
 void
 SocksOutStream::_remoteBytesWritten(qint64 bytes) {
-  // As long as there is data left send by the client
-  while (this->bytesAvailable()) {
+  // As long as there is data left and the output buffer is not full
+  while (bytesAvailable() && ((1<<20) > _outStream->bytesToWrite())) {
     uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
-    int len = this->read((char *) buffer, DHT_STREAM_MAX_DATA_SIZE);
-    if (0 >= len) { return; }
-    /// @bug What if _outStream buffer is full?
-    if (len != _outStream->write((const char *)buffer, len)) {
-      logError() << "SOCKS: Dataloss: Client -> Remote. => Close connection.";
-      close(); return;
+    qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
+                          (1<<20) - _outStream->bytesToWrite());
+    // Read from client
+    if (0 < (len = read((char *) buffer, DHT_STREAM_MAX_DATA_SIZE))) {
+      // forward to remote
+      _outStream->write((const char *)buffer, len);
     }
   }
 }
@@ -429,29 +440,31 @@ SocksOutStream::_remoteError(QAbstractSocket::SocketError error) {
 
 void
 SocksOutStream::_clientReadyRead() {
-  while (bytesAvailable() && (CONNECTED == _state)) {
+  // As long as there is data left and the output buffer is not full
+  while (bytesAvailable() && ((1<<20) > _outStream->bytesToWrite())) {
     uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
-    int len = read((char *) buffer, DHT_STREAM_MAX_DATA_SIZE);
-    if (0 >= len) { return; }
-    if (len != _outStream->write((const char *)buffer, len)) {
-      logError() << "SOCKS: Dataloss: Client -> Remote. => Close connection.";
-      close(); return;
+    qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
+                          (1<<20) - _outStream->bytesToWrite());
+    // Read from client
+    if (0 < (len = read((char *) buffer, DHT_STREAM_MAX_DATA_SIZE))) {
+      // forward to remote
+      _outStream->write((const char *)buffer, len);
     }
   }
 }
 
 void
 SocksOutStream::_clientBytesWritten(qint64 bytes) {
-  while (_outStream->bytesAvailable())  {
-    uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
-    // Keep the output buffer limited to 1MB
-    if ((1<20)<bytesToWrite()) { return; }
-    int64_t len = std::min(((1<<20)-bytesToWrite()),
-                           qint64(DHT_STREAM_MAX_DATA_SIZE));
-    len = _outStream->read((char *) buffer, len);
-    if ( len != write((const char *)buffer, len) ) {
-      logError() << "SOCKS: Dataloss: Remote -> Client. => Close connection.";
-      close(); return;
+  uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
+  // As long as there is data to read from the remote socket,
+  // the connection is established and there is space left in the output buffer.
+  while (_outStream->bytesAvailable() && ((1<<20)>bytesToWrite())) {
+    qint64 len = std::min((1<<20)-bytesToWrite(),
+                          qint64(DHT_STREAM_MAX_DATA_SIZE));
+    // Read from remote
+    if (0 < (len = _outStream->read((char *) buffer, len))) {
+      // send to client
+      this->write((const char *)buffer, len);
     }
   }
   // If closing and no data needs to be transferred -> close

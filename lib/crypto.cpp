@@ -451,27 +451,34 @@ error:
 }
 
 int
-SecureSocket::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out)
+SecureSocket::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out, uint8_t *tag)
 {
   // Check arguments
   if ((!in) || (!out)) { return -1; }
 
-  // Derive IV from shared IV and sq
-  uint8_t iv[32];
   int len1=0, len2=0;
   // Append seq to shared IV
   *((uint32_t *)(_sharedIV+16)) = seq;
-  // Compute IV from shared IV + 4bytes seq number
-  SHA256(_sharedIV, 20, iv);
   // Init encryption
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
-  if (! EVP_EncryptInit(&ctx, EVP_aes_128_cbc(), _sharedKey, iv))
+  // Set mode: AES 128bit GCM
+  if (1 != EVP_EncryptInit_ex(&ctx, EVP_aes_128_gcm(), NULL, NULL, NULL))
+    goto error;
+  // set IV length to 20 (16byte IV derived from DH + 4byte counter)
+  if (1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_IVLEN, 20, NULL))
+    goto error;
+  // set key & IV
+  if (1 != EVP_EncryptInit_ex(&ctx, NULL, NULL, _sharedKey, _sharedIV))
     goto error;
   // go
-  if (! EVP_EncryptUpdate(&ctx, out, &len1, in, inlen))
+  if (1 != EVP_EncryptUpdate(&ctx, out, &len1, in, inlen))
     goto error;
-  if (! EVP_EncryptFinal(&ctx, out+len1, &len2))
+  // finalize
+  if (1 != EVP_EncryptFinal(&ctx, out+len1, &len2))
+    goto error;
+  // get MAC tag
+  if(1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_GET_TAG, 16, (void *)tag))
     goto error;
   // done
   EVP_CIPHER_CTX_cleanup(&ctx);
@@ -488,26 +495,33 @@ error:
 }
 
 int
-SecureSocket::decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out)
+SecureSocket::decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out, const uint8_t *tag)
 {
   // Check arguments
   if ((!in) || (!out)) { return -1; }
-  // Derive IV from shared IV and sq
-  uint8_t iv[32];
   int len1=0, len2=0;
   // Append seq to shared IV
   *((uint32_t *)(_sharedIV+16)) = seq;
-  // Compute SHA256 and use first half as IV
-  SHA256(_sharedIV, 20, iv);
   // Init encryption
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
-  if (! EVP_DecryptInit(&ctx, EVP_aes_128_cbc(), _sharedKey, iv))
+  // Init mode: 128bit AES in GCM
+  if (1 != EVP_DecryptInit_ex(&ctx, EVP_aes_128_gcm(), NULL, NULL, NULL))
+    goto error;
+  // set IV len (20 = 16 shared IV + 4 counter)
+  if (1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_IVLEN, 20, NULL))
+    goto error;
+  // set key & IV
+  if (1 != EVP_DecryptInit_ex(&ctx, NULL, NULL, _sharedKey, _sharedIV))
     goto error;
   // go
-  if (! EVP_DecryptUpdate(&ctx, out, &len1, in, inlen))
+  if (1 != EVP_DecryptUpdate(&ctx, out, &len1, in, inlen))
     goto error;
-  if (! EVP_DecryptFinal(&ctx, out+len1, &len2))
+  // Set MAC tag
+  if (1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_TAG, 16, (void *)tag))
+    goto error;
+  // Finalize decryption and verify tag
+  if (0 >= EVP_DecryptFinal(&ctx, out+len1, &len2))
     goto error;
   // done
   EVP_CIPHER_CTX_cleanup(&ctx);
@@ -534,9 +548,10 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
   }
   // Get sequence number
   uint32_t seq = ntohl(*((uint32_t *)data)); data +=4;
+  const uint8_t *tag = data; data += 16;
   int rxlen = 0;
   // Decrypt message
-  if (0 > (rxlen = decrypt(seq, data, len-4, _inBuffer))) {
+  if (0 > (rxlen = decrypt(seq, data, len-4, _inBuffer, tag))) {
     logDebug() << "Failed to decrypt message" << seq;
     return;
   }
@@ -560,8 +575,9 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   // store sequence number
   *((uint32_t *)ptr) = htonl(_outSeq);
   txlen += 4; ptr += 4;
+  uint8_t *tag = ptr; ptr += 16;
   // store encrypted data if there is any
-  if ( (len <= 0) || (0 > (enclen = encrypt(_outSeq, data, len, ptr))) )
+  if ( (len <= 0) || (0 > (enclen = encrypt(_outSeq, data, len, ptr, tag))) )
     return false;
   txlen += enclen;
   // Send datagram

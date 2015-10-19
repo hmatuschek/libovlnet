@@ -12,11 +12,11 @@
 
 /** A ring buffer of size 64k (65536 bytes). This ring buffer can be implemented efficiently
  * using 2-complement integer arithmetic of 16-bit integers. Hence no modulo operation is needed. */
-class FixedBuffer
+class FixedRingBuffer
 {
 public:
   /** Constructor. */
-  FixedBuffer();
+  FixedRingBuffer();
 
   /** Returns the number of bytes available for reading. */
   inline uint32_t available() const {
@@ -116,7 +116,7 @@ public:
 
 protected:
   /** The actual buffer. */
-  uint8_t *_buffer;
+  uint8_t _buffer[0x10000];
   /** Write pointer. */
   uint16_t _inptr;
   /** Read pointer. */
@@ -220,7 +220,7 @@ protected:
 
 protected:
   /** The input buffer (64kb). */
-  FixedBuffer _buffer;
+  FixedRingBuffer _buffer;
   /** The number of bytes available for reading. */
   uint32_t _available;
   /** The next sequence number. */
@@ -347,7 +347,7 @@ protected:
 
 protected:
   /** The ring buffer. */
-  FixedBuffer   _buffer;
+  FixedRingBuffer   _buffer;
   /** The sequence number of the first byte in buffer. */
   uint32_t      _firstSequence;
   /** The sequence number of the next byte added to the buffer. */
@@ -405,7 +405,7 @@ protected:
 private slots:
   /** Gets called periodically to keep the connection alive. */
   void _onKeepAlive();
-  /** Gets called periodically to check of a packet time-out. */
+  /** Gets called periodically to check of segment timeout. */
   void _onCheckPacketTimeout();
   /** Gets called if the connection time-out. */
   void _onTimeOut();

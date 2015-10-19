@@ -16,8 +16,9 @@
 class DHT;
 
 
-/** Maximum unencrypted payload per message. */
-#define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-20)
+/** Maximum unencrypted payload per message
+ * (DHT_MAX_DATA_SIZE - 4 (sequence) - 16 (GCM-MAC) - 16 (AES 128 BLOCK MARGIN)). */
+#define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-36)
 
 
 /** Represents the identity of a node. A node is unquely identified by its keypair. The private key
@@ -130,10 +131,10 @@ protected:
   bool start(const Identifier &streamId, const PeerItem &peer, QUdpSocket *socket);
   /** Encrypts the given data @c in using the sequential number @c seq and stores the
    * result in the ouput buffer @c out. */
-  int encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out);
+  int encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out, uint8_t *tag);
   /** Decrypts the given data @c in using the sequential number @c seq and stores the
    * result in the output buffer @c out. */
-  int decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out);
+  int decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out, const uint8_t *tag);
 
 protected:
   /** A weak reference to the DHT instance. */

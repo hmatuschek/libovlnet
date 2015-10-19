@@ -34,6 +34,37 @@ struct __attribute__((packed)) Message
 };
 
 
+/* ********************************************************************************************* *
+ * Implementation of FixedBuffer
+ * ********************************************************************************************* */
+FixedRingBuffer::FixedRingBuffer()
+  : _inptr(0), _outptr(0), _full(false)
+{
+  // pass...
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of StreamInBuffer
+ * ********************************************************************************************* */
+StreamInBuffer::StreamInBuffer()
+  : _buffer(), _available(0), _nextSequence(0), _packets()
+{
+  // pass...
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of StreamInBuffer
+ * ********************************************************************************************* */
+StreamOutBuffer::StreamOutBuffer(uint64_t timeout)
+  : _buffer(), _firstSequence(0), _nextSequence(0), _window(0xffff), _timestamp(),
+    _rt_sum(0), _rt_sumsq(0), _rt_count(0), _timeout(timeout)
+{
+  // pass...
+}
+
+
 /* ******************************************************************************************** *
  * Implementation of SecureStream
  * ******************************************************************************************** */
@@ -51,6 +82,7 @@ SecureStream::SecureStream(DHT &dht, QObject *parent)
   _timeout.setInterval(10000);
   _timeout.setSingleShot(true);
 
+  // connect signals
   connect(&_keepalive, SIGNAL(timeout()), this, SLOT(_onKeepAlive()));
   connect(&_packetTimer, SIGNAL(timeout()), this, SLOT(_onCheckPacketTimeout()));
   connect(&_timeout, SIGNAL(timeout()), this, SLOT(_onTimeOut()));
@@ -71,18 +103,17 @@ SecureStream::open(OpenMode mode) {
   if ((! _closed) && ok) {
     _keepalive.start();
     _timeout.start();
-    _packetTimer.start();
   }
   return (!_closed) && ok;
 }
 
 void
 SecureStream::_onKeepAlive() {
-  // send "keep-alive" ping (ACK _inbuffer.nextSequence)
+  // send "keep-alive" ping (ACK=next expected sequence)
   Message resp(Message::ACK);
   // Set sequence
   resp.seq = htonl(_inBuffer.nextSequence());
-  // Send window size
+  // Set window size
   resp.payload.window = htons(_inBuffer.window());
   if (! sendDatagram((const uint8_t*) &resp, 7)) {
     logWarning() << "SecureStream: Failed to send ACK.";
@@ -92,13 +123,14 @@ SecureStream::_onKeepAlive() {
 void
 SecureStream::_onCheckPacketTimeout() {
   if ((! _outBuffer.timeout()) || (!_outBuffer.bytesToWrite()) ) { return; }
-  // Resent messages
-  Message msg(Message::DATA);
-  uint16_t len=sizeof(msg.payload.data); uint32_t seq=0;
-  _outBuffer.resend(msg.payload.data, len, seq);
+  // Resent some data
+  Message msg(Message::DATA); uint32_t seq=0;
+  uint32_t len = _outBuffer.resend(msg.payload.data, DHT_STREAM_MAX_DATA_SIZE, seq);
   msg.seq = htonl(seq);
   if (sendDatagram((const uint8_t *) &msg, len+5)) {
     _keepalive.start();
+  } else {
+    logWarning() << "SecureStream: Failed to resend data.";
   }
 }
 
@@ -152,23 +184,31 @@ SecureStream::writeData(const char *data, qint64 len) {
   // Determine maximum data length as the minimum of
   // maximum length (len), space in output buffer, window-size of the remote,
   // and maximum payload length
-  len = std::min(len,
-                 std::min(qint64(_outBuffer.free()),
-                          qint64(DHT_STREAM_MAX_DATA_SIZE)));
-  // Pack message
-  Message msg(Message::DATA);
-  msg.seq = htonl(_outBuffer.nextSequence());
+  len = std::min(len, qint64(_outBuffer.free()));
+  len = std::min(len, qint64(DHT_STREAM_MAX_DATA_SIZE));
+
   // put in output buffer
-  len = _outBuffer.write((const uint8_t *)data, len);
-  if (0 >= len) { return len; }
-  // store in message
+  if(0 == (len = _outBuffer.write((const uint8_t *)data, len))) { return 0; }
+
+  // If some data was added to the buffer
+  // and the packet timer is not started -> start it
+  if (! _packetTimer.isActive()) { _packetTimer.start(); }
+
+  // Assemble message
+  Message msg(Message::DATA);
+  // store seq number
+  msg.seq = htonl(_outBuffer.nextSequence());
+  // store data in message
   memcpy(msg.payload.data, data, len);
+
   // send message
   if( sendDatagram((const uint8_t *)&msg, len+5) ) {
     // reset keep-alive timer
     _keepalive.start();
     return len;
   }
+
+  // on error
   return -1;
 }
 
@@ -185,13 +225,11 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   // Ignore null-packets
   if (0 == len) { return; }
 
-  // Unpack message
+  // Check size and unpack message
   if (len > sizeof(Message)) { return; }
   const Message *msg = (const Message *)data;
 
-  /*
-   * dispatch by type
-   */
+  /* Dispatch by type */
   if (Message::DATA == msg->type) {
     // check message size
     if (len<5) { return; }
@@ -200,7 +238,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     // update input buffer, returns the number of bytes ACKed
     uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
     // One may also send an ACK if the received sequence number is outside the reception window.
-    // Here, however, I only send ACKs if some data has been received that was expeced
+    // Here, however, I only send ACKs if some data has been received, that was expeced
     if (rxlen) {
       Message resp(Message::ACK);
       // Set sequence
@@ -212,63 +250,51 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       // Signal new data got available
       emit readyRead();
     }
-  } else if (Message::ACK == msg->type) {
+    // done
+    return;
+  }
+
+  if (Message::ACK == msg->type) {
+    // check message size
     if (len!=7) { return; }
+    // Get sequence number
     uint32_t seq = ntohl(msg->seq);
-    uint32_t send = _outBuffer.ack(seq, ntohs(msg->payload.window));
-    if (send) {
-      // Signal data send
+    // ACK data in output buffer
+    if (uint32_t send = _outBuffer.ack(seq, ntohs(msg->payload.window))) {
+      // If some data in the output buffer has been ACKed
+      // -> Signal data send
       emit bytesWritten(send);
-    } else {
-      // If nothing has been ACKed and ACK seq == first byte of output buffer
-      // -> resend requested packet.
-      if (_outBuffer.firstSequence() == ntohl(msg->seq)) {
-        // -> resent requested message
-        Message resp(Message::DATA);
-        uint16_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
-        _outBuffer.resend(resp.payload.data, len, seq);
-        resp.seq = htonl(seq);
-        if (sendDatagram((const uint8_t *) &resp, len+5)) { _keepalive.start(); }
+      // If the last byte in the output buffer was ACKed and the _packettimer is
+      // runnning -> stop it.
+      if ((!_outBuffer.bytesToWrite()) && _packetTimer.isActive()) {
+        _packetTimer.stop();
       }
+      // done.
+      return;
     }
-  } else if (Message::RESET == msg->type) {
+    // If nothing has been ACKed and ACK seq == first byte of output buffer
+    // -> resend requested packet.
+    if (_outBuffer.firstSequence() == ntohl(msg->seq)) {
+      // -> resent requested message
+      Message resp(Message::DATA);
+      uint16_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
+      _outBuffer.resend(resp.payload.data, len, seq);
+      resp.seq = htonl(seq);
+      if (sendDatagram((const uint8_t *) &resp, len+5)) { _keepalive.start(); }
+    }
+    // done.
+    return;
+  }
+
+  if (Message::RESET == msg->type) {
     if (len!=1) { return; }
     _closed = true;
     emit readChannelFinished();
     close();
-  } else {
-    logError() << "Unknown datagram received: type=" << msg->type << ".";
+    // done.
+    return;
   }
+
+  // Unknown packet type
+  logError() << "Unknown datagram received: type=" << msg->type << ".";
 }
-
-
-/* ********************************************************************************************* *
- * Implementation of FixedBuffer
- * ********************************************************************************************* */
-FixedBuffer::FixedBuffer()
-  : _inptr(0), _outptr(0), _full(false)
-{
-  _buffer = (uint8_t *)malloc(0x10000);
-}
-
-
-/* ********************************************************************************************* *
- * Implementation of StreamInBuffer
- * ********************************************************************************************* */
-StreamInBuffer::StreamInBuffer()
-  : _buffer(), _available(0), _nextSequence(0), _packets()
-{
-  // pass...
-}
-
-
-/* ********************************************************************************************* *
- * Implementation of StreamInBuffer
- * ********************************************************************************************* */
-StreamOutBuffer::StreamOutBuffer(uint64_t timeout)
-  : _buffer(), _firstSequence(0), _nextSequence(0), _window(0xffff), _timestamp(),
-    _rt_sum(0), _rt_sumsq(0), _rt_count(0), _timeout(timeout)
-{
-  // pass...
-}
-
