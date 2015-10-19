@@ -126,7 +126,10 @@ protected:
 };
 
 
-/** Implements the input buffer of a TCP like stream. */
+/** Implements the input buffer of a TCP like stream.
+ * This buffer re-assembles the data stream by reordereing the received segments according to
+ * their sequence number (call @c putPacket). Whenever a part of the sequence was received,
+ * @c availabl() increases and the received data can be @c read. */
 class StreamInBuffer
 {
 public:
@@ -146,11 +149,11 @@ public:
   /** Returns the number of bytes starting at the next expected sequence number (@c nextSequence)
    * the buffer will accept. */
   uint16_t window() const {
-    if (0xffff < _available) { return 0; }
+    if (0xffff <= _available) { return 0; }
     return (0xffff-_available);
   }
 
-  /** Reads some available data. */
+  /** Reads some data available & ACKed. */
   uint32_t read(uint8_t *buffer, uint32_t len) {
     len = std::min(len, _available);
     len = _buffer.read(buffer, len);
@@ -164,27 +167,28 @@ public:
     if (!_in_window(seq)) { return 0; }
     // Compute offset w.r.t. buffer-start, where to store the data
     uint32_t offset = _available + uint32_t(seq - _nextSequence);
+    // If offset >= buffer size -> done
     if (offset >= 0x10000) { return 0; }
     // Check if some space must be allocated
     if ((offset+len)>_buffer.available()) {
       // Get as much as possible
       _buffer.allocate((offset+len)-_buffer.available());
     }
-    // store in buffer
+    // store in buffer, data will be truncated if not enougth space was allocated
     if (0 == (len = _buffer.put(offset, data, len)) ) { return 0; }
-    // Store packet
+    // Store packet in queue
     if (0 == _packets.size()) {
+      // if queue is empty -> append
       _packets.append(QPair<uint32_t, uint32_t>(seq, len));
     } else {
       // Insort according to sequence number
-      uint32_t lastSeq = _nextSequence;
-      int i=0;
+      uint32_t lastSeq = _nextSequence; int i=0;
       while ((i<_packets.size()) && (!_in_between(seq, lastSeq, _packets[i].first))) {
         lastSeq = _packets[i].first; i++;
       }
       _packets.insert(i, QPair<uint32_t, uint32_t>(seq, len));
     }
-    // The number of bytes that got available by this packet
+    // Get number of bytes that got available by this packet
     uint32_t newbytes = 0;
     while ( (_packets.size()) && _in_packet(_nextSequence, _packets.first())) {
       uint32_t acked = ((_packets.first().first+_packets.first().second)-_nextSequence);
@@ -197,7 +201,7 @@ public:
   }
 
 protected:
-  /** Returns @c true if @c seq is within the interval [a,b) modulo 2^32. */
+  /** Returns @c true if @c seq is within the interval [@c a, @c b) modulo 2^32. */
   static inline bool _in_between(uint32_t seq, uint32_t a, uint32_t b) {
     return ( (a<b) ? ((a<=seq) && (seq<b)) : ((a<=seq) || (seq<b)) );
   }
@@ -215,7 +219,7 @@ protected:
   }
 
 protected:
-  /** The input buffer. */
+  /** The input buffer (64kb). */
   FixedBuffer _buffer;
   /** The number of bytes available for reading. */
   uint32_t _available;
@@ -226,35 +230,49 @@ protected:
 };
 
 
+/** Implements the output buffer (64k) of a TCP like data stream.
+ * This buffer keeps track of the timeout of the first tranmitted but unACKed packet. It also
+ * re-computes the timeout bases on the time between sending a packet and receiving its ACK. */
 class StreamOutBuffer
 {
 public:
+  /** Constructor.
+   * @param timeout Specifies the intial packet timeout in ms.*/
   StreamOutBuffer(uint64_t timeout);
 
+  /** Returns the number of bytes that can be added to the buffer without exceeding the
+   * reception window of the remote. */
   inline uint32_t free() const {
+    // Do not exceed the reception window of the remote
     if (_buffer.available() > _window) { return 0; }
+    // Do not exceed the buffer size.
     return std::min(_buffer.free(), (_window-_buffer.available()));
   }
 
+  /** Returns the number of bytes that are not ACKed yet. */
   inline uint32_t bytesToWrite() const {
     return _buffer.available();
   }
 
+  /** Sequence number of the first unACKed byte. */
   uint32_t firstSequence() const { return _firstSequence; }
+  /** Sequence number of the first byte of a segement that will be added to the buffer,
+   * i.e. the sequence number of the last unACKed byte in buffer + 1. */
   uint32_t nextSequence() const { return _nextSequence; }
 
-  bool timestamp(uint64_t ms) {
-    return (_timestamp.addMSecs(ms) < QDateTime::currentDateTime());
-  }
-
+  /** Writes some data to the buffer. */
   uint32_t write(const uint8_t *buffer, uint32_t len) {
+    // store in ring-buffer
     len = _buffer.write(buffer, std::min(free(), len));
     if (len) {
+      // Update timestamp if buffer was empty
       if (_firstSequence == _nextSequence) {
         _timestamp = QDateTime::currentDateTime();
       }
+      // update next sequence number.
       _nextSequence += len;
     }
+    // return length of bytes added.
     return len;
   }
 
@@ -264,41 +282,54 @@ public:
     // Find the ACKed byte
     uint32_t drop = 0;
     if (_in_between(seq, _firstSequence, _nextSequence)) {
-      drop  = uint32_t(seq-_firstSequence);
+      // howmany bytes dropped
+      drop = uint32_t(seq-_firstSequence);
+      // update round-trip time
       _update_rt(age());
+      // Update timestamp of "oldest" bytes
       _timestamp = QDateTime::currentDateTime();
       // Update first sequence
       _firstSequence = seq;
-      _window        = window;
+      // update window
+      _window = window;
     }
     // Return number of bytes ACKed
     return _buffer.drop(drop);
   }
 
+  /** Returns the age of the oldest byte in the buffer. */
   inline uint64_t age() const {
     int64_t age = _timestamp.msecsTo(QDateTime::currentDateTime());
     return ((age>0) ? age : 0);
   }
 
+  /** Returns @c true if the oldest byte in the buffer is older than the timeout. */
   inline bool timeout() const {
     return (age() > _timeout);
   }
 
-  void resend(uint8_t *buffer, uint16_t &len, uint32_t &sequence) {
-    sequence = _firstSequence; size_t offset = 0;
-    len = _buffer.peek(offset, buffer, std::min(_window, len));
+  /** Get the oldes bytes.
+   * @param buffer The buffer, the data will be stored into.
+   * @param len Length of the buffer, specifies the maximum number of bytes returned.
+   * @param sequence On exit, holds the sequence number of the first byte in @c buffer.
+   * @returns The number of bytes stored in @c buffer. */
+  uint32_t resend(uint8_t *buffer, uint32_t len, uint32_t &sequence) {
+    // Set sequence
+    sequence = _firstSequence;
+    len = _buffer.peek(0, buffer, len);
+    // update the timestamp of the oldest byte
     _timestamp = QDateTime::currentDateTime();
+    // Return the number of bytes stored in the buffer
+    return len;
   }
 
 protected:
+  /** Returns @c true if @c x is in (@c a, @c b]. */
   inline bool _in_between(uint32_t x, uint32_t a, uint32_t b) {
     return ( (a<b) ? ((a<x) && (x<=b)) : ((a<x) || (x<=b)) );
   }
 
-  inline bool _in_packet(uint32_t x, uint32_t seq, uint32_t len) {
-    return _in_between(x, seq, seq+len);
-  }
-
+  /** Updates the round trip time statistics. Every 64 samples, the timeout is recalculated. */
   inline void _update_rt(size_t ms) {
     // Update sums
     _rt_sum += ms; _rt_sumsq  += ms*ms; _rt_count++;
@@ -315,14 +346,23 @@ protected:
   }
 
 protected:
+  /** The ring buffer. */
   FixedBuffer   _buffer;
+  /** The sequence number of the first byte in buffer. */
   uint32_t      _firstSequence;
+  /** The sequence number of the next byte added to the buffer. */
   uint32_t      _nextSequence;
+  /** Window w.r.t @c _firstSequence. */
   uint16_t      _window;
+  /** Timestamp of the "oldest" byte in buffer. */
   QDateTime     _timestamp;
+  /** Sum of round trip times. */
   uint64_t      _rt_sum;
+  /** Sum of squares of round trip times. */
   uint64_t      _rt_sumsq;
+  /** Number of round trip times in the sums. */
   uint64_t      _rt_count;
+  /** Current timeout. */
   uint64_t      _timeout;
 };
 
@@ -351,9 +391,6 @@ public:
 
   /** Returns the number of bytes in the input buffer. */
   qint64 bytesAvailable() const;
-  /** Returns the number of bytes that can be send to the remote. The returned value is
-   * always <= @c DHT_STREAM_MAX_DATA_SIZE. */
-  size_t canSend() const;
   /** Returns the number of bytes in the output buffer. */
   qint64 bytesToWrite() const;
 

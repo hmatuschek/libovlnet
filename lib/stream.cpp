@@ -141,12 +141,6 @@ SecureStream::bytesAvailable() const {
   return _inBuffer.available() + QIODevice::bytesAvailable();
 }
 
-size_t
-SecureStream::canSend() const {
-  return std::min(_outBuffer.free(),
-                  uint32_t(DHT_STREAM_MAX_DATA_SIZE));
-}
-
 qint64
 SecureStream::bytesToWrite() const {
   // IO device buffer + internal packet-buffer
@@ -199,18 +193,23 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
    * dispatch by type
    */
   if (Message::DATA == msg->type) {
+    // check message size
     if (len<5) { return; }
     // Get sequence number of data packet
     uint32_t seq = ntohl(msg->seq);
+    // update input buffer, returns the number of bytes ACKed
     uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
+    // One may also send an ACK if the received sequence number is outside the reception window.
+    // Here, however, I only send ACKs if some data has been received that was expeced
     if (rxlen) {
       Message resp(Message::ACK);
       // Set sequence
       resp.seq = htonl(_inBuffer.nextSequence());
-      // Send window size
+      // Set window size
       resp.payload.window = htons(_inBuffer.window());
+      // Send ACK & reset keep-alive timer
       if (sendDatagram((const uint8_t*) &resp, 7)) { _keepalive.start(); }
-      // Signal new data available (if any)
+      // Signal new data got available
       emit readyRead();
     }
   } else if (Message::ACK == msg->type) {
