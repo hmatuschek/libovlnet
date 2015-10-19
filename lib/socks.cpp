@@ -54,8 +54,8 @@ LocalSocksStream::_clientReadyRead() {
   // Keep my output buffer limited to 1Mb.
   if ((1<<20)<_inStream->bytesToWrite()) { return; }
   // Forward some data
-  int64_t len = std::min(int64_t(DHT_STREAM_MAX_DATA_SIZE),
-                         (1<<20)-_inStream->bytesToWrite());
+  qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
+                        (1<<20)-_inStream->bytesToWrite());
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
   if (0 < (len = _inStream->read((char *)buffer, len))) {
     this->write((const char *)buffer, len);
@@ -99,8 +99,8 @@ LocalSocksStream::_remoteBytesWritten(qint64 bytes) {
   // Keep my output buffer limited to 1Mb.
   if ((1<<20)<_inStream->bytesToWrite()) { return; }
   // Forward some data
-  int64_t len = std::min(int64_t(DHT_STREAM_MAX_DATA_SIZE),
-                         (1<<20)-_inStream->bytesToWrite());
+  qint64 len = std::min(qint64(DHT_STREAM_MAX_DATA_SIZE),
+                        (1<<20)-_inStream->bytesToWrite());
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
   if (0 < (len = _inStream->read((char *)buffer, len))) {
     this->write((const char *)buffer, len);
