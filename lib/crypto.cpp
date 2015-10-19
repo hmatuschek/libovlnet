@@ -485,6 +485,7 @@ SecureSocket::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   return len1+len2;
 
 error:
+  logDebug() << "SecureSocket::decrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
   ERR_load_crypto_strings();
   unsigned long e = 0;
   while ( 0 != (e = ERR_get_error()) ) {
@@ -528,6 +529,7 @@ SecureSocket::decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   return len1+len2;
 
 error:
+  logDebug() << "SecureSocket::decrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
   ERR_load_crypto_strings();
   unsigned long e = 0;
   while ( 0 != (e = ERR_get_error()) ) {
@@ -548,11 +550,12 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
   }
   // Get sequence number
   uint32_t seq = ntohl(*((uint32_t *)data)); data +=4;
+  // Get tag
   const uint8_t *tag = data; data += 16;
   int rxlen = 0;
   // Decrypt message
   if (0 > (rxlen = decrypt(seq, data, len-4, _inBuffer, tag))) {
-    logDebug() << "Failed to decrypt message" << seq;
+    logDebug() << "Failed to decrypt message " << seq;
     return;
   }
   if (rxlen > DHT_SEC_MAX_DATA_SIZE) {
