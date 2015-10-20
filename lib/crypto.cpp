@@ -284,7 +284,7 @@ SecureSocket::prepare(uint8_t *msg, size_t len) {
   // Store public key and its length into output buffer
   if (0 > (keyLen = _dht.identity().publicKey(msg+2, len-2)) )
     goto error;
-  *((uint16_t *)msg) = htons(uint16_t(keyLen));
+  *((uint16_t *)msg) = qToBigEndian(qint16(keyLen));
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
 
   // Generate session keys
@@ -304,7 +304,7 @@ SecureSocket::prepare(uint8_t *msg, size_t len) {
     goto error;
   if (keyLen>(int(len)-2))
     goto error;
-  *((uint16_t *)msg) = htons(uint16_t(keyLen));
+  *((uint16_t *)msg) = qToBigEndian(qint16(keyLen));
   keyPtr = msg+2;
   if (0 > i2d_PUBKEY(_sessionKeyPair, &keyPtr) )
     goto error;
@@ -316,7 +316,7 @@ SecureSocket::prepare(uint8_t *msg, size_t len) {
   // Sign session key
   if (0 > (keyLen = _dht.identity().sign(keyPtr, keyLen, msg+2, len-2)))
     goto error;
-  *((uint16_t *)msg) = htons(uint16_t(keyLen));
+  *((uint16_t *)msg) = qToBigEndian(qint16(keyLen));
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
   return stored;
 
@@ -353,7 +353,7 @@ SecureSocket::verify(const uint8_t *msg, size_t len)
 
   // Load peer public key
   // get length of key
-  keyLen = ntohs(*(uint16_t *)msg);
+  keyLen = qFromBigEndian(*(qint16 *)msg);
   // check length
   if (keyLen>(int(len)-2)) { goto error; }
   // read peer public key
@@ -366,7 +366,7 @@ SecureSocket::verify(const uint8_t *msg, size_t len)
   msg += keyLen+2; len -= keyLen+2;
 
   // read session public key
-  keyLen = ntohs(*(uint16_t *)msg);
+  keyLen = qFromBigEndian(*(qint16 *)msg);
   if (keyLen>(int(len)-2)) { goto error; }
   keyPtr = msg+2;
   if (0 == (_peerPubKey = d2i_PUBKEY(&_peerPubKey, &keyPtr, len-2)))
@@ -376,7 +376,7 @@ SecureSocket::verify(const uint8_t *msg, size_t len)
   msg += keyLen+2; len -= keyLen+2;
 
   // verify session key
-  sigLen = ntohs(*(uint16_t *)msg);
+  sigLen = qFromBigEndian(*(qint16 *)msg);
   if (sigLen>(int(len)-2)) { goto error; }
   if (! peer->verify(keyPtr, keyLen, msg+2, sigLen))
     goto error;
@@ -581,7 +581,7 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   memcpy(ptr, _streamId.data(), DHT_HASH_SIZE);
   ptr += DHT_HASH_SIZE; txlen += DHT_HASH_SIZE;
   // store sequence number
-  *((uint64_t *)ptr) = qToBigEndian(_outSeq); txlen += 8; ptr += 8;
+  *((uint64_t *)ptr) = qToBigEndian(qint64(_outSeq)); txlen += 8; ptr += 8;
   uint8_t *tag = ptr; ptr += 16; txlen += 16;
   // store encrypted data if there is any
   if ( (len <= 0) || (0 > (enclen = encrypt(_outSeq, data, len, ptr, tag))) )
