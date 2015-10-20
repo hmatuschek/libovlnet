@@ -483,13 +483,15 @@ SecureSocket::encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   // get MAC tag
   if(1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_GET_TAG, 16, (void *)tag))
     goto error;
-  logDebug() << "SecureSocket::encrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
   // done
   EVP_CIPHER_CTX_cleanup(&ctx);
   return len1+len2;
 
 error:
-  logDebug() << "SecureSocket::encrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
+  if (tag) {
+    logDebug() << "SecureSocket::encrypt(): TAG="
+               << QByteArray((const char *)tag, 16).toHex();
+  }
   ERR_load_crypto_strings();
   unsigned long e = 0;
   while ( 0 != (e = ERR_get_error()) ) {
@@ -535,7 +537,10 @@ SecureSocket::decrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   return len1+len2;
 
 error:
-  logDebug() << "SecureSocket::decrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
+  if (tag) {
+    logDebug() << "SecureSocket::decrypt(): TAG="
+               << QByteArray((const char *)tag, 16).toHex();
+  }
   ERR_load_crypto_strings();
   unsigned long e = 0;
   while ( 0 != (e = ERR_get_error()) ) {

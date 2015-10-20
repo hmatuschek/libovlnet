@@ -1,7 +1,7 @@
 #include "filetransfer.h"
-#include "application.h"
 #include <QtEndian>
 #include <QFileInfo>
+#include "dht.h"
 
 #define FILETRANSFER_MAX_FILENAME_LEN (DHT_SEC_MAX_DATA_SIZE-9UL)
 
@@ -35,8 +35,8 @@ typedef enum {
 /* ********************************************************************************************* *
  * Implementation of FileUpload
  * ********************************************************************************************* */
-FileUpload::FileUpload(Application &app, const QString &filename, size_t fileSize, QObject *parent)
-  : QObject(parent), SecureSocket(app.dht()), _application(app), _state(INITIALIZED),
+FileUpload::FileUpload(DHT &dht, const QString &filename, size_t fileSize, QObject *parent)
+  : QObject(parent), SecureSocket(dht), _state(INITIALIZED),
     _packetBuffer(2000), _fileName(filename), _fileSize(fileSize)
 {
   // pass...
@@ -63,7 +63,7 @@ FileUpload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _application.dht().socketClosed(id());
+      _dht.socketClosed(id());
       emit closed();
     }
     return;
@@ -148,7 +148,7 @@ FileUpload::stop() {
     _state = TERMINATED;
     emit closed();
     // signal DHT to close stream
-    _application.dht().socketClosed(id());
+    _dht.socketClosed(id());
   }
 }
 
@@ -181,8 +181,8 @@ FileUpload::write(const uint8_t *buffer, size_t size) {
 /* ********************************************************************************************* *
  * Implementation of FileDownload
  * ********************************************************************************************* */
-FileDownload::FileDownload(Application &app, QObject *parent)
-  : QObject(parent), SecureSocket(app.dht()), _application(app),
+FileDownload::FileDownload(DHT &dht, QObject *parent)
+  : QObject(parent), SecureSocket(dht),
     _state(INITIALIZED), _fileSize(0), _packetBuffer()
 {
 
@@ -223,7 +223,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _application.dht().socketClosed(id());
+      _dht.socketClosed(id());
       emit closed();
     }
     return;
@@ -312,7 +312,7 @@ FileDownload::stop() {
   if (TERMINATED != _state) {
     _state = TERMINATED;
     // signal DHT to close stream
-    _application.dht().socketClosed(id());
+    _dht.socketClosed(id());
     emit closed();
   }
 }

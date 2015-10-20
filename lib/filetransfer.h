@@ -5,9 +5,6 @@
 #include "lib/crypto.h"
 #include "lib/stream.h"
 
-// Forward declarations
-class Application;
-
 #define FILETRANSFER_MAX_DATA_LEN     (DHT_SEC_MAX_DATA_SIZE-5UL)
 
 /** Implements the file transfer sender side. */
@@ -16,12 +13,16 @@ class FileUpload : public QObject, public SecureSocket
   Q_OBJECT
 
 public:
+  /** State of the transfer. */
   typedef enum {
-    INITIALIZED, REQUEST_SEND, STARTED, TERMINATED
+    INITIALIZED,
+    REQUEST_SEND,
+    STARTED,
+    TERMINATED
   } State;
 
 public:
-  explicit FileUpload(Application &app, const QString &filename, size_t fileSize, QObject *parent = 0);
+  explicit FileUpload(DHT &dht, const QString &filename, size_t fileSize, QObject *parent = 0);
   virtual ~FileUpload();
 
   void handleDatagram(const uint8_t *data, size_t len);
@@ -47,7 +48,6 @@ signals:
   void closed();
 
 protected:
-  Application &_application;
   /** Current state of the transmission. */
   State _state;
   /** A transmission packet buffer. */
@@ -70,7 +70,7 @@ public:
   } State;
 
 public:
-  explicit FileDownload(Application &app, QObject *parent = 0);
+  explicit FileDownload(DHT &dht, QObject *parent = 0);
   virtual ~FileDownload();
 
   void handleDatagram(const uint8_t *data, size_t len);
@@ -93,7 +93,6 @@ signals:
   void closed();
 
 protected:
-  Application &_application;
   State _state;
   size_t _fileSize;
   StreamInBuffer _packetBuffer;

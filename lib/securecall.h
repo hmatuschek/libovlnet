@@ -12,9 +12,6 @@
 
 #include <QObject>
 
-// Forward declaration
-class Application;
-
 /** Target bit rate about 12kb/s, mono, wide band and 20ms frame duration. At 48k sample rate,
  * this implies 960 samples per buffer/frame. */
 class SecureCall : public QObject, public SecureSocket
@@ -33,7 +30,7 @@ public:
   /** Constructor.
    * @param incomming Indicates whether the call was initiated by the peer or this node.
    * @param application A weak reference to the application instance. */
-  explicit SecureCall(bool incomming, Application &application);
+  explicit SecureCall(bool incomming, DHT &dht);
   /** Destructor. */
   virtual ~SecureCall();
 
@@ -70,8 +67,6 @@ protected:
 protected:
   /** If @c true, this stream was initiated by the remote party. */
   bool _incomming;
-  /** A weak reference to the application instance. */
-  Application &_application;
   /** The opus audio encoder. */
   OpusEncoder *_encoder;
   /** The opus audio decoder. */

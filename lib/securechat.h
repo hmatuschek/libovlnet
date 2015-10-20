@@ -6,15 +6,13 @@
 #include <QObject>
 #include <QTimer>
 
-class Application;
-
 /** Implements a trivial chat message service. */
 class SecureChat : public QObject, public SecureSocket
 {
   Q_OBJECT
 
 public:
-  SecureChat(Application &application);
+  SecureChat(DHT &dht);
   virtual ~SecureChat();
 
 public slots:
@@ -33,7 +31,6 @@ protected slots:
   void _onTimeout();
 
 protected:
-  Application &_application;
   QTimer _keepAlive;
   QTimer _timeout;
 };

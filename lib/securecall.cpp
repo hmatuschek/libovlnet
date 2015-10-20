@@ -1,10 +1,10 @@
 #include "securecall.h"
-#include "application.h"
+#include "dht.h"
 #include <netinet/in.h>
 
-SecureCall::SecureCall(bool incomming, Application &application)
-  : QObject(0), SecureSocket(application.dht()), _incomming(incomming),
-    _application(application), _encoder(0), _decoder(0), _paStream(0)
+SecureCall::SecureCall(bool incomming, DHT &dht)
+  : QObject(0), SecureSocket(dht),
+    _incomming(incomming), _encoder(0), _decoder(0), _paStream(0)
 {
   // Init encoder
   int err = 0;

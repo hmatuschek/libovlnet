@@ -1,10 +1,9 @@
 #include "securechat.h"
-#include "application.h"
+#include "dht.h"
 
-
-SecureChat::SecureChat(Application &application)
-  : QObject(0), SecureSocket(application.dht()),
-    _application(application), _keepAlive(), _timeout()
+SecureChat::SecureChat(DHT &dht)
+  : QObject(0), SecureSocket(dht),
+    _keepAlive(), _timeout()
 {
   // Setup keep-alive timer
   _keepAlive.setInterval(1000*5);

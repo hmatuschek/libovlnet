@@ -19,7 +19,6 @@ class DHT;
 /** Maximum unencrypted payload per message
  * (DHT_MAX_DATA_SIZE - 8 (sequence) - 16 (GCM-MAC) - 16 (AES 128 BLOCK MARGIN)). */
 #define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-40)
-
 /** The max. public key size for a START_STREAM message. */
 #define DHT_MAX_PUBKEY_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-3)
 

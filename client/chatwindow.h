@@ -4,7 +4,8 @@
 #include <QWidget>
 #include <QTextBrowser>
 #include <QLineEdit>
-#include "securechat.h"
+
+#include "lib/securechat.h"
 
 
 // Forward declarations

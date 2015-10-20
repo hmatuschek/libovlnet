@@ -11,7 +11,6 @@
 #include "lib/dht.h"
 #include "dhtstatus.h"
 #include "buddylist.h"
-#include "securechat.h"
 #include "bootstrapnodelist.h"
 #include "logwindow.h"
 

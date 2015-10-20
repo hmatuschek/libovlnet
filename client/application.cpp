@@ -244,15 +244,15 @@ Application::newSocket(uint16_t service) {
   if (1 == service) {
     // VoIP service
     logDebug() << "Create new SecureCall instance.";
-    return new SecureCall(true, *this);
+    return new SecureCall(true, dht());
   } else if (2 == service) {
     // Chat service
     logDebug() << "Create new SecureChat instance.";
-    return new SecureChat(*this);
+    return new SecureChat(dht());
   } else if (4 == service) {
     // File download
     logDebug() << "Create new Download instance.";
-    return new FileDownload(*this);
+    return new FileDownload(dht());
   } else if (5 == service) {
     // SOCKS proxy service not implemented yet
     logWarning() << "Secure SOCKS proxy not implemented yet.";
@@ -316,7 +316,7 @@ Application::connectionFailed(SecureSocket *stream) {
 void
 Application::startChatWith(const Identifier &id) {
   // Add id to list of pending chats
-  _pendingStreams.insert(id, new SecureChat(*this));
+  _pendingStreams.insert(id, new SecureChat(dht()));
   // First search node
   _dht->findNode(id);
 }
@@ -324,7 +324,7 @@ Application::startChatWith(const Identifier &id) {
 void
 Application::call(const Identifier &id) {
   // Add id to list of pending calls
-  _pendingStreams.insert(id, new SecureCall(false, *this));
+  _pendingStreams.insert(id, new SecureCall(false, dht()));
   // First, search node
   _dht->findNode(id);
 }
@@ -332,7 +332,7 @@ Application::call(const Identifier &id) {
 void
 Application::sendFile(const QString &path, size_t size, const Identifier &id) {
   // Add id to list of pending file transfers
-  _pendingStreams.insert(id, new FileUpload(*this, path, size));
+  _pendingStreams.insert(id, new FileUpload(dht(), path, size));
   // First, search for the node id
   _dht->findNode(id);
 }

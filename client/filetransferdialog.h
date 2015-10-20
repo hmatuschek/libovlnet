@@ -1,13 +1,15 @@
 #ifndef FILETRANSFERDIALOG_H
 #define FILETRANSFERDIALOG_H
 
-#include "filetransfer.h"
+
+#include "lib/filetransfer.h"
 
 #include <QWidget>
 #include <QLabel>
 #include <QProgressBar>
 #include <QPushButton>
 
+class Application;
 
 class FileUploadDialog: public QWidget
 {
