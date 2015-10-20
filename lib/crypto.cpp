@@ -460,8 +460,8 @@ SecureSocket::encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   int len1=0, len2=0;
   // "derive IV"
   uint8_t iv[16]; memcpy(iv, _sharedIV, 8);
-  // Append seq to shared IV (first 8bytes)
-  *((uint64_t *)(iv+8)) = seq;
+  // Append seq number (in big endian) to shared IV (first 8bytes)
+  *((uint64_t *)(iv+8)) = qToBigEndian(qint64(seq));
   // Init encryption
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
@@ -508,7 +508,7 @@ SecureSocket::decrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   // "derive IV"
   uint8_t iv[16]; memcpy(iv, _sharedIV, 8);
   // Append seq to shared IV (first 8bytes)
-  *((uint64_t *)(iv+8)) = seq;
+  *((uint64_t *)(iv+8)) = qToBigEndian(qint64(seq));
   // Init encryption
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
@@ -519,7 +519,7 @@ SecureSocket::decrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   if (1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL))
     goto error;
   // set key & IV
-  if (1 != EVP_DecryptInit_ex(&ctx, NULL, NULL, _sharedKey, _sharedIV))
+  if (1 != EVP_DecryptInit_ex(&ctx, NULL, NULL, _sharedKey, iv))
     goto error;
   // go
   if (1 != EVP_DecryptUpdate(&ctx, out, &len1, in, inlen))
@@ -551,19 +551,22 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
     // process null datagram
     this->handleDatagram(0, 0); return;
   } else if (len<24) {
-    // A valid encrypted message needs at least 24 bytes (64bit seq + 128 tag).
+    // A valid encrypted message needs at least 24 bytes (64bit seq + 128bit tag).
     return;
   }
   // Get sequence number
   qint64 seq = qFromBigEndian(*((quint64 *)data)); data +=8;
   // Get MAC tag
   const uint8_t *tag = data; data += 16;
+  // Decrypt message, store result in _inBuffer
   int rxlen = 0;
-  // Decrypt message
   if (0 > (rxlen = decrypt(seq, data, len-24, _inBuffer, tag))) {
     logDebug() << "Failed to decrypt message " << seq;
     return;
   }
+  /// @bug That is somewhat late! However, sizeof(_inBuffer)==DHT_MAX_MESSAGE_SIZE
+  ///      and the decrypted message cannot be larger than that. Hence it is
+  ///      ensured that there is no buffer overrun.
   if (rxlen > DHT_SEC_MAX_DATA_SIZE) {
     logError() << "Fatal: Decrypted data larger than MAX_SEC_DATA_SIZE!"
                << " LEN=" << rxlen << ">" << DHT_SEC_MAX_DATA_SIZE;
