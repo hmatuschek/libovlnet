@@ -459,9 +459,9 @@ SecureSocket::encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
 
   int len1=0, len2=0;
   // "derive IV"
-  uint8_t iv[16]; memcpy(iv, _sharedIV, 16);
+  uint8_t iv[16]; memcpy(iv, _sharedIV, 8);
   // Append seq to shared IV (first 8bytes)
-  *((uint64_t *)(_sharedIV+8)) = seq;
+  *((uint64_t *)(iv+8)) = seq;
   // Init encryption
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
@@ -472,7 +472,7 @@ SecureSocket::encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   if (1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL))
     goto error;
   // set key & IV
-  if (1 != EVP_EncryptInit_ex(&ctx, NULL, NULL, _sharedKey, _sharedIV))
+  if (1 != EVP_EncryptInit_ex(&ctx, NULL, NULL, _sharedKey, iv))
     goto error;
   // go
   if (1 != EVP_EncryptUpdate(&ctx, out, &len1, in, inlen))
@@ -505,8 +505,10 @@ SecureSocket::decrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   // Check arguments
   if ((!in) || (!out)) { return -1; }
   int len1=0, len2=0;
-  // Append seq to shared IV
-  *((uint64_t *)(_sharedIV+8)) = seq;
+  // "derive IV"
+  uint8_t iv[16]; memcpy(iv, _sharedIV, 8);
+  // Append seq to shared IV (first 8bytes)
+  *((uint64_t *)(iv+8)) = seq;
   // Init encryption
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
@@ -548,13 +550,13 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
   if (0 == len) {
     // process null datagram
     this->handleDatagram(0, 0); return;
-  } else if (len<4) {
-    // A valid encrypted message needs at least 4 bytes (the sequence uint32_t).
+  } else if (len<24) {
+    // A valid encrypted message needs at least 24 bytes (64bit seq + 128 tag).
     return;
   }
   // Get sequence number
   qint64 seq = qFromBigEndian(*((quint64 *)data)); data +=8;
-  // Get tag
+  // Get MAC tag
   const uint8_t *tag = data; data += 16;
   int rxlen = 0;
   // Decrypt message
@@ -581,7 +583,8 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   ptr += DHT_HASH_SIZE; txlen += DHT_HASH_SIZE;
   // store sequence number
   *((uint64_t *)ptr) = qToBigEndian(_outSeq); txlen += 8; ptr += 8;
-  uint8_t *tag = ptr; ptr += 16; txlen += 16;
+  // Get ptr to MAC tag
+  uint8_t *tag = ptr; txlen += 16; ptr += 16;
   // store encrypted data if there is any
   if ( (len <= 0) || (0 > (enclen = encrypt(_outSeq, data, len, ptr, tag))) )
     return false;
@@ -592,10 +595,12 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
     logError() << "SecureSocket: Cannot send datagram: " << _socket->errorString();
     return false;
   }
+  // Check if datagram was send completely
   if (txlen != send)
     return false;
   // Update seq
   _outSeq += txlen;
+  // done.
   return true;
 }
 
