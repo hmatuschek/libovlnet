@@ -6,6 +6,7 @@
 
 #include <QFile>
 #include <QByteArray>
+#include <QtEndian>
 
 #include <openssl/conf.h>
 #include <openssl/err.h>
@@ -14,7 +15,6 @@
 #include <openssl/pem.h>
 #include <openssl/ripemd.h>
 
-#include "netinet/in.h"
 
 
 /* ******************************************************************************************** *
@@ -432,11 +432,12 @@ SecureSocket::start(const Identifier &streamId, const PeerItem &peer, QUdpSocket
   OPENSSL_free(skey);
 
   // Set seq to random value
-  _outSeq = dht_rand32();
+  _outSeq = dht_rand64();
   // Store peer
   _peer = peer;
   // Store stream id and socket
-  _streamId = streamId; _socket = socket;
+  _streamId = streamId;
+  _socket = socket;
   return true;
 
 error:
@@ -451,7 +452,7 @@ error:
 }
 
 int
-SecureSocket::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out, uint8_t *tag)
+SecureSocket::encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *out, uint8_t *tag)
 {
   // Check arguments
   if ((!in) || (!out)) { return -1; }
@@ -459,16 +460,18 @@ SecureSocket::encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   logDebug() << "SecureSocket::encrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
 
   int len1=0, len2=0;
-  // Append seq to shared IV
-  *((uint32_t *)(_sharedIV+16)) = seq;
+  // "derive IV"
+  uint8_t iv[16]; memcpy(iv, _sharedIV, 16);
+  // Append seq to shared IV (first 8bytes)
+  *((uint64_t *)(_sharedIV+8)) = seq;
   // Init encryption
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
   // Set mode: AES 128bit GCM
   if (1 != EVP_EncryptInit_ex(&ctx, EVP_aes_128_gcm(), NULL, NULL, NULL))
     goto error;
-  // set IV length to 20 (16byte IV derived from DH + 4byte counter)
-  if (1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_IVLEN, 20, NULL))
+  // set IV length to 16 (8byte IV derived from DH + 8byte counter)
+  if (1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL))
     goto error;
   // set key & IV
   if (1 != EVP_EncryptInit_ex(&ctx, NULL, NULL, _sharedKey, _sharedIV))
@@ -498,21 +501,21 @@ error:
 }
 
 int
-SecureSocket::decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out, const uint8_t *tag)
+SecureSocket::decrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *out, const uint8_t *tag)
 {
   // Check arguments
   if ((!in) || (!out)) { return -1; }
   int len1=0, len2=0;
   // Append seq to shared IV
-  *((uint32_t *)(_sharedIV+16)) = seq;
+  *((uint64_t *)(_sharedIV+8)) = seq;
   // Init encryption
   EVP_CIPHER_CTX ctx;
   EVP_CIPHER_CTX_init(&ctx);
   // Init mode: 128bit AES in GCM
   if (1 != EVP_DecryptInit_ex(&ctx, EVP_aes_128_gcm(), NULL, NULL, NULL))
     goto error;
-  // set IV len (20 = 16 shared IV + 4 counter)
-  if (1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_IVLEN, 20, NULL))
+  // set IV len (16 = 8 shared IV + 8 counter)
+  if (1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL))
     goto error;
   // set key & IV
   if (1 != EVP_DecryptInit_ex(&ctx, NULL, NULL, _sharedKey, _sharedIV))
@@ -551,12 +554,12 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
     return;
   }
   // Get sequence number
-  uint32_t seq = ntohl(*((uint32_t *)data)); data +=4;
+  uint64_t seq = qFromBigEndian(*((quint64 *)data)); data +=8;
   // Get tag
   const uint8_t *tag = data; data += 16;
   int rxlen = 0;
   // Decrypt message
-  if (0 > (rxlen = decrypt(seq, data, len-20, _inBuffer, tag))) {
+  if (0 > (rxlen = decrypt(seq, data, len-22, _inBuffer, tag))) {
     logDebug() << "Failed to decrypt message " << seq;
     return;
   }
@@ -578,7 +581,7 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   memcpy(ptr, _streamId.data(), DHT_HASH_SIZE);
   ptr += DHT_HASH_SIZE; txlen += DHT_HASH_SIZE;
   // store sequence number
-  *((uint32_t *)ptr) = htonl(_outSeq); txlen += 4; ptr += 4;
+  *((uint64_t *)ptr) = qToBigEndian(_outSeq); txlen += 8; ptr += 8;
   uint8_t *tag = ptr; ptr += 16; txlen += 16;
   // store encrypted data if there is any
   if ( (len <= 0) || (0 > (enclen = encrypt(_outSeq, data, len, ptr, tag))) )

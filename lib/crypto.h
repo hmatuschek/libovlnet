@@ -17,8 +17,11 @@ class DHT;
 
 
 /** Maximum unencrypted payload per message
- * (DHT_MAX_DATA_SIZE - 4 (sequence) - 16 (GCM-MAC) - 16 (AES 128 BLOCK MARGIN)). */
-#define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-36)
+ * (DHT_MAX_DATA_SIZE - 8 (sequence) - 16 (GCM-MAC) - 16 (AES 128 BLOCK MARGIN)). */
+#define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-40)
+
+/** The max. public key size for a START_STREAM message. */
+#define DHT_MAX_PUBKEY_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-3)
 
 
 /** Represents the identity of a node. A node is unquely identified by its keypair. The private key
@@ -69,7 +72,16 @@ protected:
 
 
 
-/** Represents a simple encrypted datagram socket between two nodes. */
+/** Represents a simple encrypted datagram socket between two nodes.
+ * Although being secure by means of encryption and authentication, it is not reliable. A message
+ * or datagram may get lost during the transmission without notice. For a reliable transport,
+ * consider @c SecureStream.
+ *
+ * The shared secret for the connection will be derived from a ECDH handshake, where a fresh ECDH
+ * keypair is used for every connection. The SHA-2-256 hash is used as the key-derivative function
+ * to obtain the 128bit shared symmetric key and the first 64bit of the IV. The second half of the
+ * IV (64bit) is a sequence nuber send along with the encrypted datagrams. The symmetric cipher is
+ * AES-128 in GCM mode. */
 class SecureSocket
 {
 public:
@@ -87,7 +99,20 @@ protected:
   /** Needs to be implemented by any specialization to handle received datagrams. */
   virtual void handleDatagram(const uint8_t *data, size_t len) = 0;
 
-  /** Sends the given @c data as an encrypted datagram. */
+  /** Sends the given @c data as an encrypted datagram.
+   * Datagram format:
+   * \code
+   * struct {
+   *   // 64bit big-endian sequence number, forms the second half of the IV used to encrypt the
+   *   // datagram. The initial tag is chosed randomly and will be incremented by the size of the
+   *   // encrypted payload.
+   *   uint64_t sequence;
+   *   // 128bit Message authentication tag
+   *   uint8_t  mac_tag[16];
+   *   // Encrypted message
+   *   uint8_t  data[*];
+   * };
+   **/
   bool sendDatagram(const uint8_t *data, size_t len);
 
   /** Sends a null datagram. */
@@ -131,10 +156,10 @@ protected:
   bool start(const Identifier &streamId, const PeerItem &peer, QUdpSocket *socket);
   /** Encrypts the given data @c in using the sequential number @c seq and stores the
    * result in the ouput buffer @c out. */
-  int encrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out, uint8_t *tag);
+  int encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *out, uint8_t *tag);
   /** Decrypts the given data @c in using the sequential number @c seq and stores the
    * result in the output buffer @c out. */
-  int decrypt(uint32_t seq, const uint8_t *in, size_t inlen, uint8_t *out, const uint8_t *tag);
+  int decrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *out, const uint8_t *tag);
 
 protected:
   /** A weak reference to the DHT instance. */
@@ -152,9 +177,9 @@ private:
   /** The shared key. */
   uint8_t _sharedKey[16];
   /** The shared IV. */
-  uint8_t _sharedIV[20];
+  uint8_t _sharedIV[16];
   /** The current sequence number (bytes send). */
-  uint32_t _outSeq;
+  uint64_t _outSeq;
   /** Buffer holding the decrypted message. */
   uint8_t _inBuffer[DHT_MAX_MESSAGE_SIZE];
   /** Identifier of the stream. */
