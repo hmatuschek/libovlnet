@@ -457,8 +457,6 @@ SecureSocket::encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   // Check arguments
   if ((!in) || (!out)) { return -1; }
 
-  logDebug() << "SecureSocket::encrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
-
   int len1=0, len2=0;
   // "derive IV"
   uint8_t iv[16]; memcpy(iv, _sharedIV, 16);
@@ -485,6 +483,7 @@ SecureSocket::encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
   // get MAC tag
   if(1 != EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_GET_TAG, 16, (void *)tag))
     goto error;
+  logDebug() << "SecureSocket::encrypt(): TAG=" << QByteArray((const char *)tag, 16).toHex();
   // done
   EVP_CIPHER_CTX_cleanup(&ctx);
   return len1+len2;
@@ -554,12 +553,12 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
     return;
   }
   // Get sequence number
-  uint64_t seq = qFromBigEndian(*((quint64 *)data)); data +=8;
+  qint64 seq = qFromBigEndian(*((quint64 *)data)); data +=8;
   // Get tag
   const uint8_t *tag = data; data += 16;
   int rxlen = 0;
   // Decrypt message
-  if (0 > (rxlen = decrypt(seq, data, len-22, _inBuffer, tag))) {
+  if (0 > (rxlen = decrypt(seq, data, len-24, _inBuffer, tag))) {
     logDebug() << "Failed to decrypt message " << seq;
     return;
   }
