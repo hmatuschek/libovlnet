@@ -90,7 +90,7 @@ Application::Application(int &argc, char *argv[])
   _bootstrap   = new QAction(QIcon("://icons/bootstrap.png"), tr("Bootstrap ..."), this);
   _showStatus  = new QAction(QIcon("://icons/dashboard.png"), tr("Show status ..."), this);
   _showSettings = new QAction(QIcon("://icons/wrench.png"), tr("Settings ..."), this);
-  _quit        = new QAction(QIcon("://icons/quit.png"),      tr("Quit"), this);
+  _quit        = new QAction(QIcon("://icons/power-standby.png"), tr("Quit"), this);
 
   _searchWindow = 0;
   _buddyListWindow = 0;
@@ -106,6 +106,7 @@ Application::Application(int &argc, char *argv[])
   ctx->addSeparator();
   ctx->addAction(_quit);
 
+  // setup tray icon
   _trayIcon = new QSystemTrayIcon();
   if (_dht->numNodes()) {
     _trayIcon->setIcon(QIcon("://icons/fork.png"));
@@ -122,6 +123,7 @@ Application::Application(int &argc, char *argv[])
     _reconnectTimer.start();
   }
 
+  // Connect to signals
   connect(_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(onNodeFound(NodeItem)));
   connect(_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
           this, SLOT(onNodeNotFound(Identifier,QList<NodeItem>)));

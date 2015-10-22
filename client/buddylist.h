@@ -66,6 +66,9 @@ public:
     bool hasNode(const Identifier &id) const;
     Node *node(size_t idx);
     Node *node(const Identifier &id);
+    /** Returns the index of the given node within this buddy or -1 if the node is not associated
+     * with this buddy. */
+    int index(const Identifier &id) const;
     void delNode(const Identifier &id);
     void addNode(const Identifier &id, const QHostAddress &host=QHostAddress(), uint16_t port=0);
 
@@ -139,10 +142,6 @@ public slots:
   void save();
 
 signals:
-  void buddyAdded(const QString &name);
-  void buddyRemoved(const QString &name);
-  void nodeAdded(const QString &buddy, const Identifier &node);
-  void nodeRemoved(const QString &buddy, const Identifier &node);
   void appeared(const Identifier &id);
   void disappeared(const Identifier &id);
 

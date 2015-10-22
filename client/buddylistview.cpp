@@ -135,8 +135,20 @@ BuddyListView::onDelete() {
   QModelIndexList items = _tree->selectionModel()->selectedIndexes();
   if ((0 == items.size()) || (!items.first().isValid())) { return; }
   if (_application.buddies().isBuddy(items.first())) {
+    QString name = _application.buddies().getBuddy(items.first())->name();
+    if (QMessageBox::Yes != QMessageBox::question(0, tr("Delete contact"),
+                                                  tr("Delete contact %1").arg(name),
+                                                  QMessageBox::No, QMessageBox::Yes)) {
+      return;
+    }
     _application.buddies().delBuddy(items.first());
   } else if (_application.buddies().isNode(items.first())) {
+    QString name = _application.buddies().getNode(items.first())->id().toBase32();
+    if (QMessageBox::Yes != QMessageBox::question(0, tr("Delete node"),
+                                                  tr("Delete node %1").arg(name),
+                                                  QMessageBox::No, QMessageBox::Yes)) {
+      return;
+    }
     _application.buddies().delNode(items.first());
   }
 }

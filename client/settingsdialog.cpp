@@ -13,7 +13,7 @@
 SettingsDialog::SettingsDialog(Settings &settings, QWidget *parent)
   : QDialog(parent), _settings(settings)
 {
-  setMinimumWidth(480);
+  setMinimumWidth(640);
 
   _socks = new SocksServiceSettingsView(settings.socksServiceSettings());
 

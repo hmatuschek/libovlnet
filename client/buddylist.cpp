@@ -99,6 +99,12 @@ BuddyList::Buddy::node(const Identifier &id) {
   return _nodes[_nodeTable[id]];
 }
 
+int
+BuddyList::Buddy::index(const Identifier &id) const {
+  if (_nodeTable.contains(id)) { return -1; }
+  return _nodeTable[id];
+}
+
 bool
 BuddyList::Buddy::hasNode(const Identifier &id) const {
   return _nodeTable.contains(id);
@@ -192,7 +198,7 @@ BuddyList::BuddyList(Application &application, const QString path, QObject *pare
 
   // Read buddy list from file
   if (! _file.open(QIODevice::ReadOnly)) {
-    logInfo() << "Can not read buddy list from " << _file.fileName(); return;
+    logError() << "Can not read buddy list from " << _file.fileName(); return;
   }
   logDebug() << "Read buddy list from file " << _file.fileName();
 
@@ -260,15 +266,19 @@ BuddyList::hasNode(const Identifier &id) const {
 
 BuddyList::Buddy *
 BuddyList::getBuddy(size_t idx) const {
+  if (idx >= _buddies.size()) { return 0; }
   return _buddies[idx];
 }
+
 BuddyList::Buddy *
 BuddyList::getBuddy(const QString &name) const {
+  if (! _buddyTable.contains(name)) { return 0; }
   return _buddies[_buddyTable[name]];
 }
 
 BuddyList::Buddy *
 BuddyList::getBuddy(const Identifier &id) const {
+  if (! _nodes.contains(id)) { return 0; }
   return _buddies[_nodes[id]];
 }
 
@@ -332,7 +342,6 @@ BuddyList::delBuddy(const QString &name) {
   Buddy *buddy = _buddies[idx];
 
   beginRemoveRows(QModelIndex(), idx, idx);
-
   _buddyTable.remove(name);
   // Remove all nodes associated with the buddy
   Buddy::iterator node = buddy->begin();
@@ -351,20 +360,26 @@ BuddyList::delBuddy(const QString &name) {
 void
 BuddyList::delNode(const QString &name, const Identifier &node) {
   if (! _buddyTable.contains(name)) { return; }
-  size_t idx = _buddyTable[name];
-  if (! _buddies[idx]->hasNode(node)) { return; }
-  _buddies[idx]->delNode(node);
+  size_t buddyIdx = _buddyTable[name];
+  Buddy *buddy = _buddies[buddyIdx];
+  if (! buddy->hasNode(node)) { return; }
+  size_t nodeIdx = buddy->index(node);
+
+  beginRemoveRows(index(buddyIdx, 0, QModelIndex()), nodeIdx, nodeIdx);
+  buddy->delNode(node);
   _nodes.remove(node);
-  emit nodeRemoved(name, node);
+  endRemoveRows();
+  // done
   save();
 }
 
 void
 BuddyList::save()  {
   if (!_file.open(QIODevice::WriteOnly)) {
-    logError() << "Cannot write buddy list!"; return;
+    logError() << "Cannot write buddy list!";
+    return;
   }
-
+  // Serialize buddylist
   QJsonDocument doc;
   QJsonArray lst;
   QVector<Buddy *>::const_iterator buddy = _buddies.begin();
@@ -372,8 +387,10 @@ BuddyList::save()  {
     lst.append((*buddy)->toJson());
   }
   doc.setArray(lst);
+  // write to file
   _file.write(doc.toJson());
   _file.close();
+  // done.
 }
 
 QModelIndex
@@ -450,8 +467,6 @@ void
 BuddyList::_onNodeFound(const NodeItem &node) {
   // check if node belongs to a buddy
   if (! _nodes.contains(node.id())) { return; }
-  logDebug() << "Node " << node.id() << " found @"
-             << node.addr() << ":" << node.port() << ": Send ping request.";
   // Send ping to node
   _application.dht().ping(node.addr(), node.port());
 }
@@ -460,7 +475,6 @@ void
 BuddyList::_onNodeReachable(const NodeItem &node) {
   // check if node belongs to a buddy
   if (! _nodes.contains(node.id())) { return; }
-  logDebug() << "Node " << node.id() << " reachable at " << node.addr() << ":" << node.port();
   BuddyList::Buddy *buddy = _buddies[_nodes[node.id()]];
   BuddyList::Node *nodeitem = buddy->node(node.id());
   if (! nodeitem->hasBeenSeen()) {

@@ -6,7 +6,6 @@
         <file>icons/people.png</file>
         <file>icons/person.png</file>
         <file>icons/phone.png</file>
-        <file>icons/quit.png</file>
         <file>icons/search.png</file>
         <file>icons/data-transfer-upload.png</file>
         <file>icons/circle-check.png</file>
@@ -21,5 +20,6 @@
         <file>icons/person_gray.png</file>
         <file>icons/wrench.png</file>
         <file>icons/dashboard.png</file>
+        <file>icons/power-standby.png</file>
     </qresource>
 </RCC>
