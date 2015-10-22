@@ -1,5 +1,6 @@
 #include "settings.h"
 #include "lib/logger.h"
+#include <QJsonArray>
 
 
 /* ********************************************************************************************* *
@@ -119,8 +120,8 @@ SocksServiceWhiteList::SocksServiceWhiteList(const QJsonArray &lst)
   : QSet<Identifier>()
 {
   for (QJsonArray::const_iterator item = lst.begin(); item != lst.end(); item++) {
-    if (item->isString()) {
-      this->insert(Identifier::fromBase32(item->toString()));
+    if ((*item).isString()) {
+      this->insert(Identifier::fromBase32((*item).toString()));
     }
   }
 }
