@@ -23,8 +23,8 @@
 #include <QJsonArray>
 
 Application::Application(int &argc, char *argv[])
-  : QApplication(argc, argv), _identity(0), _dht(0), _status(0), _buddies(0),
-    _bootstrapList(), _reconnectTimer()
+  : QApplication(argc, argv), _identity(0), _dht(0), _status(0), _settings(0),
+    _buddies(0), _bootstrapList(), _reconnectTimer()
 {
   // Init PortAudio
   Pa_Initialize();
@@ -38,14 +38,14 @@ Application::Application(int &argc, char *argv[])
   setOrganizationDomain("com.github.hmatuschek");
 
   // Try to load identity from file
-  QDir vlfDir = QStandardPaths::writableLocation(
+  QDir nodeDir = QStandardPaths::writableLocation(
         QStandardPaths::DataLocation);
   // check if VLF directory exists
-  if (! vlfDir.exists()) {
-    vlfDir.mkpath(vlfDir.absolutePath());
+  if (! nodeDir.exists()) {
+    nodeDir.mkpath(nodeDir.absolutePath());
   }
   // Load or create identity
-  QString idFile(vlfDir.canonicalPath()+"/identity.pem");
+  QString idFile(nodeDir.canonicalPath()+"/identity.pem");
   if (!QFile::exists(idFile)) {
     logInfo() << "No identity found -> create new identity.";
     _identity = Identity::newIdentity();
@@ -67,8 +67,11 @@ Application::Application(int &argc, char *argv[])
   // Create DHT instance
   _dht = new DHT(*_identity, this, QHostAddress::Any, 7742);
 
+  // Load settings
+  _settings = new Settings(nodeDir.canonicalPath()+"/settings.json");
+
   // load a list of bootstrap servers.
-  _bootstrapList = BootstrapNodeList(vlfDir.canonicalPath()+"/bootstrap.json");
+  _bootstrapList = BootstrapNodeList(nodeDir.canonicalPath()+"/bootstrap.json");
   QPair<QString, uint16_t> hostport;
   foreach (hostport, _bootstrapList) {
     _dht->ping(hostport.first, hostport.second);
@@ -77,7 +80,7 @@ Application::Application(int &argc, char *argv[])
   // Create DHT status object
   _status = new DHTStatus(*this);
   // Create buddy list model
-  _buddies = new BuddyList(*this, vlfDir.canonicalPath()+"/buddies.json");
+  _buddies = new BuddyList(*this, nodeDir.canonicalPath()+"/buddies.json");
 
   // Actions
   _search      = new QAction(QIcon("://icons/search.png"),    tr("Search..."), this);
@@ -254,9 +257,12 @@ Application::newSocket(uint16_t service) {
     logDebug() << "Create new Download instance.";
     return new FileDownload(dht());
   } else if (5 == service) {
-    // SOCKS proxy service not implemented yet
-    logWarning() << "Secure SOCKS proxy not implemented yet.";
-    return 0;
+    // If socks service is disabled -> return 0
+    if (! _settings->socksServiceSettings().enabled()) {
+      return 0;
+    }
+    // otherwise create SOCKS proxy stream
+    return new SocksOutStream(dht());
   } else {
     logWarning() << "Unknown service number " << service;
   }
@@ -270,39 +276,42 @@ Application::allowConnection(uint16_t service, const NodeItem &peer) {
     //  check if peer is buddy list
     return _buddies->hasNode(peer.id());
   } else if (5 == service) {
-    // SOCKS proxy service not implemented yet
+    // If buddies are allowed to use the SOCKS service or
+    //  if whitelist is enabled and node is listed there
+    return ( (_settings->socksServiceSettings().allowBuddies() && _buddies->hasNode(peer.id())) ||
+             (_settings->socksServiceSettings().allowWhiteListed() &&
+              _settings->socksServiceSettings().whitelist().contains(peer.id())) );
   }
   return false;
 }
 
 void
 Application::connectionStarted(SecureSocket *stream) {
-  SecureChat *chat = 0;
-  SecureCall *call = 0;
-  FileUpload *upload = 0;
-  FileDownload *download = 0;
-  LocalSocksStream *socks = 0;
-
-  if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
-    // start keep alive timer
+  // Dispatch by stream type
+  if (SecureChat *chat = dynamic_cast<SecureChat *>(stream)) {
+    // Start keep alive timer
     chat->started();
     (new ChatWindow(*this, chat))->show();
-  } else if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
-    // start streaming
+  } else if (SecureCall *call = dynamic_cast<SecureCall *>(stream)) {
+    // Start streaming
     call->initialized();
     (new CallWindow(*this, call))->show();
-  } else if (0 != (upload = dynamic_cast<FileUpload *>(stream))) {
+  } else if (FileUpload *upload = dynamic_cast<FileUpload *>(stream)) {
     // Send request
     upload->sendRequest();
-    // show upload dialog
+    // Show upload dialog
     (new FileUploadDialog(upload, *this))->show();
-  } else if (0 != (download = dynamic_cast<FileDownload *>(stream))) {
-    // show download dialog
+  } else if (FileDownload *download = dynamic_cast<FileDownload *>(stream)) {
+    // Show download dialog
     (new FileDownloadDialog(download, *this))->show();
-  } else if (0 != (socks = dynamic_cast<LocalSocksStream *>(stream))) {
+  } else if (LocalSocksStream *socksin = dynamic_cast<LocalSocksStream *>(stream)) {
     // Simply open the stream
-    socks->open(QIODevice::ReadWrite);
+    socksin->open(QIODevice::ReadWrite);
+  } else if (SocksOutStream *socksout = dynamic_cast<SocksOutStream *>(stream)) {
+    // start SOCKS service.
+    socksout->open(QIODevice::ReadWrite);
   } else {
+    logWarning() << "Unknown service type. Close connection " << stream->id();
     _dht->socketClosed(stream->id());
     delete stream;
   }
@@ -340,6 +349,11 @@ Application::sendFile(const QString &path, size_t size, const Identifier &id) {
 DHT &
 Application::dht() {
   return *_dht;
+}
+
+Settings &
+Application::settings() {
+  return *_settings;
 }
 
 Identity &

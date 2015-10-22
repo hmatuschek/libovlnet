@@ -49,11 +49,6 @@ void
 SearchDialog::_onStartSearch() {
   // Assemble ID
   Identifier id = Identifier::fromBase32(_query->text());
-  if (id.size() > DHT_HASH_SIZE) { id.resize(DHT_HASH_SIZE); }
-  else if (id.size() < DHT_HASH_SIZE) {
-    id.reserve(DHT_HASH_SIZE);
-    while (id.size()<DHT_HASH_SIZE) { id.append('\x00'); }
-  }
   _currentSearch = id;
   _result->setRowCount(0);
   _dht->findNode(_currentSearch);

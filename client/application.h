@@ -13,6 +13,7 @@
 #include "buddylist.h"
 #include "bootstrapnodelist.h"
 #include "logwindow.h"
+#include "settings.h"
 
 
 class Application : public QApplication, public ServiceHandler
@@ -38,6 +39,8 @@ public:
 
   /** Returns a weak reference to the DHT instance. */
   DHT &dht();
+  /** Returns the settings instance. */
+  Settings &settings();
   /** Returns a weak reference to the identity of this DHT node. */
   Identity &identity();
   /** Returns a weak reference to the buddy list. */
@@ -82,6 +85,8 @@ protected:
   DHT *_dht;
   /** Status of the DHT node. */
   DHTStatus *_status;
+  /** The persistent settings instance. */
+  Settings *_settings;
   /** The buddy list. */
   BuddyList *_buddies;
   /** The list of bootstap servers. */
