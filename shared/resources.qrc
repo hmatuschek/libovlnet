@@ -8,7 +8,6 @@
         <file>icons/phone.png</file>
         <file>icons/quit.png</file>
         <file>icons/search.png</file>
-        <file>icons/settings.png</file>
         <file>icons/data-transfer-upload.png</file>
         <file>icons/circle-check.png</file>
         <file>icons/circle-x.png</file>
@@ -20,5 +19,7 @@
         <file>icons/list.png</file>
         <file>icons/fork_gray.png</file>
         <file>icons/person_gray.png</file>
+        <file>icons/wrench.png</file>
+        <file>icons/dashboard.png</file>
     </qresource>
 </RCC>

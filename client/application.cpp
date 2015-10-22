@@ -5,8 +5,9 @@
 #include "chatwindow.h"
 #include "callwindow.h"
 #include "filetransferdialog.h"
-#include "lib/socks.h"
+#include "settingsdialog.h"
 
+#include "lib/socks.h"
 #include "lib/logger.h"
 
 #include <portaudio.h>
@@ -21,6 +22,7 @@
 #include <QStandardPaths>
 #include <QJsonDocument>
 #include <QJsonArray>
+
 
 Application::Application(int &argc, char *argv[])
   : QApplication(argc, argv), _identity(0), _dht(0), _status(0), _settings(0),
@@ -88,7 +90,8 @@ Application::Application(int &argc, char *argv[])
   _showBuddies = new QAction(QIcon("://icons/people.png"),    tr("Contacts..."), this);
   _buddyListWindow = 0;
   _bootstrap   = new QAction(QIcon("://icons/bootstrap.png"), tr("Bootstrap..."), this);
-  _showStatus  = new QAction(QIcon("://icons/settings.png"),  tr("Show status ..."), this);
+  _showSettings = new QAction(QIcon("://icons/wrench.png"), tr("Settings..."), this);
+  _showStatus  = new QAction(QIcon("://icons/dashboard.png"),  tr("Show status ..."), this);
   _statusWindow = 0;
   _showLogWindow = new QAction(QIcon("://icons/list.png"), tr("Show log..."), this);
   _logWindow = 0;
@@ -99,6 +102,7 @@ Application::Application(int &argc, char *argv[])
   ctx->addAction(_showBuddies);
   ctx->addSeparator();
   ctx->addAction(_bootstrap);
+  ctx->addAction(_showSettings);
   ctx->addAction(_showStatus);
   ctx->addAction(_showLogWindow);
   ctx->addSeparator();
@@ -197,6 +201,12 @@ Application::onShowBuddies() {
 void
 Application::onBuddyListClosed() {
   _buddyListWindow = 0;
+}
+
+void
+Application::onShowSettings() {
+  SettingsDialog dialog(settings());
+  dialog.exec();
 }
 
 void
