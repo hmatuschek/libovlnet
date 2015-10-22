@@ -124,15 +124,16 @@ Application::Application(int &argc, char *argv[])
     _reconnectTimer.start();
   }
 
-  QObject::connect(_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(onNodeFound(NodeItem)));
-  QObject::connect(_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
-                   this, SLOT(onNodeNotFound(Identifier,QList<NodeItem>)));
+  connect(_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(onNodeFound(NodeItem)));
+  connect(_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
+          this, SLOT(onNodeNotFound(Identifier,QList<NodeItem>)));
   QObject::connect(_dht, SIGNAL(connected()), this, SLOT(onDHTConnected()));
   QObject::connect(_dht, SIGNAL(disconnected()), this, SLOT(onDHTDisconnected()));
 
-  QObject::connect(_bootstrap, SIGNAL(triggered()), this, SLOT(onBootstrap()));
-  QObject::connect(_showBuddies, SIGNAL(triggered()), this, SLOT(onShowBuddies()));
   QObject::connect(_search, SIGNAL(triggered()), this, SLOT(search()));
+  QObject::connect(_showBuddies, SIGNAL(triggered()), this, SLOT(onShowBuddies()));
+  QObject::connect(_bootstrap, SIGNAL(triggered()), this, SLOT(onBootstrap()));
+  connect(_showSettings, SIGNAL(triggered()), this, SLOT(onShowSettings()));
   QObject::connect(_showStatus, SIGNAL(triggered()), this, SLOT(onShowStatus()));
   QObject::connect(_showLogWindow, SIGNAL(triggered()), this, SLOT(onShowLogWindow()));
   QObject::connect(_quit, SIGNAL(triggered()), this, SLOT(onQuit()));
@@ -206,7 +207,9 @@ Application::onBuddyListClosed() {
 void
 Application::onShowSettings() {
   SettingsDialog dialog(settings());
-  dialog.exec();
+  if (QDialog::Accepted == dialog.exec()) {
+    dialog.apply();
+  }
 }
 
 void

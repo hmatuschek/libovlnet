@@ -3,6 +3,7 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QPushButton>
+#include <QDialogButtonBox>
 
 
 /* ********************************************************************************************* *
@@ -11,15 +12,24 @@
 SettingsDialog::SettingsDialog(Settings &settings, QWidget *parent)
   : QDialog(parent), _settings(settings)
 {
+  setMinimumWidth(480);
+
   _socks = new SocksServiceSettingsView(settings.socksServiceSettings());
 
   QTabWidget *tabs = new QTabWidget();
   tabs->addTab(_socks, tr("SOCKS Proxy"));
 
+  QDialogButtonBox *bbox = new QDialogButtonBox(
+        QDialogButtonBox::Close | QDialogButtonBox::Apply | QDialogButtonBox::Ok);
+
   QVBoxLayout *layout = new QVBoxLayout();
-  layout->setContentsMargins(0,0,0,0);
   layout->addWidget(tabs);
+  layout->addWidget(bbox);
   setLayout(layout);
+
+  connect(bbox, SIGNAL(accepted()), this, SLOT(accept()));
+  connect(bbox, SIGNAL(rejected()), this, SLOT(reject()));
+  connect(bbox->button(QDialogButtonBox::Apply), SIGNAL(clicked(bool)), this, SLOT(apply()));
 }
 
 void
@@ -104,6 +114,7 @@ WhiteListView::WhiteListView(QSet<Identifier> &whitelist, QWidget *parent)
 
   QVBoxLayout *layout = new QVBoxLayout();
   layout->setContentsMargins(0,0,0,0);
+  layout->setSpacing(0);
   QHBoxLayout *bbox = new QHBoxLayout();
   bbox->setContentsMargins(0,0,0,0);
   bbox->addWidget(add);
