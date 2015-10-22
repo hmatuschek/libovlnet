@@ -55,6 +55,8 @@ protected slots:
   void onShowBuddies();
   /** Callback for the "bootstrap" action. */
   void onBootstrap();
+  /** Callback for the "show settings" action. */
+  void onShowSettings();
   /** Callback for the "show DHT status" action. */
   void onShowStatus();
   /** Callback for the "show log window" action. */
@@ -97,6 +99,7 @@ protected:
   QAction *_showBuddies;
   QAction *_search;
   QAction *_bootstrap;
+  QAction *_showSettings;
   QAction *_showStatus;
   QAction *_showLogWindow;
   QAction *_quit;
