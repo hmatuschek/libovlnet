@@ -105,20 +105,23 @@ public:
   bool hasBuddy(const QString &name) const;
   /** Returns @c true if the node is assigned to a buddy. */
   bool hasNode(const Identifier &id) const;
+
   /** Returns the specified buddy. */
   Buddy *getBuddy(size_t idx) const;
+  Buddy *getBuddy(const QModelIndex &idx) const;
   /** Returns the specified buddy. */
   Buddy *getBuddy(const QString &name) const;
   /** Returns the budy associated with the given node. */
   Buddy *getBuddy(const Identifier &id) const;
-  Buddy *getBuddy(const QModelIndex &idx) const;
   /** Returns the name of the buddy with the associated node. */
   QString buddyName(const Identifier &id) const;
-  /** Add a buddy to the list or the given node to the speicified buddy. */
+
+  /** Add a buddy to the list. */
   void addBuddy(const QString &name, const Identifier &node);
-  /** Add a node to the specified buddy. */
-  void addNode(const QString &name, const Identifier &node);
+  /** Removes a buddy by index. */
+  void delBuddy(const QModelIndex &idx);
   Node *getNode(const QModelIndex &idx) const;
+  void delNode(const QModelIndex &idx);
   /** Removes a buddy from the list. */
   void delBuddy(const QString &name);
   /** Removes a node from the given buddy. */

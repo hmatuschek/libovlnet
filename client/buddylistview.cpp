@@ -132,7 +132,13 @@ BuddyListView::onSearch() {
 
 void
 BuddyListView::onDelete() {
-  logInfo() << "Not implemented yet.";
+  QModelIndexList items = _tree->selectionModel()->selectedIndexes();
+  if ((0 == items.size()) || (!items.first().isValid())) { return; }
+  if (_application.buddies().isBuddy(items.first())) {
+    _application.buddies().delBuddy(items.first());
+  } else if (_application.buddies().isNode(items.first())) {
+    _application.buddies().delNode(items.first());
+  }
 }
 
 void

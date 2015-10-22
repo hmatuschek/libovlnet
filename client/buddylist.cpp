@@ -279,11 +279,32 @@ BuddyList::getBuddy(const QModelIndex &idx) const {
         reinterpret_cast<Item *>(idx.internalPointer()));
 }
 
+void
+BuddyList::delBuddy(const QModelIndex &idx) {
+  Buddy *buddy = getBuddy(idx);
+  if (0 == buddy) { return; }
+  delBuddy(buddy->name());
+}
+
 BuddyList::Node *
 BuddyList::getNode(const QModelIndex &idx) const {
   if (! idx.isValid()) { return 0; }
   return dynamic_cast<Node *>(
         reinterpret_cast<Item *>(idx.internalPointer()));
+}
+
+void
+BuddyList::delNode(const QModelIndex &idx) {
+  Node  *node = getNode(idx);
+  if (0 == node) { return ; }
+  Buddy *buddy = _buddies[_nodes[node->id()]];
+
+  beginRemoveRows(idx.parent(), idx.row(), idx.row());
+  // Remove node from buddy
+  buddy->delNode(node->id());
+  // Remove nodes from table associated with the given buddy
+  _nodes.remove(node->id());
+  endRemoveRows();
 }
 
 QString
@@ -293,22 +314,14 @@ BuddyList::buddyName(const Identifier &id) const {
 
 void
 BuddyList::addBuddy(const QString &name, const Identifier &node) {
-  if (! _buddyTable.contains(name)) {
-    Buddy *buddy = new Buddy(name);
-    buddy->addNode(node);
-    _buddyTable.insert(name, _buddies.size());
-    _nodes.insert(node, _buddies.size());
-    _buddies.append(buddy);
-    emit buddyAdded(name);
-  }
-  save();
-}
-
-void
-BuddyList::addNode(const QString &name, const Identifier &node) {
-  if (! hasBuddy(name)) { return; }
-  _buddies[_buddyTable[name]]->addNode(node);
-  emit nodeAdded(name, node);
+  if (_buddyTable.contains(name)) { return; }
+  beginInsertRows(QModelIndex(), _buddies.size(), _buddies.size());
+  Buddy *buddy = new Buddy(name);
+  buddy->addNode(node);
+  _buddyTable.insert(name, _buddies.size());
+  _nodes.insert(node, _buddies.size());
+  _buddies.append(buddy);
+  endInsertRows();
   save();
 }
 
@@ -316,14 +329,22 @@ void
 BuddyList::delBuddy(const QString &name) {
   if (! _buddyTable.contains(name)) { return; }
   size_t idx = _buddyTable[name];
-  delete _buddies[idx];
+  Buddy *buddy = _buddies[idx];
+
+  beginRemoveRows(QModelIndex(), idx, idx);
+
   _buddyTable.remove(name);
-  _buddies.remove(idx);
+  // Remove all nodes associated with the buddy
+  Buddy::iterator node = buddy->begin();
+  for (; node != buddy->end(); node++) { _nodes.remove((*node)->id()); }
   // Update indices
+  _buddyTable.clear();
   for (int i=0; i<_buddies.size(); i++) {
     _buddyTable[_buddies[i]->name()] = i;
   }
-  emit buddyRemoved(name);
+  delete _buddies[idx]; _buddies.remove(idx);
+  endRemoveRows();
+  // save.
   save();
 }
 

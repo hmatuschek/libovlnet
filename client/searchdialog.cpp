@@ -61,8 +61,10 @@ SearchDialog::_onAddAsNewBuddy() {
   QList<QTableWidgetItem *> selectedItems = _result->selectedItems();
   QList<QTableWidgetItem *>::iterator item = selectedItems.begin();
   for (; item != selectedItems.end(); item++) {
+    logDebug() << "Add node: " << _result->item((*item)->row(), 0)->text();
     nodes.insert(
           Identifier::fromBase32(_result->item((*item)->row(), 0)->text()));
+    logDebug() << " ... " << Identifier::fromBase32(_result->item((*item)->row(), 0)->text());
   }
   if (0 == nodes.size()) { return; }
   Identifier node = *(nodes.begin());
