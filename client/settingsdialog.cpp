@@ -4,6 +4,7 @@
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QDialogButtonBox>
+#include <QLabel>
 
 
 /* ********************************************************************************************* *
@@ -17,7 +18,7 @@ SettingsDialog::SettingsDialog(Settings &settings, QWidget *parent)
   _socks = new SocksServiceSettingsView(settings.socksServiceSettings());
 
   QTabWidget *tabs = new QTabWidget();
-  tabs->addTab(_socks, tr("SOCKS Proxy"));
+  tabs->addTab(_socks, QIcon("://icons/globe.png"), tr("SOCKS Proxy"));
 
   QDialogButtonBox *bbox = new QDialogButtonBox(
         QDialogButtonBox::Close | QDialogButtonBox::Apply | QDialogButtonBox::Ok);
@@ -57,12 +58,12 @@ SocksServiceSettingsView::SocksServiceSettingsView(SocksServiceSettings &setting
   _whitelist->setEnabled(_settings.enabled() && _settings.allowWhiteListed());
 
   QVBoxLayout *layout = new QVBoxLayout();
-  layout->setContentsMargins(0,0,0,0);
   QFormLayout *form = new QFormLayout();
   form->addRow(tr("Enabled"), _enabled);
   form->addRow(tr("Allow contacts"), _allowBuddies);
   form->addRow(tr("Allow whitelisted"), _allowWhiteList);
   layout->addLayout(form);
+  layout->addWidget(new QLabel(tr("Whitelist:")));
   layout->addWidget(_whitelist);
   setLayout(layout);
 

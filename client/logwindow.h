@@ -6,6 +6,8 @@
 #include <QTableView>
 #include "lib/logger.h"
 
+class Application;
+
 
 class LogModel: public QAbstractTableModel, public LogHandler
 {
@@ -27,15 +29,12 @@ protected:
 };
 
 
-class LogWindow: public QWidget
+class LogWidget: public QWidget
 {
   Q_OBJECT
 
 public:
-  explicit LogWindow(LogModel *model);
-
-protected:
-  void closeEvent(QCloseEvent *evt);
+  explicit LogWidget(Application &app);
 
 protected:
   QTableView *_table;

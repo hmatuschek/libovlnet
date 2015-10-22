@@ -85,26 +85,24 @@ Application::Application(int &argc, char *argv[])
   _buddies = new BuddyList(*this, nodeDir.canonicalPath()+"/buddies.json");
 
   // Actions
-  _search      = new QAction(QIcon("://icons/search.png"),    tr("Search..."), this);
-  _searchWindow = 0;
-  _showBuddies = new QAction(QIcon("://icons/people.png"),    tr("Contacts..."), this);
-  _buddyListWindow = 0;
-  _bootstrap   = new QAction(QIcon("://icons/bootstrap.png"), tr("Bootstrap..."), this);
-  _showSettings = new QAction(QIcon("://icons/wrench.png"), tr("Settings..."), this);
-  _showStatus  = new QAction(QIcon("://icons/dashboard.png"),  tr("Show status ..."), this);
-  _statusWindow = 0;
-  _showLogWindow = new QAction(QIcon("://icons/list.png"), tr("Show log..."), this);
-  _logWindow = 0;
+  _search      = new QAction(QIcon("://icons/search.png"), tr("Search ..."), this);
+  _showBuddies = new QAction(QIcon("://icons/people.png"), tr("Contacts ..."), this);
+  _bootstrap   = new QAction(QIcon("://icons/bootstrap.png"), tr("Bootstrap ..."), this);
+  _showStatus  = new QAction(QIcon("://icons/dashboard.png"), tr("Show status ..."), this);
+  _showSettings = new QAction(QIcon("://icons/wrench.png"), tr("Settings ..."), this);
   _quit        = new QAction(QIcon("://icons/quit.png"),      tr("Quit"), this);
+
+  _searchWindow = 0;
+  _buddyListWindow = 0;
+  _statusWindow = 0;
 
   QMenu *ctx = new QMenu();
   ctx->addAction(_search);
   ctx->addAction(_showBuddies);
   ctx->addSeparator();
   ctx->addAction(_bootstrap);
-  ctx->addAction(_showSettings);
   ctx->addAction(_showStatus);
-  ctx->addAction(_showLogWindow);
+  ctx->addAction(_showSettings);
   ctx->addSeparator();
   ctx->addAction(_quit);
 
@@ -127,18 +125,17 @@ Application::Application(int &argc, char *argv[])
   connect(_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(onNodeFound(NodeItem)));
   connect(_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
           this, SLOT(onNodeNotFound(Identifier,QList<NodeItem>)));
-  QObject::connect(_dht, SIGNAL(connected()), this, SLOT(onDHTConnected()));
-  QObject::connect(_dht, SIGNAL(disconnected()), this, SLOT(onDHTDisconnected()));
+  connect(_dht, SIGNAL(connected()), this, SLOT(onDHTConnected()));
+  connect(_dht, SIGNAL(disconnected()), this, SLOT(onDHTDisconnected()));
 
-  QObject::connect(_search, SIGNAL(triggered()), this, SLOT(search()));
-  QObject::connect(_showBuddies, SIGNAL(triggered()), this, SLOT(onShowBuddies()));
-  QObject::connect(_bootstrap, SIGNAL(triggered()), this, SLOT(onBootstrap()));
+  connect(_search, SIGNAL(triggered()), this, SLOT(search()));
+  connect(_showBuddies, SIGNAL(triggered()), this, SLOT(onShowBuddies()));
+  connect(_bootstrap, SIGNAL(triggered()), this, SLOT(onBootstrap()));
   connect(_showSettings, SIGNAL(triggered()), this, SLOT(onShowSettings()));
-  QObject::connect(_showStatus, SIGNAL(triggered()), this, SLOT(onShowStatus()));
-  QObject::connect(_showLogWindow, SIGNAL(triggered()), this, SLOT(onShowLogWindow()));
-  QObject::connect(_quit, SIGNAL(triggered()), this, SLOT(onQuit()));
+  connect(_showStatus, SIGNAL(triggered()), this, SLOT(onShowStatus()));
+  connect(_quit, SIGNAL(triggered()), this, SLOT(onQuit()));
 
-  QObject::connect(&_reconnectTimer, SIGNAL(timeout()), this, SLOT(onReconnect()));
+  connect(&_reconnectTimer, SIGNAL(timeout()), this, SLOT(onReconnect()));
 }
 
 Application::~Application() {
@@ -218,7 +215,7 @@ Application::onShowStatus() {
     _statusWindow->activateWindow();
     _statusWindow->raise();
   } else {
-    _statusWindow = new DHTStatusView(_status);
+    _statusWindow = new DHTStatusWindow(*this);
     _statusWindow->show();
     _statusWindow->raise();
     QObject::connect(_statusWindow, SIGNAL(destroyed()),
@@ -229,25 +226,6 @@ Application::onShowStatus() {
 void
 Application::onStatusWindowClosed() {
   _statusWindow = 0;
-}
-
-void
-Application::onShowLogWindow() {
-  if (_logWindow) {
-    _logWindow->activateWindow();
-    _logWindow->raise();
-  } else {
-    _logWindow = new LogWindow(_logModel);
-    _logWindow->show();
-    _logWindow->raise();
-    QObject::connect(_logWindow, SIGNAL(destroyed()),
-                     this, SLOT(onLogWindowClosed()));
-  }
-}
-
-void
-Application::onLogWindowClosed() {
-  _logWindow = 0;
 }
 
 void
@@ -377,6 +355,21 @@ Application::identity() {
 BuddyList &
 Application::buddies() {
   return *_buddies;
+}
+
+LogModel &
+Application::log() {
+  return *_logModel;
+}
+
+DHTStatus &
+Application::status() {
+  return *_status;
+}
+
+bool
+Application::started() const {
+  return (_dht && _dht->started());
 }
 
 void

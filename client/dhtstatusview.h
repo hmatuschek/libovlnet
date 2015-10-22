@@ -7,12 +7,25 @@
 #include <QTimer>
 #include <QLabel>
 
+
+class DHTStatusWindow: public QWidget
+{
+  Q_OBJECT
+
+public:
+  DHTStatusWindow(Application &app, QWidget *parent=0);
+
+protected:
+  void closeEvent(QCloseEvent *evt);
+};
+
+
 class DHTStatusView : public QWidget
 {
   Q_OBJECT
 
 public:
-  explicit DHTStatusView(DHTStatus *status, QWidget *parent = 0);
+  explicit DHTStatusView(Application &app, QWidget *parent = 0);
 
 
 protected slots:
@@ -21,7 +34,6 @@ protected slots:
 protected:
   QString _formatBytes(size_t bytes);
   QString _formatRate(double rate);
-  void closeEvent(QCloseEvent *evt);
 
 protected:
   DHTStatus *_status;

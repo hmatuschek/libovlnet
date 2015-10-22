@@ -8,6 +8,8 @@
 #include <QCloseEvent>
 #include <QFileInfo>
 
+#include "application.h"
+
 
 LogModel::LogModel(QObject *parent)
   : QAbstractTableModel(parent), LogHandler(LogMessage::DEBUG)
@@ -79,19 +81,17 @@ LogModel::handleMessage(const LogMessage &msg) {
 
 
 
-LogWindow::LogWindow(LogModel *model)
+LogWidget::LogWidget(Application &app)
   : QWidget(0)
 {
-  setWindowTitle(tr("Log Messages"));
-
   setMinimumSize(640, 360);
 
   _table = new QTableView();
-  _table->setModel(model);
+  _table->setModel(&app.log());
   _table->horizontalHeader()->setVisible(false);
   _table->horizontalHeader()->setStretchLastSection(true);
 
-  connect(model, SIGNAL(rowsInserted(QModelIndex,int,int)),
+  connect(&app.log(), SIGNAL(rowsInserted(QModelIndex,int,int)),
           _table, SLOT(scrollToBottom()));
   QVBoxLayout *layout = new QVBoxLayout();
   layout->addWidget(_table);
@@ -99,11 +99,4 @@ LogWindow::LogWindow(LogModel *model)
   setLayout(layout);
 
   _table->scrollToBottom();
-}
-
-void
-LogWindow::closeEvent(QCloseEvent *evt)  {
-  QWidget::closeEvent(evt);
-  evt->accept();
-  this->deleteLater();
 }

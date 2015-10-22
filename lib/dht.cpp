@@ -351,14 +351,16 @@ StartStreamRequest::StartStreamRequest(uint16_t service, const Identifier &peer,
  * ******************************************************************************************** */
 DHT::DHT(Identity &id, ServiceHandler *streamHandler,
          const QHostAddress &addr, quint16 port, QObject *parent)
-  : QObject(parent), _self(id), _socket(), _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
+  : QObject(parent), _self(id), _socket(), _started(false),
+    _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
     _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),
     _streamHandler(streamHandler), _streams(),
     _requestTimer(), _nodeTimer(), _announcementTimer(), _statisticsTimer()
 {
   logInfo() << "Start node #" << id.id() << " @ " << addr << ":" << port;
 
-  if (!_socket.bind(addr, port)) {
+  // try to bind socket to address and port
+  if (! _socket.bind(addr, port)) {
     logError() << "Cannot bind to " << addr << ":" << port;
     return;
   }
@@ -391,6 +393,8 @@ DHT::DHT(Identity &id, ServiceHandler *streamHandler,
   _nodeTimer.start();
   _announcementTimer.start();
   _statisticsTimer.start();
+
+  _started = true;
 }
 
 DHT::~DHT() {
@@ -548,6 +552,13 @@ DHT::identity() const {
 const Identifier &
 DHT::id() const {
   return _self.id();
+}
+
+bool
+DHT::started() const {
+  // Check if socket is bound
+  return (_started && _socket.isValid() &&
+          (QAbstractSocket::BoundState == _socket.state()));
 }
 
 size_t

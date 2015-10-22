@@ -51,6 +51,8 @@ public:
   const Identity &identity() const;
   /** Returns the identifier of the DHT node. */
   const Identifier &id() const;
+  /** Returns @c true if the socket is listening on the specified port. */
+  bool started() const;
 
   /** Returns the number of bytes send. */
   size_t bytesSend() const;
@@ -193,6 +195,8 @@ protected:
   Identity &_self;
   /** The network socket. */
   QUdpSocket _socket;
+  /** If @c true, the socket was bound to the address and port given to the constructor. */
+  bool _started;
 
   /** The number of bytes received. */
   size_t _bytesReceived;

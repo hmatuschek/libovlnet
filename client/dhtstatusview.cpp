@@ -1,16 +1,46 @@
 #include "dhtstatusview.h"
+#include "logwindow.h"
+
 #include <QString>
 #include <QFormLayout>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QCloseEvent>
+#include <QTabWidget>
+
+#include "application.h"
 
 
-DHTStatusView::DHTStatusView(DHTStatus *status, QWidget *parent) :
-  QWidget(parent), _status(status), _updateTimer()
+/* ******************************************************************************************** *
+ * Implementation of DHTStatusWindow
+ * ******************************************************************************************** */
+DHTStatusWindow::DHTStatusWindow(Application &app, QWidget *parent)
+  : QWidget(parent)
 {
   setWindowTitle(tr("Overlay network status"));
 
+  QTabWidget *tabs = new QTabWidget();
+  tabs->addTab(new DHTStatusView(app), QIcon("://icons/dashboard.png"), tr("Status"));
+  tabs->addTab(new LogWidget(app), QIcon("://icons/list.png"), tr("Log"));
+
+  QVBoxLayout *layout = new QVBoxLayout();
+  layout->addWidget(tabs);
+  setLayout(layout);
+}
+
+void
+DHTStatusWindow::closeEvent(QCloseEvent *evt) {
+  evt->accept();
+  deleteLater();
+}
+
+
+/* ******************************************************************************************** *
+ * Implementation of DHTStatusView
+ * ******************************************************************************************** */
+DHTStatusView::DHTStatusView(Application &app, QWidget *parent) :
+  QWidget(parent), _status(&app.status()), _updateTimer()
+{
   _updateTimer.setInterval(5000);
   _updateTimer.setSingleShot(false);
 
@@ -90,8 +120,3 @@ DHTStatusView::_formatRate(double rate) {
   return QString("%1Mb/s").arg(QString::number(rate/1e6, 'f', 1));
 }
 
-void
-DHTStatusView::closeEvent(QCloseEvent *evt) {
-  evt->accept();
-  this->deleteLater();
-}

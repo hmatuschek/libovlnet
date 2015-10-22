@@ -45,6 +45,13 @@ public:
   Identity &identity();
   /** Returns a weak reference to the buddy list. */
   BuddyList &buddies();
+  /** Returns the log model. */
+  LogModel &log();
+  /** Returns the status model of the application. */
+  DHTStatus &status();
+
+  /** Returns @c true if the OvlNet node was started successfully. */
+  bool started() const;
 
 public slots:
   /** Shows the search dialog. */
@@ -59,15 +66,12 @@ protected slots:
   void onShowSettings();
   /** Callback for the "show DHT status" action. */
   void onShowStatus();
-  /** Callback for the "show log window" action. */
-  void onShowLogWindow();
   /** Callback for the "quit" action. */
   void onQuit();
 
   void onSearchWindowClosed();
   void onBuddyListClosed();
   void onStatusWindowClosed();
-  void onLogWindowClosed();
 
   /** Get notified if a node search was successful. */
   void onNodeFound(const NodeItem &node);
@@ -101,13 +105,11 @@ protected:
   QAction *_bootstrap;
   QAction *_showSettings;
   QAction *_showStatus;
-  QAction *_showLogWindow;
   QAction *_quit;
 
   QWidget *_searchWindow;
   QWidget *_buddyListWindow;
   QWidget *_statusWindow;
-  QWidget *_logWindow;
 
   /** Table of pending streams. */
   QHash<Identifier, SecureSocket *> _pendingStreams;
