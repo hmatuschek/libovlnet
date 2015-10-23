@@ -585,8 +585,6 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   uint8_t msg[DHT_MAX_MESSAGE_SIZE];
   uint8_t *ptr = msg;
   int txlen = 0, enclen=0;
-
-  logDebug() << "SecureSocket: Send " << len << "b: " << QByteArray((const char *)data, len).toHex();
   // Store stream cookie
   memcpy(ptr, _streamId.data(), DHT_HASH_SIZE);
   ptr += DHT_HASH_SIZE; txlen += DHT_HASH_SIZE;
