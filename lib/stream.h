@@ -153,7 +153,7 @@ public:
     return (0xffff-_available);
   }
 
-  /** Reads some data available & ACKed. */
+  /** Reads some ACKed data . */
   uint32_t read(uint8_t *buffer, uint32_t len) {
     len = std::min(len, _available);
     len = _buffer.read(buffer, len);
@@ -329,7 +329,7 @@ protected:
     return ( (a<b) ? ((a<x) && (x<=b)) : ((a<x) || (x<=b)) );
   }
 
-  /** Updates the round trip time statistics. Every 64 samples, the timeout is recalculated. */
+  /** Updates the round trip time statistics. Every 64 samples, the timeout is updated. */
   inline void _update_rt(size_t ms) {
     // Update sums
     _rt_sum += ms; _rt_sumsq  += ms*ms; _rt_count++;
@@ -375,6 +375,19 @@ class SecureStream: public QIODevice, public SecureSocket
   Q_OBJECT
 
 public:
+  /** Possible states of the stream. */
+  typedef enum {
+    INITIALIZED,  ///< Stream is initialized, data may be received but and stored in the buffer,
+                  ///  but no event is emitted.
+    OPEN,         ///< Stream is open and data can be send or received. IO events are emitted.
+    FIN_RECEIVED, ///< No data is received anymore but remaining data will be send. The state will
+                  ///  change to CLOSED once all data has been send. This state can be reached if
+                  ///  either a FIN packet is received or if @c close is called.
+    CLOSED        ///< Stream closed, either by receiving a RST message or by having send all data
+                  ///  remained at a call to @c close.
+  } State;
+
+public:
   /** Constructor.
    * @param dht A weak reference to the DHT instance.
    * @param parent The optional QObject parent. */
@@ -388,6 +401,8 @@ public:
   bool open(OpenMode mode);
   /** Close the stream. */
   void close();
+  /** Reset the connection. */
+  void cancel();
 
   /** Returns the number of bytes in the input buffer. */
   qint64 bytesAvailable() const;
@@ -415,8 +430,8 @@ private:
   StreamInBuffer  _inBuffer;
   /** The output buffer. */
   StreamOutBuffer _outBuffer;
-  /** If @c true the stream has been closed. */
-  bool _closed;
+  /** The internal state of the connection. */
+  State _state;
   /** Keep-alive timer. */
   QTimer _keepalive;
   /** Checks for packet timeouts. */

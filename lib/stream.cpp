@@ -70,7 +70,7 @@ StreamOutBuffer::StreamOutBuffer(uint64_t timeout)
  * ******************************************************************************************** */
 SecureStream::SecureStream(DHT &dht, QObject *parent)
   : QIODevice(parent), SecureSocket(dht), _inBuffer(), _outBuffer(2000),
-    _closed(false), _keepalive(), _packetTimer(), _timeout()
+    _state(INITIALIZED), _keepalive(), _packetTimer(), _timeout()
 {
   // Setup keep-alive timer, gets started by open();
   _keepalive.setInterval(1000);
@@ -100,15 +100,20 @@ SecureStream::isSequential() const {
 bool
 SecureStream::open(OpenMode mode) {
   bool ok = QIODevice::open(mode);
-  if ((! _closed) && ok) {
+  if ((INITIALIZED == _state) && ok) {
     _keepalive.start();
     _timeout.start();
+    _state = OPEN;
   }
-  return (!_closed) && ok;
+  return (OPEN == _state) && ok;
 }
 
 void
 SecureStream::_onKeepAlive() {
+  if (CLOSED == _state) {
+    _keepalive.stop();
+    return;
+  }
   // send "keep-alive" ping (ACK=next expected sequence)
   Message resp(Message::ACK);
   // Set sequence
@@ -136,13 +141,34 @@ SecureStream::_onCheckPacketTimeout() {
 
 void
 SecureStream::_onTimeOut() {
-  logDebug() << "SecureStream: Connection timeout -> close().";
-  // close connection
-  close();
+  logDebug() << "SecureStream: Connection timeout -> reset connection.";
+  // abort connection
+  cancel();
 }
 
 void
 SecureStream::close() {
+  // If already closed -> done
+  if (CLOSED == _state) { return; }
+
+  // close QIODevice
+  QIODevice::close();
+
+  // If state is open
+  if (OPEN == _state) {
+    // readcanel finished
+    emit readChannelFinished();
+    _state = FIN_RECEIVED;
+    // If all data has been send -> closed
+    if (! bytesToWrite()) {
+      // sends RST & closes the connection
+      cancel();
+    }
+  }
+}
+
+void
+SecureStream::cancel() {
   // Stop keep alive timer
   _keepalive.stop();
   // Stop packet timer.
@@ -157,9 +183,9 @@ SecureStream::close() {
   QIODevice::close();
 
   // Send reset packet
-  if (! _closed) {
+  if (CLOSED != _state) {
     logDebug() << "SecureStream: Close connection, send RST.";
-    _closed = true;
+    _state = CLOSED;
     Message msg(Message::RESET);
     if(! sendDatagram((uint8_t *) &msg, 1)) {
       logError() << "SecureConnection: Can not send RST packet.";
@@ -247,8 +273,10 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       resp.payload.window = htons(_inBuffer.window());
       // Send ACK & reset keep-alive timer
       if (sendDatagram((const uint8_t*) &resp, 7)) { _keepalive.start(); }
-      // Signal new data got available
-      emit readyRead();
+      // Signal new data got available if stream is open
+      if (OPEN == _state) {
+        emit readyRead();
+      }
     }
     // done
     return;
@@ -262,12 +290,18 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     // ACK data in output buffer
     if (uint32_t send = _outBuffer.ack(seq, ntohs(msg->payload.window))) {
       // If some data in the output buffer has been ACKed
-      // -> Signal data send
-      emit bytesWritten(send);
+      // -> Signal data send if stream is open
+      if (OPEN == _state) {
+        emit bytesWritten(send);
+      }
       // If the last byte in the output buffer was ACKed and the _packettimer is
       // runnning -> stop it.
       if ((!_outBuffer.bytesToWrite()) && _packetTimer.isActive()) {
         _packetTimer.stop();
+      }
+      if ((FIN_RECEIVED == _state) && (! bytesToWrite())) {
+        // close connection
+        cancel();
       }
       // done.
       return;
@@ -280,7 +314,9 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       uint16_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
       _outBuffer.resend(resp.payload.data, len, seq);
       resp.seq = htonl(seq);
-      if (sendDatagram((const uint8_t *) &resp, len+5)) { _keepalive.start(); }
+      if (sendDatagram((const uint8_t *) &resp, len+5)) {
+        _keepalive.start();
+      }
     }
     // done.
     return;
@@ -288,9 +324,8 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
 
   if (Message::RESET == msg->type) {
     if (len!=1) { return; }
-    _closed = true;
     emit readChannelFinished();
-    close();
+    cancel();
     // done.
     return;
   }
