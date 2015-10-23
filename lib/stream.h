@@ -264,7 +264,6 @@ public:
   uint32_t write(const uint8_t *buffer, uint32_t len) {
     // store in ring-buffer
     len = _buffer.write(buffer, std::min(free(), len));
-    logDebug() << "Put " << len << "b into output buffer.";
 
     if (len) {
       // Update timestamp if buffer was empty
