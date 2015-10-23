@@ -212,6 +212,7 @@ SecureStream::writeData(const char *data, qint64 len) {
   // and maximum payload length
   len = std::min(len, qint64(_outBuffer.free()));
   len = std::min(len, qint64(DHT_STREAM_MAX_DATA_SIZE));
+  if (0 == len) { return 0; }
 
   // Assemble message
   Message msg(Message::DATA);

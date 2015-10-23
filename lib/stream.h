@@ -246,7 +246,7 @@ public:
     // Do not exceed the reception window of the remote
     if (_buffer.available() > _window) { return 0; }
     // Do not exceed the buffer size.
-    return std::min(_buffer.free(), (_window-_buffer.available()));
+    return std::min(_buffer.free(), (uint32_t(_window)-_buffer.available()));
   }
 
   /** Returns the number of bytes that are not ACKed yet. */
@@ -263,9 +263,7 @@ public:
   /** Writes some data to the buffer. */
   uint32_t write(const uint8_t *buffer, uint32_t len) {
     // store in ring-buffer
-    len = _buffer.write(buffer, std::min(free(), len));
-
-    if (len) {
+    if ( (len = _buffer.write(buffer, std::min(free(), len))) ) {
       // Update timestamp if buffer was empty
       if (_firstSequence == _nextSequence) {
         _timestamp = QDateTime::currentDateTime();
