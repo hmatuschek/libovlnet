@@ -180,7 +180,7 @@ private:
   /** The current sequence number (bytes send). */
   uint64_t _outSeq;
   /** Buffer holding the decrypted message. */
-  uint8_t _inBuffer[DHT_MAX_MESSAGE_SIZE];
+  uint8_t _inBuffer[DHT_MAX_DATA_SIZE];
   /** Identifier of the stream. */
   Identifier _streamId;
   /** The UDP socket. */
