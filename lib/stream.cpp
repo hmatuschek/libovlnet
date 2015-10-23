@@ -213,17 +213,18 @@ SecureStream::writeData(const char *data, qint64 len) {
   len = std::min(len, qint64(_outBuffer.free()));
   len = std::min(len, qint64(DHT_STREAM_MAX_DATA_SIZE));
 
-  // put in output buffer
+  // Assemble message
+  Message msg(Message::DATA);
+  // store seq number
+  msg.seq = htonl(_outBuffer.nextSequence());
+
+  // put in output buffer, updates sequence number
   if(0 == (len = _outBuffer.write((const uint8_t *)data, len))) { return 0; }
 
   // If some data was added to the buffer
   // and the packet timer is not started -> start it
   if (! _packetTimer.isActive()) { _packetTimer.start(); }
 
-  // Assemble message
-  Message msg(Message::DATA);
-  // store seq number
-  msg.seq = htonl(_outBuffer.nextSequence());
   // store data in message
   memcpy(msg.payload.data, data, len);
 
