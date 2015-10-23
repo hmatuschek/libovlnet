@@ -258,7 +258,8 @@ SocksOutStream::_clientParse() {
       // check version
       if (5 != buffer[0]) {
         logInfo() << "SOCKS: Unknown version number " << int(buffer[0]);
-        close(); return;
+        close();
+        return;
       }
       // check command (only CONNECT (0x01) is supported).
       if (1 != buffer[1]) {
