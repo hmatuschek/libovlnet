@@ -14,14 +14,14 @@
 
 // Forward declarations
 struct Message;
-class Request;
-class FindNodeQuery;
-class FindValueQuery;
+class SearchQuery;
 class Request;
 class PingRequest;
 class FindNodeRequest;
 class FindValueRequest;
-class StartStreamRequest;
+class FindNeighboursRequest;
+class RendezvousSearchRequest;
+class StartConnectionRequest;
 class Identity;
 class ServiceHandler;
 class SecureSocket;
@@ -76,10 +76,17 @@ public:
   /** Sends a ping request to the given node. */
   void ping(const NodeItem &node);
 
-  /** Starts the search for a node with the given identifier. */
-  void findNode(const Identifier &id);
   /** Returns the list of all nodes in the buckets. */
   void nodes(QList<NodeItem> &lst);
+
+  /** Searches for the neighbours of the given identifier. */
+  void findNeighbours(const Identifier &id, const QList<NodeItem> &start = QList<NodeItem>());
+  /** Starts the search for a node with the given identifier. */
+  void findNode(const Identifier &id);
+  /** Starts a rendezvous search for the given node.
+   * First the neighbours of the node are searched and a rendezvous request will be send to each of
+   * the neighbours. */
+  void rendezvous(const Identifier &id);
 
   /** Returns the number of keys held by this DHT node. */
   size_t numKeys() const;
@@ -99,13 +106,6 @@ public:
   bool startStream(uint16_t service, const NodeItem &node, SecureSocket *stream);
   /** Unregister the socket with the DHT instance. */
   void socketClosed(const Identifier &id);
-
-  /** Starts a rendezvous with the give node.
-   * First the neighbours of the node are search and a rendezvous request will be send to each of
-   * the neighbours. */
-  bool rendezvous(const Identifier &id);
-  /** Sends a rendezvous request for the given node ID to the specified nodes. */
-  bool rendezvous(const Identifier &id, const QList<NodeItem> &vias);
   
 signals:
   /** Gets emitted as the DHT node enters the network. */
@@ -127,20 +127,30 @@ signals:
   void valueFound(const Identifier &id, const QList<NodeItem> &nodes);
   /** Gets emitted if the given value was not found. */
   void valueNotFound(const Identifier &id);
+  /** Gets emitted if a search neighbours query finished. */
+  void neighboursFound(const Identifier &id, const QList<NodeItem> &neighbours);
+  /** Gets emitted if the node to date can be found. */
+  void rendezvousInitiated(const NodeItem &node);
+  /** Gets emitted if the node to date cannot be found. */
+  void rendezvousFailed(const Identifier &id);
 
 protected:
   /** Sends a FindNode message to the node @c to to search for the node specified by @c id.
    * Any response to that request will be forwarded to the specified @c query. */
-  void sendFindNode(const NodeItem &to, FindNodeQuery *query);
+  void sendFindNode(const NodeItem &to, SearchQuery *query);
   /** Sends a FindValue message to the node @c to to search for the node specified by @c id.
    * Any response to that request will be forwarded to the specified @c query. */
-  void sendFindValue(const NodeItem &to, FindValueQuery *query);
+  void sendFindValue(const NodeItem &to, SearchQuery *query);
+  /** Sends a FindNode message to the node @c to to search for neighbours. */
+  void sendFindNeighbours(const NodeItem &to, SearchQuery *query);
+  /** Sends a RendezvousSearchRequest to the given node. */
+  void sendRendezvousSearch(const NodeItem &to, SearchQuery *query);
   /** Returns @c true if the given identifier belongs to a value being announced. */
   bool isPendingAnnouncement(const Identifier &id) const;
   /** Sends an Annouce message to the given node. */
   void sendAnnouncement(const NodeItem &to, const Identifier &what);
   /** Sends a Rendezvous request to the given node. */
-  void sendRendezvous(const Identifier &with, const NodeItem &to); 
+  void sendRendezvous(const Identifier &with, const PeerItem &to);
 
 private:
   /** Processes a Ping response. */
@@ -152,8 +162,14 @@ private:
   /** Processes a FindValue response. */
   void _processFindValueResponse(const Message &msg, size_t size, FindValueRequest *req,
                                 const QHostAddress &addr, uint16_t port);
+  /** Processes a FindNeighbours response. */
+  void _processFindNeighboursResponse(const Message &msg, size_t size, FindNeighboursRequest *req,
+                                      const QHostAddress &addr, uint16_t port);
+  /** Processes a RendezvousSearchRequest response. */
+  void _processRendezvousSearchResponse(const Message &msg, size_t size, RendezvousSearchRequest *req,
+                                        const QHostAddress &addr, uint16_t port);
   /** Processes a StartStream response. */
-  void _processStartStreamResponse(const Message &msg, size_t size, StartStreamRequest *req,
+  void _processStartStreamResponse(const Message &msg, size_t size, StartConnectionRequest *req,
                                    const QHostAddress &addr, uint16_t port);
   /** Processes a Ping request. */
   void _processPingRequest(const Message &msg, size_t size,

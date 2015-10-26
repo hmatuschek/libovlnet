@@ -7,17 +7,8 @@
 #include <inttypes.h>
 
 
-/** Possible message types. */
-typedef enum {
-  MSG_PING = 0,
-  MSG_ANNOUNCE,
-  MSG_FIND_NODE,
-  MSG_FIND_VALUE,
-  MSG_START_STREAM,
-  MSG_RENDEZVOUS,
-} MessageType;
-
-/** Represents a triple of ID, IP address and port as transferred via UDP. */
+/** Represents a triple of ID, IP address and port as transferred via UDP.
+ * @ingroup internal */
 struct __attribute__((packed)) DHTTriple {
   /** The ID of a node. */
   char      id[DHT_HASH_SIZE];
@@ -27,27 +18,50 @@ struct __attribute__((packed)) DHTTriple {
   uint16_t  port;
 };
 
-/** The structure of the UDP datagrams transferred. */
+
+/** The structure of the UDP datagrams transferred.
+ * @ingroup internal */
 struct __attribute__((packed)) Message
 {
-  /** The magic cookie to match a response to a request. */
-  char    cookie[DHT_HASH_SIZE];
+  /** Possible message types. */
+  typedef enum {
+    /** A ping request or response. */
+    PING = 0,
+    /** An announce message. */
+    ANNOUNCE,
+    /** A find node request message. */
+    FIND_NODE,
+    /** A find value request message. */
+    FIND_VALUE,
+    /** A "connect" request or response message. */
+    START_STREAM,
+    /** A rendezvous request or notification message. */
+    RENDEZVOUS,
+  } Type;
 
-  /** Payload */
+  /** The magic cookie to match a response to a request. */
+  char cookie[DHT_COOKIE_SIZE];
+
+  /** Payload. */
   union __attribute__((packed)) {
+    /** A ping message (request & response) consists of a type identifier
+     * and the ID of the sender. */
     struct __attribute__((packed)){
-      uint8_t type; // == PING;
-      char    id[DHT_HASH_SIZE];
+      uint8_t type;               ///< Type flag == @c MSG_PING.
+      char    id[DHT_HASH_SIZE];  ///< Identifier of the sender
     } ping;
 
+    /** An announcement message. */
     struct __attribute__((packed)) {
-      uint8_t type; // == ANNOUNCE
-      char    who[DHT_HASH_SIZE];
-      char    what[DHT_HASH_SIZE];
+      uint8_t type;                ///< Type flag == @c MSG_ANNOUNCE.
+      char    who[DHT_HASH_SIZE];  ///< Identifier of the sender.
+      char    what[DHT_HASH_SIZE]; ///< Identifier of the object.
     } announce;
 
+    /** A find node request. */
     struct __attribute__((packed)) {
-      uint8_t type; // == FIND_NODE
+      /** Type flag == @c MSG_FIND_NODE. */
+      uint8_t type;
       /** The identifier of the node to find. */
       char    id[DHT_HASH_SIZE];
       /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
@@ -57,7 +71,8 @@ struct __attribute__((packed)) Message
     } find_node;
 
     struct __attribute__((packed)) {
-      uint8_t type; // == FIND_VALUE
+      /** Type flag == @c MSG_FIND_VALUE. */
+      uint8_t type;
       /** The identifier of the value to find. */
       char    id[DHT_HASH_SIZE];
       /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
@@ -66,21 +81,30 @@ struct __attribute__((packed)) Message
       char    dummy[DHT_MAX_TRIPLES*DHT_TRIPLE_SIZE-DHT_HASH_SIZE];
     } find_value;
 
+    /** A response to "find value" or "find node". */
     struct __attribute__((packed)) {
+      /** If a FIND_VALUE response, this flag indicates success. Then, the triples contain the
+       * nodes associated with the requested value. Otherwise the triples contain the nodes to
+       * ask next. */
       uint8_t   success;
+      /** Node tiples (ID, address, port). */
       DHTTriple triples[DHT_MAX_TRIPLES];
     } result;
 
+    /** A start secure connection request and response. Implementing the ECDH handshake. */
     struct __attribute__((packed)) {
-      uint8_t  type;      // == START_STREAM
-      /** A stream service id (not part of the DHT specification). */
+      /** Type flag == @c MSG_START_CONNECTION. */
+      uint8_t  type;
+      /** A service id (not part of the DHT specification). */
       uint16_t service;
       /** Public (ECDH) key of the requesting or responding node. */
       uint8_t  pubkey[DHT_MAX_PUBKEY_SIZE];
     } start_stream;
 
+    /** A rendesvous request or notification message. */
     struct __attribute__((packed)) {
-      uint8_t  type;  // == MSG_RENDEZVOUS
+      /** Type flag == @c MSG_RENDEZVOUS. */
+      uint8_t  type;
       /** Specifies the ID of the node to date. */
       char     id[DHT_HASH_SIZE];
       /** Will be set by the rendezvous server to the source address of the reuquest sender, 
@@ -95,6 +119,7 @@ struct __attribute__((packed)) Message
     uint8_t datagram[DHT_MAX_DATA_SIZE];
   } payload;
 
+  /** Constructor. */
   Message();
 };
 
@@ -103,120 +128,200 @@ Message::Message()
   memset(this, 0, sizeof(Message));
 }
 
-#define DHT_RENDEZVOUS_MSG_SIZE (2*DHT_HASH_SIZE+19)
+
+#define DHT_PING_REQU_SIZE             (DHT_COOKIE_SIZE+DHT_HASH_SIZE+1)
+#define DHT_PING_RESP_SIZE             DHT_PING_REQU_SIZE
+#define DHT_FIND_NODE_MIN_REQU_SIZE    (DHT_COOKIE_SIZE+DHT_HASH_SIZE+1)
+#define DHT_FIND_NODE_MIN_RESP_SIZE    (DHT_COOKIE_SIZE+1)
+#define DHT_FIND_VALUE_MIN_REQU_SIZE   DHT_FIND_NODE_MIN_REQU_SIZE
+#define DHT_FIND_VALUE_MIN_RESP_SIZE   DHT_FIND_NODE_MIN_RESP_SIZE
+#define DHT_ANNOUNCE_REQU_SIZE         (DHT_COOKIE_SIZE+2*DHT_HASH_SIZE+1)
+#define DHT_START_STREAM_MIN_REQU_SIZE (DHT_COOKIE_SIZE+DHT_HASH_SIZE+3)
+#define DHT_START_STREAM_MIN_RESP_SIZE (DHT_COOKIE_SIZE+3)
+#define DHT_RENDEZVOUS_REQU_SIZE       (DHT_COOKIE_SIZE+DHT_HASH_SIZE+19)
 
 
-
+/** Base class of all search queries.
+ * @ingroup internal */
 class SearchQuery
 {
-protected:
-  SearchQuery(const Identifier &self, const Identifier &id);
-
 public:
+  /** Constructor. */
+  SearchQuery(const Identifier &self, const Identifier &id);
+  /** Returns the identifier of the element being searched for. */
   const Identifier &id() const;
+  /** Update the search queue (ordered list of nodes to query). */
   void update(const NodeItem &nodes);
+  /** Returns the next node to query or @c false if no node left to query. */
   bool next(NodeItem &node);
+  /** Returns the current search query. This list is also the list of the closest nodes to the
+   * target known. */
   QList<NodeItem> &best();
+  /** Returns the current search query. This list is also the list of the closest nodes to the
+   * target known. */
   const QList<NodeItem> &best() const;
+  /** Returns the first element from the search queue. */
   const NodeItem &first() const;
 
 protected:
+  /** The identifier of the element being searched for. */
   Identifier _id;
+  /** The current search queue. */
   QList<NodeItem> _best;
+  /** The set of nodes already asked. */
   QSet<Identifier> _queried;
 };
 
 
-class FindNodeQuery: public SearchQuery
-{
-public:
-  FindNodeQuery(const Identifier &self, const Identifier &id);
-
-  bool found() const;
-};
-
-
-class FindValueQuery: public SearchQuery
-{
-public:
-  FindValueQuery(const Identifier &self, const Identifier &id);
-};
-
-
-class FindNeighboursQuery: public SearchQuery
-{
-public:
-  FindNeighboursQuery(const Identifier &self, const Identifier &id);
-};
-
-
+/** Base class of all request items. A request item will be stored for every request send. This
+ * allows to associate a response (identified by the magic cookie) with a request.
+ * @ingroup internal */
 class Request
 {
+public:
+  /** Request type. */
+  typedef enum {
+    PING,              ///< A ping request.
+    FIND_NODE,         ///< A find value request.
+    FIND_VALUE,        ///< A find value request.
+    FIND_NEIGHBOURS,   ///< A find neighbours request.
+    RENDEZVOUS_SEARCH, ///< A Rendezvous search request.
+    START_CONNECTION   ///< A Start connection request.
+  } Type;
+
 protected:
-  Request(MessageType type);
+  /** Hidden constructor. */
+  Request(Type type);
 
 public:
-  inline MessageType type() const { return _type; }
+  /** Returns the request type. */
+  inline Type type() const { return _type; }
+  /** Returns the request cookie. */
   inline const Identifier &cookie() const { return _cookie; }
+  /** Returns the timestamp of the request. */
   inline const QDateTime &timestamp() const { return _timestamp; }
+  /** Returns @c true if the request is older than the specified number of seconds. */
   inline size_t olderThan(size_t seconds) const {
     return (_timestamp.addMSecs(seconds) < QDateTime::currentDateTime());
   }
 
 protected:
-  MessageType _type;
+  /** The request type. */
+  Type _type;
+  /** The magic cookie. */
   Identifier  _cookie;
+  /** The request timestamp. */
   QDateTime   _timestamp;
 };
 
 
+/** A ping request item.
+ * @ingroup internal */
 class PingRequest: public Request
 {
 public:
+  /** Anonymous ping request. */
   PingRequest();
+  /** Named ping request. */
   PingRequest(const Identifier &id);
-
+  /** Returns the identifier of the node if this is a named ping request. */
   inline const Identifier &id() const { return _id; }
+
 protected:
+  /** Identifier of the node if this is a named ping request. */
   Identifier _id;
 };
 
 
-class FindNodeRequest: public Request
+/** Represents all search requests.
+ * @ingroup internal */
+class SearchRequest: public Request
 {
+protected:
+  /** Hidden constructor. */
+  SearchRequest(Request::Type type, SearchQuery *query);
+
 public:
-  FindNodeRequest(FindNodeQuery *query);
-  inline FindNodeQuery *query() const { return _findNodeQuery; }
+  /** Returns the query instance associated with the request. */
+  inline SearchQuery *query() const { return _query; }
 
 protected:
-  FindNodeQuery *_findNodeQuery;
+  /** The search query associated with the request. */
+  SearchQuery *_query;
 };
 
 
-class FindValueRequest: public Request
+/** A find node request item.
+ * @ingroup internal */
+class FindNodeRequest: public SearchRequest
 {
 public:
-  FindValueRequest(FindValueQuery *query);
-  inline FindValueQuery *query() const { return _findValueQuery; }
-
-protected:
-  FindValueQuery *_findValueQuery;
+  /** Constructor.
+   * @param query Specifies the query object associated with this request. */
+  FindNodeRequest(SearchQuery *query);
 };
 
 
-class StartStreamRequest: public Request
+/** A find value request item.
+ * @ingroup internal */
+class FindValueRequest: public SearchRequest
 {
 public:
-  StartStreamRequest(uint16_t service, const Identifier &peer, SecureSocket *stream);
+  /** Constructor.
+   * @param query Specifies the query object associated with this request. */
+  FindValueRequest(SearchQuery *query);
+};
 
-  inline SecureSocket *query() const { return _stream; }
+
+/** A find value request item.
+ * @ingroup internal */
+class FindNeighboursRequest: public SearchRequest
+{
+public:
+  /** Constructor.
+   * @param query Specifies the query object associated with this request. */
+  FindNeighboursRequest(SearchQuery *query);
+};
+
+
+/** A Rendezvous search request.
+ * Works like a @c FindNeighboursRequest but sends a rendezvous request to every node that appears
+ * to know the target node.
+ * @ingroup internal */
+class RendezvousSearchRequest: public SearchRequest
+{
+public:
+  /** Constructor.
+   * @param query Specifies the query object associated with this request. */
+  RendezvousSearchRequest(SearchQuery *query);
+};
+
+
+/** A start secure connection request item.
+ * @ingroup internal */
+class StartConnectionRequest: public Request
+{
+public:
+  /** Constructor.
+   * @param service The service number.
+   * @param peer Identifier of the peer node.
+   * @param socket The secure socket for the connection. */
+  StartConnectionRequest(uint16_t service, const Identifier &peer, SecureSocket *socket);
+
+  /** Returns the socket of the request. */
+  inline SecureSocket *socket() const { return _socket; }
+  /** Returns the service number of the request. */
   inline uint16_t service() const { return _service; }
+  /** Returns the identifier of the remote node. */
   inline const Identifier &peedId() const { return _peer; }
 
 protected:
+  /** The service number. */
   uint16_t _service;
+  /** The id of the remote node. */
   Identifier _peer;
-  SecureSocket *_stream;
+  /** The socket of the connection. */
+  SecureSocket *_socket;
 };
 
 
@@ -281,68 +386,61 @@ SearchQuery::first() const {
 }
 
 
-FindNodeQuery::FindNodeQuery(const Identifier &self, const Identifier &id)
-  : SearchQuery(self, id)
-{
-  // pass...
-}
-
-bool
-FindNodeQuery::found() const {
-  if (0 == _best.size()) { return false; }
-  return _id == _best.front().id();
-}
-
-FindValueQuery::FindValueQuery(const Identifier &self, const Identifier &id)
-  : SearchQuery(self, id)
-{
-  // pass...
-}
-
-FindNeighboursQuery::FindNeighboursQuery(const Identifier &self, const Identifier &id)
-  : SearchQuery(self, id)
-{
-  // pass...
-}
-
-
 /* ******************************************************************************************** *
  * Implementation of Request etc.
  * ******************************************************************************************** */
-Request::Request(MessageType type)
+Request::Request(Type type)
   : _type(type), _cookie(Identifier::create()), _timestamp(QDateTime::currentDateTime())
 {
   // pass...
 }
 
 PingRequest::PingRequest()
-  : Request(MSG_PING), _id()
+  : Request(PING), _id()
 {
   // pass...
 }
 
 PingRequest::PingRequest(const Identifier &id)
-  : Request(MSG_PING), _id(id)
+  : Request(PING), _id(id)
 {
   // pass...
 }
 
-FindNodeRequest::FindNodeRequest(FindNodeQuery *query)
-  : Request(MSG_FIND_NODE), _findNodeQuery(query)
+SearchRequest::SearchRequest(Request::Type type, SearchQuery *query)
+  : Request(type), _query(query)
 {
   // pass...
 }
 
-FindValueRequest::FindValueRequest(FindValueQuery *query)
-  : Request(MSG_FIND_VALUE), _findValueQuery(query)
+FindNodeRequest::FindNodeRequest(SearchQuery *query)
+  : SearchRequest(FIND_NODE, query)
 {
   // pass...
 }
 
-StartStreamRequest::StartStreamRequest(uint16_t service, const Identifier &peer, SecureSocket *stream)
-  : Request(MSG_START_STREAM), _service(service), _peer(peer), _stream(stream)
+FindValueRequest::FindValueRequest(SearchQuery *query)
+  : SearchRequest(FIND_VALUE, query)
 {
-  _cookie = stream->id();
+  // pass...
+}
+
+FindNeighboursRequest::FindNeighboursRequest(SearchQuery *query)
+  : SearchRequest(FIND_NEIGHBOURS, query)
+{
+  // pass...
+}
+
+RendezvousSearchRequest::RendezvousSearchRequest(SearchQuery *query)
+  : SearchRequest(RENDEZVOUS_SEARCH, query)
+{
+  // pass...
+}
+
+StartConnectionRequest::StartConnectionRequest(uint16_t service, const Identifier &peer, SecureSocket *socket)
+  : Request(START_CONNECTION), _service(service), _peer(peer), _socket(socket)
+{
+  _cookie = socket->id();
 }
 
 
@@ -422,12 +520,12 @@ DHT::ping(const QHostAddress &addr, uint16_t port) {
 
   // Assemble message
   Message msg;
-  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
+  memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
   memcpy(msg.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
-  msg.payload.ping.type = MSG_PING;
+  msg.payload.ping.type = Message::PING;
   //logDebug() << "Send ping to " << addr << ":" << port;
   // send it
-  if(0 > _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port)) {
+  if(0 > _socket.writeDatagram((char *) &msg, DHT_COOKIE_SIZE+DHT_HASH_SIZE+1, addr, port)) {
     logError() << "Failed to send ping to " << addr << ":" << port;
   }
 }
@@ -440,12 +538,12 @@ DHT::ping(const Identifier &id, const QHostAddress &addr, uint16_t port) {
 
   // Assemble message
   Message msg;
-  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
+  memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
   memcpy(msg.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
-  msg.payload.ping.type = MSG_PING;
+  msg.payload.ping.type = Message::PING;
   //logDebug() << "Send ping to " << addr << ":" << port;
   // send it
-  if(0 > _socket.writeDatagram((char *) &msg, 2*DHT_HASH_SIZE+1, addr, port)) {
+  if(0 > _socket.writeDatagram((char *) &msg, DHT_COOKIE_SIZE+DHT_HASH_SIZE+1, addr, port)) {
     logError() << "Failed to send ping to " << addr << ":" << port;
   }
 }
@@ -459,7 +557,7 @@ void
 DHT::findNode(const Identifier &id) {
   // logDebug() << "Search for node " << id;
   // Create a query instance
-  FindNodeQuery *query = new FindNodeQuery(_self.id(), id);
+  SearchQuery *query = new SearchQuery(_self.id(), id);
   // Collect DHT_K nearest nodes
   _buckets.getNearest(id, query->best());
   // Send request to the first element in the list
@@ -477,10 +575,49 @@ DHT::findNode(const Identifier &id) {
 }
 
 void
+DHT::rendezvous(const Identifier &id) {
+  // Create a query instance
+  SearchQuery *query = new SearchQuery(_self.id(), id);
+  // Collect DHT_K nearest nodes
+  _buckets.getNearest(id, query->best());
+  // Send request to the first element in the list
+  NodeItem next;
+  if (! query->next(next)) {
+    logInfo() << "Can not find node" << id << ". Buckets empty.";
+    // Emmit signal if failiour is not a pending announcement
+    emit rendezvousFailed(id);
+    delete query;
+  } else {
+    sendRendezvousSearch(next, query);
+  }
+}
+
+void
+DHT::findNeighbours(const Identifier &id, const QList<NodeItem> &start) {
+  // logDebug() << "Search for node " << id;
+  // Create a query instance
+  SearchQuery *query = new SearchQuery(_self.id(), id);
+  // Collect DHT_K nearest nodes
+  _buckets.getNearest(id, query->best());
+  // Update with start items
+  QList<NodeItem>::const_iterator item = start.begin();
+  for (; item != start.end(); item++) { query->update(*item); }
+  // Send request to the first element in the list
+  NodeItem next;
+  if (! query->next(next)) {
+    logInfo() << "Can not find node" << id << ". Buckets empty.";
+    emit neighboursFound(id, query->best());
+    delete query;
+  } else {
+    sendFindNeighbours(next, query);
+  }
+}
+
+void
 DHT::findValue(const Identifier &id) {
   //logDebug() << "Search for value " << id;
   // Create a query instance
-  FindValueQuery *query = new FindValueQuery(_self.id(), id);
+  SearchQuery *query = new SearchQuery(_self.id(), id);
   // Collect DHT_K nearest nodes
   _buckets.getNearest(id, query->best());
   // Send request to the first element in the list
@@ -508,12 +645,12 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
              << " to " << node.id()
              << " @" << node.addr() << ":" << node.port();
   if (! stream) { delete stream; return false; }
-  StartStreamRequest *req = new StartStreamRequest(service, node.id(), stream);
+  StartConnectionRequest *req = new StartConnectionRequest(service, node.id(), stream);
 
   // Assemble message
   Message msg;
-  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
-  msg.payload.start_stream.type = MSG_START_STREAM;
+  memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
+  msg.payload.start_stream.type = Message::START_STREAM;
   msg.payload.start_stream.service = htons(service);
   int keyLen = 0;
   if (0 > (keyLen = stream->prepare(msg.payload.start_stream.pubkey, DHT_MAX_PUBKEY_SIZE)) ) {
@@ -521,7 +658,7 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
   }
 
   // Compute total size
-  keyLen += DHT_HASH_SIZE + 1 + 2;
+  keyLen += DHT_COOKIE_SIZE + 1 + 2;
 
   // add to pending request list & send it
   _pendingRequests.insert(req->cookie(), req);
@@ -611,7 +748,7 @@ DHT::outRate() const {
  * Implementation of internal used methods.
  */
 void
-DHT::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
+DHT::sendFindNode(const NodeItem &to, SearchQuery *query) {
   /*logDebug() << "Send FindNode request to " << to.id()
              << " @" << to.addr() << ":" << to.port(); */
   // Construct request item
@@ -620,10 +757,10 @@ DHT::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
   _pendingRequests.insert(req->cookie(), req);
   // Assemble & send message
   Message msg;
-  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
-  msg.payload.find_node.type = MSG_FIND_NODE;
+  memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
+  msg.payload.find_node.type = Message::FIND_NODE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
-  int size = DHT_HASH_SIZE+1+DHT_K*DHT_TRIPLE_SIZE;
+  int size = DHT_COOKIE_SIZE+1+DHT_K*DHT_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindNode request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
@@ -631,7 +768,7 @@ DHT::sendFindNode(const NodeItem &to, FindNodeQuery *query) {
 }
 
 void
-DHT::sendFindValue(const NodeItem &to, FindValueQuery *query) {
+DHT::sendFindValue(const NodeItem &to, SearchQuery *query) {
   /*logDebug() << "Send FindValue request to " << to.id()
              << " @" << to.addr() << ":" << to.port(); */
   // Construct request item
@@ -640,11 +777,51 @@ DHT::sendFindValue(const NodeItem &to, FindValueQuery *query) {
   _pendingRequests.insert(req->cookie(), req);
   // Assemble & send message
   Message msg;
-  memcpy(msg.cookie, req->cookie().data(), DHT_HASH_SIZE);
-  msg.payload.find_node.type = MSG_FIND_VALUE;
+  memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
+  msg.payload.find_node.type = Message::FIND_VALUE;
   memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
   // Determine size of request
-  int size = DHT_HASH_SIZE+1+DHT_MAX_TRIPLES*DHT_TRIPLE_SIZE;
+  int size = DHT_COOKIE_SIZE+1+DHT_MAX_TRIPLES*DHT_TRIPLE_SIZE;
+  if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
+    logError() << "Failed to send FindNode request to " << to.id()
+               << " @" << to.addr() << ":" << to.port();
+  }
+}
+
+void
+DHT::sendFindNeighbours(const NodeItem &to, SearchQuery *query) {
+  /*logDebug() << "Send FindNode request to " << to.id()
+             << " @" << to.addr() << ":" << to.port(); */
+  // Construct request item
+  FindNeighboursRequest *req = new FindNeighboursRequest(query);
+  // Queue request
+  _pendingRequests.insert(req->cookie(), req);
+  // Assemble & send message
+  Message msg;
+  memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
+  msg.payload.find_node.type = Message::FIND_NODE;
+  memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
+  int size = DHT_COOKIE_SIZE+1+DHT_K*DHT_TRIPLE_SIZE;
+  if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
+    logError() << "Failed to send FindNode request to " << to.id()
+               << " @" << to.addr() << ":" << to.port();
+  }
+}
+
+void
+DHT::sendRendezvousSearch(const NodeItem &to, SearchQuery *query) {
+  /*logDebug() << "Send FindNode request to " << to.id()
+             << " @" << to.addr() << ":" << to.port(); */
+  // Construct request item
+  RendezvousSearchRequest *req = new RendezvousSearchRequest(query);
+  // Queue request
+  _pendingRequests.insert(req->cookie(), req);
+  // Assemble & send message
+  Message msg;
+  memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
+  msg.payload.find_node.type = Message::FIND_NODE;
+  memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
+  int size = DHT_COOKIE_SIZE+1+DHT_K*DHT_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindNode request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
@@ -662,25 +839,24 @@ DHT::sendAnnouncement(const NodeItem &to, const Identifier &what) {
              << " @" << to.addr() << ":" << to.port(); */
   // Assemble & send message
   struct Message msg;
-  memcpy(msg.cookie, Identifier::create().data(), DHT_HASH_SIZE);
+  memcpy(msg.cookie, Identifier::create().data(), DHT_COOKIE_SIZE);
   memcpy(msg.payload.announce.what, what.data(), DHT_HASH_SIZE);
   memcpy(msg.payload.announce.who, _self.id().data(), DHT_HASH_SIZE);
-  msg.payload.announce.type = MSG_ANNOUNCE;
-  if (0 > _socket.writeDatagram((char *)&msg, 3*DHT_HASH_SIZE+1, to.addr(), to.port())) {
+  msg.payload.announce.type = Message::ANNOUNCE;
+  if (0 > _socket.writeDatagram((char *)&msg, DHT_COOKIE_SIZE+2*DHT_HASH_SIZE+1, to.addr(), to.port())) {
     logError() << "Failed to send Announce request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
   }
 }
 
 void
-DHT::sendRendezvous(const Identifier &with, const NodeItem &to) {
+DHT::sendRendezvous(const Identifier &with, const PeerItem &to) {
   Message msg;
-  memcpy(msg.cookie, Identifier::create().data(), DHT_HASH_SIZE);
+  memcpy(msg.cookie, Identifier::create().data(), DHT_COOKIE_SIZE);
   memcpy(msg.payload.rendezvous.id, with.data(), DHT_HASH_SIZE);
-  if (DHT_RENDEZVOUS_MSG_SIZE != _socket.writeDatagram(
-        (char *)&msg, DHT_RENDEZVOUS_MSG_SIZE, to.addr(), to.port())) {
-    logError() << "DHT: Failed to send Rendezvous request to " << to.id() 
-               << " @" << to.addr() << ":" << to.port();
+  if (DHT_RENDEZVOUS_REQU_SIZE != _socket.writeDatagram(
+        (char *)&msg, DHT_RENDEZVOUS_REQU_SIZE, to.addr(), to.port())) {
+    logError() << "DHT: Failed to send Rendezvous request to " << to.addr() << ":" << to.port();
   }
 }
 
@@ -705,40 +881,44 @@ DHT::_onReadyRead() {
       // First, check if message belongs to a open stream
       if (_streams.contains(cookie)) {
         // Process streams
-        _streams[cookie]->handleData(((uint8_t *)&msg)+DHT_HASH_SIZE, size-DHT_HASH_SIZE);
+        _streams[cookie]->handleData(((uint8_t *)&msg)+DHT_COOKIE_SIZE, size-DHT_COOKIE_SIZE);
       } else if (_pendingRequests.contains(cookie)) {
         // Message is a response -> dispatch by type from table
         Request *item = _pendingRequests[cookie];
         _pendingRequests.remove(cookie);
-        if (MSG_PING == item->type()) {
+        if (Request::PING == item->type()) {
           _processPingResponse(msg, size, static_cast<PingRequest *>(item), addr, port);
-        } else if (MSG_FIND_NODE == item->type()) {
+        } else if (Request::FIND_NODE == item->type()) {
           _processFindNodeResponse(msg, size, static_cast<FindNodeRequest *>(item), addr, port);
-        } else if (MSG_FIND_VALUE == item->type()) {
+        } else if (Request::FIND_VALUE == item->type()) {
           _processFindValueResponse(msg, size, static_cast<FindValueRequest *>(item), addr, port);
-        } else if (MSG_START_STREAM == item->type()) {
-          _processStartStreamResponse(msg, size, static_cast<StartStreamRequest *>(item), addr, port);
+        } else if (Request::FIND_NEIGHBOURS == item->type()) {
+          _processFindNeighboursResponse(msg, size, static_cast<FindNeighboursRequest *>(item), addr, port);
+        } else if (Request::RENDEZVOUS_SEARCH == item->type()) {
+          _processRendezvousSearchResponse(msg, size, static_cast<RendezvousSearchRequest *>(item), addr, port);
+        } else if (Request::START_CONNECTION == item->type()) {
+          _processStartStreamResponse(msg, size, static_cast<StartConnectionRequest *>(item), addr, port);
         }else {
           logInfo() << "Unknown response from " << addr << ":" << port;
         }
         delete item;
       } else {
         // Message is likely a request
-        if ((size == (2*DHT_HASH_SIZE+1)) && (MSG_PING == msg.payload.ping.type)){
+        if ((size == DHT_PING_REQU_SIZE) && (Message::PING == msg.payload.ping.type)){
           _processPingRequest(msg, size, addr, port);
-        } else if ((size >= (2*DHT_HASH_SIZE+1)) && (MSG_FIND_NODE == msg.payload.find_node.type)) {
+        } else if ((size >= DHT_FIND_NODE_MIN_REQU_SIZE) && (Message::FIND_NODE == msg.payload.find_node.type)) {
           _processFindNodeRequest(msg, size, addr, port);
-        } else if ((size >= (2*DHT_HASH_SIZE+1)) && (MSG_FIND_VALUE == msg.payload.find_value.type)) {
+        } else if ((size >= DHT_FIND_VALUE_MIN_REQU_SIZE) && (Message::FIND_VALUE == msg.payload.find_value.type)) {
           _processFindValueRequest(msg, size, addr, port);
-        } else if ((size == (3*DHT_HASH_SIZE+1)) && (MSG_ANNOUNCE == msg.payload.announce.type)) {
+        } else if ((size == DHT_ANNOUNCE_REQU_SIZE) && (Message::ANNOUNCE == msg.payload.announce.type)) {
           _processAnnounceRequest(msg, size, addr, port);
-        } else if ((size > (DHT_HASH_SIZE+3)) && (MSG_START_STREAM == msg.payload.start_stream.type)) {
+        } else if ((size > DHT_START_STREAM_MIN_REQU_SIZE) && (Message::START_STREAM == msg.payload.start_stream.type)) {
           _processStartStreamRequest(msg, size, addr, port);
-        } else if ((size == DHT_RENDEZVOUS_MSG_SIZE) && (MSG_RENDEZVOUS == msg.payload.rendezvous.type)) {
+        } else if ((size == DHT_RENDEZVOUS_REQU_SIZE) && (Message::RENDEZVOUS == msg.payload.rendezvous.type)) {
           _processRendezvousRequest(msg, size, addr, port);
         } else {
           logInfo() << "Unknown request from " << addr << ":" << port
-                    << " dropping " << (size-DHT_HASH_SIZE) << "b payload.";
+                    << " dropping " << (size-DHT_COOKIE_SIZE) << "b payload.";
         }
       }
     }
@@ -780,9 +960,9 @@ DHT::_processFindNodeResponse(
     const struct Message &msg, size_t size, FindNodeRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // payload length must be a multiple of triple length
-  if ( 0 == ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
+  if ( 0 == ((size-DHT_FIND_NODE_MIN_RESP_SIZE)%DHT_TRIPLE_SIZE) ) {
     // unpack and update query
-    size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
+    size_t Ntriple = (size-DHT_FIND_NODE_MIN_RESP_SIZE)/DHT_TRIPLE_SIZE;
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
       NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip)),
@@ -794,7 +974,7 @@ DHT::_processFindNodeResponse(
     }
 
     // If the node was found -> signal success
-    if (req->query()->found()) {
+    if (req->query()->best().size() && (req->query()->id() == req->query()->first().id())) {
       // Signal node found
       emit nodeFound(req->query()->first());
       // delete query
@@ -828,8 +1008,6 @@ DHT::_processFindNodeResponse(
     return;
   }
 
-  /*logDebug() << "Node " << req->query()->id() << " not found yet -> continue with "
-             << next.id() << " @" << next.addr() << ":" << next.port(); */
   // Send next request
   sendFindNode(next, req->query());
 }
@@ -839,12 +1017,12 @@ DHT::_processFindValueResponse(
     const struct Message &msg, size_t size, FindValueRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // payload length must be a multiple of triple length
-  if ( 0 != ((size-DHT_HASH_SIZE-1)%DHT_TRIPLE_SIZE) ) {
-    logInfo() << "Received a malformed FIND_NODE response from "
+  if ( 0 != ((size-DHT_FIND_VALUE_MIN_RESP_SIZE)%DHT_TRIPLE_SIZE) ) {
+    logInfo() << "Received a malformed FIND_VALUE response from "
               << addr << ":" << port;
   } else {
     // unpack and update query
-    size_t Ntriple = (size-DHT_HASH_SIZE-1)/DHT_TRIPLE_SIZE;
+    size_t Ntriple = (size-DHT_FIND_VALUE_MIN_RESP_SIZE)/DHT_TRIPLE_SIZE;
 
     // If queried node has value
     if (msg.payload.result.success) {
@@ -890,45 +1068,127 @@ DHT::_processFindValueResponse(
 }
 
 void
+DHT::_processFindNeighboursResponse(const Message &msg, size_t size, FindNeighboursRequest *req,
+                                    const QHostAddress &addr, uint16_t port)
+{
+  // payload length must be a multiple of triple length
+  if ( 0 != ((size-DHT_FIND_NODE_MIN_RESP_SIZE)%DHT_TRIPLE_SIZE) ) {
+    logInfo() << "Received a malformed FIND_NODE response from "
+              << addr << ":" << port;
+  } else {
+    // unpack and update query
+    size_t Ntriple = (size-DHT_FIND_VALUE_MIN_RESP_SIZE)/DHT_TRIPLE_SIZE;
+    // proceed with returned nodes
+    for (size_t i=0; i<Ntriple; i++) {
+      Identifier id(msg.payload.result.triples[i].id);
+      NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)* (msg.payload.result.triples[i].ip)),
+                    ntohs(msg.payload.result.triples[i].port));
+      // Add discovered node to buckets
+      _buckets.addCandidate(id, item.addr(), item.port());
+      // Update node list of query
+      req->query()->update(item);
+    }
+  }
+
+  NodeItem next;
+  // get next node to query, if there is no next node -> search failed
+  if (! req->query()->next(next)) {
+    // signal error
+    emit neighboursFound(req->query()->id(), req->query()->best());
+    // delete query
+    delete req->query();
+    // done.
+    return;
+  }
+  // Send next request
+  sendFindNeighbours(next, req->query());
+}
+
+void
+DHT::_processRendezvousSearchResponse(const Message &msg, size_t size, RendezvousSearchRequest *req,
+                                      const QHostAddress &addr, uint16_t port)
+{
+  // payload length must be a multiple of triple length
+  if ( 0 != ((size-DHT_FIND_NODE_MIN_RESP_SIZE)%DHT_TRIPLE_SIZE) ) {
+    logInfo() << "Received a malformed FIND_NODE response from "
+              << addr << ":" << port;
+  } else {
+    // unpack and update query
+    size_t Ntriple = (size-DHT_FIND_VALUE_MIN_RESP_SIZE)/DHT_TRIPLE_SIZE;
+    // proceed with returned nodes
+    for (size_t i=0; i<Ntriple; i++) {
+      Identifier id(msg.payload.result.triples[i].id);
+      QHostAddress nodeaddr((const Q_IPV6ADDR &)* (msg.payload.result.triples[i].ip));
+      uint16_t     nodeport(ntohs(msg.payload.result.triples[i].port));
+      // Add discovered node to buckets
+      _buckets.addCandidate(id, nodeaddr, nodeport);
+      // Update node list of query
+      req->query()->update(NodeItem(id, nodeaddr, nodeport));
+      // If the peer knows the target -> send him a rendezvous message
+      if (req->query()->id() == id) {
+        sendRendezvous(req->query()->id(), PeerItem(addr, port));
+      }
+    }
+  }
+
+  NodeItem next;
+  // get next node to query, if there is no next node -> search failed
+  if (! req->query()->next(next)) {
+    // If at least someone I asked knows the item -> success
+    if (req->query()->best().size() && (req->query()->first().id() == req->query()->id())) {
+      emit rendezvousInitiated(req->query()->first());
+    }
+    // signal error
+    emit rendezvousFailed(req->query()->id());
+    // delete query
+    delete req->query();
+    // done.
+    return;
+  }
+  // Send next request
+  sendRendezvousSearch(next, req->query());
+}
+
+void
 DHT::_processStartStreamResponse(
-    const Message &msg, size_t size, StartStreamRequest *req, const QHostAddress &addr, uint16_t port)
+    const Message &msg, size_t size, StartConnectionRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // Verify session key
-  if (! req->query()->verify(msg.payload.start_stream.pubkey, size-DHT_HASH_SIZE-3)) {
+  if (! req->socket()->verify(msg.payload.start_stream.pubkey, size-DHT_COOKIE_SIZE-3)) {
     logError() << "Verification of peer session key failed.";
-    delete req->query(); return;
+    delete req->socket(); return;
   }
   // Verify fingerprints
-  if (!(req->query()->peerId() == req->peedId())) {
-    logError() << "Peer fingerprint mismatch: " << req->query()->peerId()
+  if (!(req->socket()->peerId() == req->peedId())) {
+    logError() << "Peer fingerprint mismatch: " << req->socket()->peerId()
                << " != " << req->peedId();
-    delete req->query(); return;
+    delete req->socket(); return;
   }
 
   // Success -> start stream
-  if (! req->query()->start(req->cookie(), PeerItem(addr, port), &_socket)) {
+  if (! req->socket()->start(req->cookie(), PeerItem(addr, port), &_socket)) {
     logError() << "Can not start sym. crypt.";
-    delete req->query(); return;
+    delete req->socket(); return;
   }
 
   // Stream started: register stream & notify stream handler
-  _streams[req->cookie()] = req->query();
-  _streamHandler->connectionStarted(req->query());
+  _streams[req->cookie()] = req->socket();
+  _streamHandler->connectionStarted(req->socket());
 }
 
 void
 DHT::_processPingRequest(
-    const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+    const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
   //logDebug() << "Received Ping request from " << addr << ":" << port;
   // simply assemble a pong response including my own ID
-  struct Message resp;
-  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+  Message resp;
+  memcpy(resp.cookie, msg.cookie, DHT_COOKIE_SIZE);
   memcpy(resp.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
-  resp.payload.ping.type = MSG_PING;
+  resp.payload.ping.type = Message::PING;
   // send
   //logDebug() << "Send Ping response to " << addr << ":" << port;
-  if(0 > _socket.writeDatagram((char *) &resp, 2*DHT_HASH_SIZE+1, addr, port)) {
+  if(0 > _socket.writeDatagram((char *) &resp, DHT_PING_RESP_SIZE, addr, port)) {
     logError() << "Failed to send Ping response to " << addr << ":" << port;
   }
   // Add node to candidate nodes for the bucket table if not known already
@@ -946,11 +1206,11 @@ DHT::_processFindNodeRequest(
 
   struct Message resp;
   // Assemble response
-  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+  memcpy(resp.cookie, msg.cookie, DHT_COOKIE_SIZE);
   resp.payload.result.success = 0;
   // Determine the number of nodes to reply
   int N = std::min(std::min(DHT_K, best.size()),
-                   int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
+                   int(size-DHT_FIND_NODE_MIN_REQU_SIZE)/DHT_TRIPLE_SIZE);
   //logDebug() << "Assemble FindNode response (N req.: " << N << ")";
   // Add items
   QList<NodeItem>::iterator item = best.begin();
@@ -963,7 +1223,7 @@ DHT::_processFindNodeRequest(
   }
 
   // Compute size and send reponse
-  size_t resp_size = (1 + DHT_HASH_SIZE + N*DHT_TRIPLE_SIZE);
+  size_t resp_size = (DHT_FIND_NODE_MIN_RESP_SIZE + N*DHT_TRIPLE_SIZE);
   _socket.writeDatagram((char *) &resp, resp_size, addr, port);
 }
 
@@ -977,11 +1237,11 @@ DHT::_processFindValueRequest(
     QHash<Identifier, AnnouncementItem> &owners
         = _announcements[msg.payload.find_value.id];
     // Assemble response
-    memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+    memcpy(resp.cookie, msg.cookie, DHT_COOKIE_SIZE);
     resp.payload.result.success = 1;
     // Determine the number of nodes to reply
     int N = std::min(std::min(DHT_MAX_TRIPLES, owners.size()),
-                     int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
+                     int(size-DHT_FIND_VALUE_MIN_REQU_SIZE)/DHT_TRIPLE_SIZE);
     //logDebug() << "Assemble FindValue response (N req.: " << N << ")";
     QHash<Identifier, AnnouncementItem>::iterator item = owners.begin();
     for (int i = 0; (item!=owners.end()) && (i<N); item++, i++) {
@@ -990,18 +1250,18 @@ DHT::_processFindValueRequest(
       resp.payload.result.triples[i].port = htons(item->port());
     }
     // Compute size and send reponse
-    size_t resp_size = 1+DHT_HASH_SIZE+N*DHT_TRIPLE_SIZE;
+    size_t resp_size = DHT_FIND_VALUE_MIN_RESP_SIZE+N*DHT_TRIPLE_SIZE;
     _socket.writeDatagram((char *) &resp, resp_size, addr, port);
   } else {
     // Get best matching nodes from the buckets
     QList<NodeItem> best;
     _buckets.getNearest(msg.payload.find_node.id, best);
     // Assemble response
-    memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
+    memcpy(resp.cookie, msg.cookie, DHT_COOKIE_SIZE);
     resp.payload.result.success = 0;
     // Determine the number of nodes to reply
     int N = std::min(std::min(DHT_K, best.size()),
-                     int(size-1-DHT_HASH_SIZE)/DHT_TRIPLE_SIZE);
+                     int(size-DHT_FIND_VALUE_MIN_REQU_SIZE)/DHT_TRIPLE_SIZE);
     QList<NodeItem>::iterator item = best.begin();
     for (int i = 0; (item!=best.end()) && (i<N); item++, i++) {
       memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
@@ -1009,7 +1269,7 @@ DHT::_processFindValueRequest(
       resp.payload.result.triples[i].port = htons(item->port());
     }
     // Compute size and send reponse
-    size_t resp_size = 1+DHT_HASH_SIZE+N*DHT_TRIPLE_SIZE;
+    size_t resp_size = DHT_FIND_NODE_MIN_RESP_SIZE+N*DHT_TRIPLE_SIZE;
     _socket.writeDatagram((char *) &resp, resp_size, addr, port);
   }
 }
@@ -1048,7 +1308,7 @@ DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddr
     return;
   }
   // Verify
-  if (! stream->verify(msg.payload.start_stream.pubkey, size-DHT_HASH_SIZE-3)) {
+  if (! stream->verify(msg.payload.start_stream.pubkey, size-DHT_COOKIE_SIZE-3)) {
     logError() << "Can not verify stream peer.";
     delete stream; return;
   }
@@ -1060,8 +1320,8 @@ DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddr
 
   // Assemble response
   Message resp; int keyLen=0;
-  memcpy(resp.cookie, msg.cookie, DHT_HASH_SIZE);
-  resp.payload.start_stream.type = MSG_START_STREAM;
+  memcpy(resp.cookie, msg.cookie, DHT_COOKIE_SIZE);
+  resp.payload.start_stream.type = Message::START_STREAM;
   resp.payload.start_stream.service = msg.payload.start_stream.service;
   if (0 > (keyLen = stream->prepare(resp.payload.start_stream.pubkey, DHT_MAX_PUBKEY_SIZE))) {
     logError() << "Can not prepare stream.";
@@ -1074,7 +1334,7 @@ DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddr
   }
 
   // compute message size
-  keyLen += DHT_HASH_SIZE+3;
+  keyLen += DHT_START_STREAM_MIN_RESP_SIZE;
   // Send response
   if (keyLen != _socket.writeDatagram((char *)&resp, keyLen, addr, port)) {
     logError() << "Can not send StartStream response";
@@ -1097,8 +1357,8 @@ DHT::_processRendezvousRequest(Message &msg, size_t size, const QHostAddress &ad
     NodeItem node = _buckets.getNode(msg.payload.rendezvous.id);
     memcpy(msg.payload.rendezvous.ip, addr.toIPv6Address().c, 16);
     msg.payload.rendezvous.port = htons(port);
-    if (DHT_RENDEZVOUS_MSG_SIZE != _socket.writeDatagram(
-          (char *)&msg, DHT_RENDEZVOUS_MSG_SIZE, node.addr(), node.port())) {
+    if (DHT_RENDEZVOUS_REQU_SIZE != _socket.writeDatagram(
+          (char *)&msg, DHT_RENDEZVOUS_REQU_SIZE, node.addr(), node.port())) {
       logError() << "DHT: Cannot forward rendezvous request to " << node.id()
                  << " @" << node.addr() << ":" << node.port();
     }  
@@ -1122,7 +1382,7 @@ DHT::_onCheckRequestTimeout() {
   // Process dead requests, dispatch by type
   QList<Request *>::iterator req = deadRequests.begin();
   for (; req != deadRequests.end(); req++) {
-    if (MSG_PING == (*req)->type()) {
+    if (Request::PING == (*req)->type()) {
       logDebug() << "Ping request timeout...";
       PingRequest *ping = static_cast<PingRequest *>(*req);
       // If the ping was send to a known node (known ID, and not to a peer)
@@ -1130,9 +1390,9 @@ DHT::_onCheckRequestTimeout() {
         _buckets.pingLost(ping->id());
       }
       delete ping;
-    } else if (MSG_FIND_NODE == (*req)->type()) {
+    } else if (Request::FIND_NODE == (*req)->type()) {
       logDebug() << "FindNode request timeout...";
-      FindNodeQuery *query = static_cast<FindNodeRequest *>(*req)->query();
+      SearchQuery *query = static_cast<FindNodeRequest *>(*req)->query();
       // Get next node to query
       NodeItem next;
       // get next node to query, if there is no next node -> search failed
@@ -1154,9 +1414,9 @@ DHT::_onCheckRequestTimeout() {
         // Continue search
         sendFindNode(next, query); delete *req;
       }
-    } else if (MSG_FIND_VALUE == (*req)->type()) {
+    } else if (Request::FIND_VALUE == (*req)->type()) {
       logDebug() << "FindValue request timeout...";
-      FindValueQuery *query = static_cast<FindValueRequest *>(*req)->query();
+      SearchQuery *query = static_cast<FindValueRequest *>(*req)->query();
       // Get next node to query
       NodeItem next;
       // get next node to query, if there is no next node -> search failed
@@ -1170,14 +1430,51 @@ DHT::_onCheckRequestTimeout() {
         sendFindValue(next, query);
         delete *req;
       }
-    } else if (MSG_START_STREAM == (*req)->type()) {
-      logDebug() << "StartStream request timeout...";
+    } else if (Request::FIND_NEIGHBOURS == (*req)->type()) {
+      logDebug() << "FindNeighbours request timeout...";
+      SearchQuery *query = static_cast<FindNeighboursRequest *>(*req)->query();
+      // Get next node to query
+      NodeItem next;
+      // get next node to query, if there is no next node -> done
+      if (! query->next(next)) {
+        // signal end of search
+        emit neighboursFound(query->id(), query->best());
+        // delete request & query
+        delete *req; delete query;
+      } else {
+        // Send next request
+        sendFindNeighbours(next, query);
+        delete *req;
+      }
+    } else if (Request::RENDEZVOUS_SEARCH == (*req)->type()) {
+      logDebug() << "RendezvousSearch request timeout...";
+      SearchQuery *query = static_cast<RendezvousSearchRequest *>(*req)->query();
+      // Get next node to query
+      NodeItem next;
+      // get next node to query, if there is no next node -> done
+      if (! query->next(next)) {
+        // If node was found -> rendezvous initiated
+        if (query->best().size() && (query->first().id() == query->id())) {
+          emit rendezvousInitiated(query->first());
+        } else {
+          // if not -> failed.
+          emit rendezvousFailed(query->id());
+        }
+        // delete request & query
+        delete *req; delete query;
+      } else {
+        // Send next request
+        sendRendezvousSearch(next, query);
+        delete *req;
+      }
+    } else if (Request::START_CONNECTION == (*req)->type()) {
+      logDebug() << "StartConnection request timeout...";
       if (_streamHandler) {
         _streamHandler->connectionFailed(
-              static_cast<StartStreamRequest *>(*req)->query());
+              static_cast<StartConnectionRequest *>(*req)->socket());
       }
       // delete stream
-      delete static_cast<StartStreamRequest *>(*req)->query();
+      delete static_cast<StartConnectionRequest *>(*req)->socket();
       delete *req;
     }
   }
@@ -1249,8 +1546,8 @@ DHT::_onCheckAnnouncementTimeout() {
 
 void
 DHT::_onUpdateStatistics() {
-  _inRate = (_bytesReceived-_lastBytesReceived)/5;
+  _inRate = (double(_bytesReceived - _lastBytesReceived)/_statisticsTimer.interval())/1000;
   _lastBytesReceived = _bytesReceived;
-  _outRate = (_bytesSend - _lastBytesSend)/5;
+  _outRate = (double(_bytesSend - _lastBytesSend)/_statisticsTimer.interval())/1000;
   _lastBytesSend = _bytesSend;
 }

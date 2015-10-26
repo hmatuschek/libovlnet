@@ -35,9 +35,9 @@ typedef enum {
 /* ********************************************************************************************* *
  * Implementation of FileUpload
  * ********************************************************************************************* */
-FileUpload::FileUpload(DHT &dht, const QString &filename, size_t fileSize, QObject *parent)
+FileUpload::FileUpload(DHT &dht, const QString &filename, size_t filesize, QObject *parent)
   : QObject(parent), SecureSocket(dht), _state(INITIALIZED),
-    _packetBuffer(2000), _fileName(filename), _fileSize(fileSize)
+    _packetBuffer(2000), _fileName(filename), _fileSize(filesize)
 {
   // pass...
 }

@@ -11,7 +11,8 @@
 /** Implements a local enpoint of a SOCKS v4 or v5 connection (tunnel) that will be relayed to
  * another node which acts as the exit point. This class is simple, once the connection to the node
  * is established, the data to and from the local TCP connection is forwarded to the node,
- * including the SOCKS messages. It is the remote node that implements the actual SOCKS proxy. */
+ * including the SOCKS messages. It is the remote node that implements the actual SOCKS proxy.
+ * @ingroup services */
 class LocalSocksStream: public SecureStream
 {
   Q_OBJECT
@@ -59,7 +60,8 @@ protected:
  * node providing the SOCKS service. The node is passed to the constructor.
  * This class listen on a local TCP port (1080 by default) for incomming connections. Once a
  * TCP connection is established, the remote node is contacted. If the connection to the remote
- * node is established, the client (at the TCP connection) can use the remote node as a proxy. */
+ * node is established, the client (at the TCP connection) can use the remote node as a proxy.
+ * @ingroup services */
 class LocalSocksService : public QObject
 {
   Q_OBJECT
@@ -108,7 +110,8 @@ protected:
 /** Represents the exit point of a SOCKS v5 proxy connection.
  * Once the connection with the client is made, the SOCKS request is parsed and a connection
  * to the requested host is established. Any further data to and from the client is then
- * proxied to that host. */
+ * proxied to that host.
+ * @ingroup services */
 class SocksOutStream: public SecureStream
 {
   Q_OBJECT
@@ -158,6 +161,7 @@ protected slots:
   void _remoteReadyRead();
   /** Gets called if data has been send to the remote host. */
   void _remoteBytesWritten(qint64 bytes);
+  /** Gets called if the remote connection will close. */
   void _remoteReadChannelFinished();
   /** Gets called if the connection to the remote host is closed, e.g. the remote resets the
    * TCP connection. */

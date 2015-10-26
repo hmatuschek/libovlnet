@@ -11,7 +11,8 @@
 
 
 /** A ring buffer of size 64k (65536 bytes). This ring buffer can be implemented efficiently
- * using 2-complement integer arithmetic of 16-bit integers. Hence no modulo operation is needed. */
+ * using 2-complement integer arithmetic of 16-bit integers. Hence no modulo operation is needed.
+ * @ingroup internal */
 class FixedRingBuffer
 {
 public:
@@ -129,7 +130,8 @@ protected:
 /** Implements the input buffer of a TCP like stream.
  * This buffer re-assembles the data stream by reordereing the received segments according to
  * their sequence number (call @c putPacket). Whenever a part of the sequence was received,
- * @c availabl() increases and the received data can be @c read. */
+ * @c availabl() increases and the received data can be @c read.
+ * @ingroup internal */
 class StreamInBuffer
 {
 public:
@@ -232,7 +234,8 @@ protected:
 
 /** Implements the output buffer (64k) of a TCP like data stream.
  * This buffer keeps track of the timeout of the first tranmitted but unACKed packet. It also
- * re-computes the timeout bases on the time between sending a packet and receiving its ACK. */
+ * re-computes the timeout bases on the time between sending a packet and receiving its ACK.
+ * @ingroup internal */
 class StreamOutBuffer
 {
 public:
@@ -368,7 +371,8 @@ protected:
 
 /** Implements a encrypted stream. While the @c SecureSocket implements encrypted datagrams
  * (UDP like), the secure stream implements an encrypted data stream (TCP like), handling packet
- * loss and maintaining the data order. */
+ * loss and maintaining the data order.
+ * @ingroup core */
 class SecureStream: public QIODevice, public SecureSocket
 {
   Q_OBJECT

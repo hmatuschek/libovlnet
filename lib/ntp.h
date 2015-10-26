@@ -9,7 +9,8 @@
 #include <QTimer>
 #include <inttypes.h>
 
-/** Implements a simple NTP client. */
+/** Implements a simple NTP client.
+ * @ingroup utils */
 class NTPClient: public QObject
 {
   Q_OBJECT

@@ -25,7 +25,8 @@ class DHT;
 
 /** Represents the identity of a node. A node is unquely identified by its keypair. The private key
  * of that key is only known to the node. Its public key is used to verify its identity. The hash
- * of the public key is the identifier of the node. */
+ * of the public key is the identifier of the node.
+ * @ingroup core */
 class Identity
 {
 protected:
@@ -80,7 +81,8 @@ protected:
  * keypair is used for every connection. The SHA-2-256 hash is used as the key-derivative function
  * to obtain the 128bit shared symmetric key and the first 64bit of the IV. The second half of the
  * IV (64bit) is a sequence nuber send along with the encrypted datagrams. The symmetric cipher is
- * AES-128 in GCM mode. */
+ * AES-128 in GCM mode.
+ * @ingroup core */
 class SecureSocket
 {
 public:
@@ -205,7 +207,8 @@ private:
  *
  * On an outgoing connection, e.g. by calling @c DHT::startStream, the DHT will try to establish
  * a secure connection. On success, @c connectionStarted will be called and @c connectionFailed
- * on error. Again, both methods transfer the ownership of the socket. */
+ * on error. Again, both methods transfer the ownership of the socket.
+ * @ingroup core */
 class ServiceHandler
 {
 protected:

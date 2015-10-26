@@ -10,7 +10,8 @@
 #include <inttypes.h>
 
 
-/** Implements a trivial NAT-PMP client to request a port mapping from a NAT. */
+/** Implements a trivial NAT-PMP client to request a port mapping from a NAT.
+ * @ingroup nat */
 class PMPClient : public QObject
 {
   Q_OBJECT
