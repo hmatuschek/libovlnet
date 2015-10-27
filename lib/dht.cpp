@@ -99,7 +99,7 @@ struct __attribute__((packed)) Message
       uint16_t service;
       /** Public (ECDH) key of the requesting or responding node. */
       uint8_t  pubkey[DHT_MAX_PUBKEY_SIZE];
-    } start_stream;
+    } start_connection;
 
     /** A rendesvous request or notification message. */
     struct __attribute__((packed)) {
@@ -452,7 +452,7 @@ DHT::DHT(Identity &id, ServiceHandler *streamHandler,
   : QObject(parent), _self(id), _socket(), _started(false),
     _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
     _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),
-    _streamHandler(streamHandler), _streams(),
+    _connectionHandler(streamHandler), _connections(),
     _requestTimer(), _nodeTimer(), _announcementTimer(), _statisticsTimer()
 {
   logInfo() << "Start node #" << id.id() << " @ " << addr << ":" << port;
@@ -470,22 +470,25 @@ DHT::DHT(Identity &id, ServiceHandler *streamHandler,
   // check request timeouts every 500ms
   _requestTimer.setInterval(500);
   _requestTimer.setSingleShot(false);
+
   // Update statistics every 5 seconds
   _statisticsTimer.setInterval(1000*5);
   _statisticsTimer.setSingleShot(false);
+
   // check for dead nodes every minute
   _nodeTimer.setInterval(1000*60);
   _nodeTimer.setSingleShot(false);
+
   // check announcements every 5 minutes
   _announcementTimer.setInterval(1000*60*5);
   _announcementTimer.setSingleShot(false);
 
-  QObject::connect(&_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
-  QObject::connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
-  QObject::connect(&_requestTimer, SIGNAL(timeout()), this, SLOT(_onCheckRequestTimeout()));
-  QObject::connect(&_nodeTimer, SIGNAL(timeout()), this, SLOT(_onCheckNodeTimeout()));
-  QObject::connect(&_announcementTimer, SIGNAL(timeout()), this, SLOT(_onCheckAnnouncementTimeout()));
-  QObject::connect(&_statisticsTimer, SIGNAL(timeout()), this, SLOT(_onUpdateStatistics()));
+  connect(&_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+  connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
+  connect(&_requestTimer, SIGNAL(timeout()), this, SLOT(_onCheckRequestTimeout()));
+  connect(&_nodeTimer, SIGNAL(timeout()), this, SLOT(_onCheckNodeTimeout()));
+  connect(&_announcementTimer, SIGNAL(timeout()), this, SLOT(_onCheckAnnouncementTimeout()));
+  connect(&_statisticsTimer, SIGNAL(timeout()), this, SLOT(_onUpdateStatistics()));
 
   _requestTimer.start();
   _nodeTimer.start();
@@ -502,8 +505,8 @@ DHT::~DHT() {
 void
 DHT::ping(const QString &addr, uint16_t port) {
   QHostInfo info = QHostInfo::fromName(addr);
-  if (info.addresses().size()) {
-    ping(info.addresses().front(), port);
+  foreach (QHostAddress addr, info.addresses()) {
+    ping(addr, port);
   }
 }
 
@@ -517,13 +520,11 @@ DHT::ping(const QHostAddress &addr, uint16_t port) {
   // Create ping request
   PingRequest *req = new PingRequest();
   _pendingRequests.insert(req->cookie(), req);
-
   // Assemble message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
   memcpy(msg.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
   msg.payload.ping.type = Message::PING;
-  //logDebug() << "Send ping to " << addr << ":" << port;
   // send it
   if(0 > _socket.writeDatagram((char *) &msg, DHT_COOKIE_SIZE+DHT_HASH_SIZE+1, addr, port)) {
     logError() << "Failed to send ping to " << addr << ":" << port;
@@ -532,16 +533,14 @@ DHT::ping(const QHostAddress &addr, uint16_t port) {
 
 void
 DHT::ping(const Identifier &id, const QHostAddress &addr, uint16_t port) {
-  // Create ping request
+  // Create named ping request
   PingRequest *req = new PingRequest(id);
   _pendingRequests.insert(req->cookie(), req);
-
   // Assemble message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
   memcpy(msg.payload.ping.id, _self.id().data(), DHT_HASH_SIZE);
   msg.payload.ping.type = Message::PING;
-  //logDebug() << "Send ping to " << addr << ":" << port;
   // send it
   if(0 > _socket.writeDatagram((char *) &msg, DHT_COOKIE_SIZE+DHT_HASH_SIZE+1, addr, port)) {
     logError() << "Failed to send ping to " << addr << ":" << port;
@@ -555,7 +554,6 @@ DHT::ping(const NodeItem &node) {
 
 void
 DHT::findNode(const Identifier &id) {
-  // logDebug() << "Search for node " << id;
   // Create a query instance
   SearchQuery *query = new SearchQuery(_self.id(), id);
   // Collect DHT_K nearest nodes
@@ -640,7 +638,7 @@ DHT::announce(const Identifier &id) {
 
 bool
 DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
-  if (0 == _streamHandler) { delete stream; return false; }
+  if (0 == _connectionHandler) { delete stream; return false; }
   logDebug() << "Send start secure connection id=" << stream->id()
              << " to " << node.id()
              << " @" << node.addr() << ":" << node.port();
@@ -650,10 +648,10 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
   // Assemble message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
-  msg.payload.start_stream.type = Message::START_STREAM;
-  msg.payload.start_stream.service = htons(service);
+  msg.payload.start_connection.type = Message::START_STREAM;
+  msg.payload.start_connection.service = htons(service);
   int keyLen = 0;
-  if (0 > (keyLen = stream->prepare(msg.payload.start_stream.pubkey, DHT_MAX_PUBKEY_SIZE)) ) {
+  if (0 > (keyLen = stream->prepare(msg.payload.start_connection.pubkey, DHT_MAX_PUBKEY_SIZE)) ) {
     delete stream; delete req; return false;
   }
 
@@ -673,7 +671,7 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
 void
 DHT::socketClosed(const Identifier &id) {
   logDebug() << "Secure socket " << id << " closed.";
-  _streams.remove(id);
+  _connections.remove(id);
 }
 
 Identity &
@@ -720,7 +718,7 @@ DHT::numData() const {
 
 size_t
 DHT::numStreams() const {
-  return _streams.size();
+  return _connections.size();
 }
 
 size_t
@@ -835,8 +833,6 @@ DHT::isPendingAnnouncement(const Identifier &id) const {
 
 void
 DHT::sendAnnouncement(const NodeItem &to, const Identifier &what) {
-  /**logDebug() << "Send Announcement of " << what << " to " << to.id()
-             << " @" << to.addr() << ":" << to.port(); */
   // Assemble & send message
   struct Message msg;
   memcpy(msg.cookie, Identifier::create().data(), DHT_COOKIE_SIZE);
@@ -860,6 +856,27 @@ DHT::sendRendezvous(const Identifier &with, const PeerItem &to) {
   }
 }
 
+bool
+DHT::sendData(const Identifier &id, const uint8_t *data, size_t len, const PeerItem &peer) {
+  return sendData(id, data, len, peer.addr(), peer.port());
+}
+
+bool
+DHT::sendData(const Identifier &id, const uint8_t *data, size_t len, const QHostAddress &addr, uint16_t port) {
+  if (len > DHT_MAX_DATA_SIZE) {
+    logError() << "DHT: sendData(): Cannot send connection data: payload too large "
+               << len << ">" << DHT_MAX_DATA_SIZE << "!";
+    return false;
+  }
+  // Assemble message
+  Message msg;
+  memcpy(msg.cookie, id.constData(), DHT_COOKIE_SIZE);
+  memcpy(msg.payload.datagram, data, len);
+  // send it
+  return ((len+DHT_COOKIE_SIZE) ==
+          _socket.writeDatagram((const char *)&msg, (len+DHT_COOKIE_SIZE), addr, port));
+}
+
 void
 DHT::_onReadyRead() {
   while (_socket.hasPendingDatagrams()) {
@@ -879,9 +896,9 @@ DHT::_onReadyRead() {
 
       Identifier cookie(msg.cookie);
       // First, check if message belongs to a open stream
-      if (_streams.contains(cookie)) {
+      if (_connections.contains(cookie)) {
         // Process streams
-        _streams[cookie]->handleData(((uint8_t *)&msg)+DHT_COOKIE_SIZE, size-DHT_COOKIE_SIZE);
+        _connections[cookie]->handleData(((uint8_t *)&msg)+DHT_COOKIE_SIZE, size-DHT_COOKIE_SIZE);
       } else if (_pendingRequests.contains(cookie)) {
         // Message is a response -> dispatch by type from table
         Request *item = _pendingRequests[cookie];
@@ -912,8 +929,8 @@ DHT::_onReadyRead() {
           _processFindValueRequest(msg, size, addr, port);
         } else if ((size == DHT_ANNOUNCE_REQU_SIZE) && (Message::ANNOUNCE == msg.payload.announce.type)) {
           _processAnnounceRequest(msg, size, addr, port);
-        } else if ((size > DHT_START_STREAM_MIN_REQU_SIZE) && (Message::START_STREAM == msg.payload.start_stream.type)) {
-          _processStartStreamRequest(msg, size, addr, port);
+        } else if ((size > DHT_START_STREAM_MIN_REQU_SIZE) && (Message::START_STREAM == msg.payload.start_connection.type)) {
+          _processStartConnectionRequest(msg, size, addr, port);
         } else if ((size == DHT_RENDEZVOUS_REQU_SIZE) && (Message::RENDEZVOUS == msg.payload.rendezvous.type)) {
           _processRendezvousRequest(msg, size, addr, port);
         } else {
@@ -1154,7 +1171,7 @@ DHT::_processStartStreamResponse(
     const Message &msg, size_t size, StartConnectionRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // Verify session key
-  if (! req->socket()->verify(msg.payload.start_stream.pubkey, size-DHT_COOKIE_SIZE-3)) {
+  if (! req->socket()->verify(msg.payload.start_connection.pubkey, size-DHT_COOKIE_SIZE-3)) {
     logError() << "Verification of peer session key failed.";
     delete req->socket(); return;
   }
@@ -1166,14 +1183,14 @@ DHT::_processStartStreamResponse(
   }
 
   // Success -> start stream
-  if (! req->socket()->start(req->cookie(), PeerItem(addr, port), &_socket)) {
+  if (! req->socket()->start(req->cookie(), PeerItem(addr, port))) {
     logError() << "Can not start sym. crypt.";
     delete req->socket(); return;
   }
 
   // Stream started: register stream & notify stream handler
-  _streams[req->cookie()] = req->socket();
-  _streamHandler->connectionStarted(req->socket());
+  _connections[req->cookie()] = req->socket();
+  _connectionHandler->connectionStarted(req->socket());
 }
 
 void
@@ -1293,58 +1310,58 @@ DHT::_processAnnounceRequest(
 }
 
 void
-DHT::_processStartStreamRequest(const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
+DHT::_processStartConnectionRequest(const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
-  logDebug() << "Received StartStream request, service: " << ntohs(msg.payload.start_stream.service);
-  // check if a stream handler is installed
-  if (0 == _streamHandler) {
-    logInfo() << "No stream handler installed -> ignore request";
+  logDebug() << "Received StartConnection request, service: " << ntohs(msg.payload.start_connection.service);
+  // check if a connection handler is installed
+  if (0 == _connectionHandler) {
+    logInfo() << "No connection handler installed -> ignore request";
     return;
   }
-  // Request new stream from stream handler
-  SecureSocket *stream = 0;
-  if (0 == (stream =_streamHandler->newSocket(ntohs(msg.payload.start_stream.service))) ) {
-    logInfo() << "Stream handler refuses to create a new stream.";
+  // Request new connection from connection handler
+  SecureSocket *connection = 0;
+  if (0 == (connection = _connectionHandler->newSocket(ntohs(msg.payload.start_connection.service))) ) {
+    logInfo() << "Connection handler refuses to create a new connection.";
     return;
   }
   // Verify
-  if (! stream->verify(msg.payload.start_stream.pubkey, size-DHT_COOKIE_SIZE-3)) {
-    logError() << "Can not verify stream peer.";
-    delete stream; return;
+  if (! connection->verify(msg.payload.start_connection.pubkey, size-DHT_COOKIE_SIZE-3)) {
+    logError() << "Can not verify connection peer.";
+    delete connection; return;
   }
-  // check if stream is allowed
-  if (! _streamHandler->allowConnection(ntohs(msg.payload.start_stream.service), NodeItem(stream->peerId(), addr, port))) {
-    logError() << "Stream recjected by StreamHandler.";
-    delete stream; return;
+  // check if connection is allowed
+  if (! _connectionHandler->allowConnection(ntohs(msg.payload.start_connection.service),
+                                            NodeItem(connection->peerId(), addr, port))) {
+    logInfo() << "Connection recjected by ConnectionHandler.";
+    delete connection; return;
   }
 
   // Assemble response
   Message resp; int keyLen=0;
   memcpy(resp.cookie, msg.cookie, DHT_COOKIE_SIZE);
-  resp.payload.start_stream.type = Message::START_STREAM;
-  resp.payload.start_stream.service = msg.payload.start_stream.service;
-  if (0 > (keyLen = stream->prepare(resp.payload.start_stream.pubkey, DHT_MAX_PUBKEY_SIZE))) {
-    logError() << "Can not prepare stream.";
-    delete stream; return;
+  resp.payload.start_connection.type = Message::START_STREAM;
+  resp.payload.start_connection.service = msg.payload.start_connection.service;
+  if (0 > (keyLen = connection->prepare(resp.payload.start_connection.pubkey, DHT_MAX_PUBKEY_SIZE))) {
+    logError() << "Can not prepare connection.";
+    delete connection; return;
   }
 
-  if (! stream->start(resp.cookie, PeerItem(addr, port), &_socket)) {
-    logError() << "Can not finish SecureStream handshake.";
-    delete stream; return;
+  if (! connection->start(resp.cookie, PeerItem(addr, port))) {
+    logError() << "Can not finish SecureSocket handshake.";
+    delete connection; return;
   }
 
   // compute message size
   keyLen += DHT_START_STREAM_MIN_RESP_SIZE;
   // Send response
   if (keyLen != _socket.writeDatagram((char *)&resp, keyLen, addr, port)) {
-    logError() << "Can not send StartStream response";
-    delete stream; return;
+    logError() << "Can not send StartConnection response";
+    delete connection; return;
   }
 
-  //logDebug() << "Stream started.";
-  // Stream started..
-  _streams[resp.cookie] = stream;
-  _streamHandler->connectionStarted(stream);
+  // Connection started..
+  _connections[resp.cookie] = connection;
+  _connectionHandler->connectionStarted(connection);
 }
 
 void
@@ -1469,8 +1486,8 @@ DHT::_onCheckRequestTimeout() {
       }
     } else if (Request::START_CONNECTION == (*req)->type()) {
       logDebug() << "StartConnection request timeout...";
-      if (_streamHandler) {
-        _streamHandler->connectionFailed(
+      if (_connectionHandler) {
+        _connectionHandler->connectionFailed(
               static_cast<StartConnectionRequest *>(*req)->socket());
       }
       // delete stream
@@ -1510,7 +1527,7 @@ DHT::_onCheckNodeTimeout() {
   if (_buckets.numNodes()) {
     // search for myself, this will certainly fail but results in a list
     // of the closest nodes, which will be added to the buckets as candidates
-    findNode(_self.id());
+    findNeighbours(_self.id());
   }
 }
 

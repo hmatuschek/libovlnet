@@ -154,7 +154,7 @@ protected:
 
   /** Derives the session secret from the session keys & initializes the symmetric
    * encryption/decryption. */
-  bool start(const Identifier &streamId, const PeerItem &peer, QUdpSocket *socket);
+  bool start(const Identifier &streamId, const PeerItem &peer);
   /** Encrypts the given data @c in using the sequential number @c seq and stores the
    * result in the ouput buffer @c out. */
   int encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *out, uint8_t *tag);
@@ -185,8 +185,6 @@ private:
   uint8_t _inBuffer[DHT_MAX_DATA_SIZE];
   /** Identifier of the stream. */
   Identifier _streamId;
-  /** The UDP socket. */
-  QUdpSocket *_socket;
 
   // DHT may access some of the protected methods
   friend class DHT;

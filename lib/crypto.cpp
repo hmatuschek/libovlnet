@@ -263,7 +263,7 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
  * Implementation of SecureSocket
  * ******************************************************************************************** */
 SecureSocket::SecureSocket(DHT &dht)
-  : _dht(dht), _sessionKeyPair(0), _peerPubKey(0), _streamId(Identifier::create()), _socket(0)
+  : _dht(dht), _sessionKeyPair(0), _peerPubKey(0), _streamId(Identifier::create())
 {
   // pass...
 }
@@ -396,7 +396,7 @@ error:
 }
 
 bool
-SecureSocket::start(const Identifier &streamId, const PeerItem &peer, QUdpSocket *socket) {
+SecureSocket::start(const Identifier &streamId, const PeerItem &peer) {
   // Check if everything is present
   if (! _peerPubKey) { return false; }
   if (! _sessionKeyPair) { return false; }
@@ -437,7 +437,6 @@ SecureSocket::start(const Identifier &streamId, const PeerItem &peer, QUdpSocket
   _peer = peer;
   // Store stream id and socket
   _streamId = streamId;
-  _socket = socket;
   return true;
 
 error:
@@ -586,37 +585,32 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   uint8_t msg[DHT_MAX_MESSAGE_SIZE];
   uint8_t *ptr = msg;
   int txlen = 0, enclen=0;
-  // Store stream cookie
-  memcpy(ptr, _streamId.data(), DHT_HASH_SIZE);
-  ptr += DHT_HASH_SIZE; txlen += DHT_HASH_SIZE;
+
   // store sequence number
   *((uint64_t *)ptr) = qToBigEndian(qint64(_outSeq)); txlen += 8; ptr += 8;
+
   // Get ptr to auth tag
   uint8_t *tag = ptr; txlen += 16; ptr += 16;
+
   // store encrypted data if there is any
   if ( (len <= 0) || (0 > (enclen = encrypt(_outSeq, data, len, ptr, tag))) )
     return false;
   txlen += enclen;
+
   // Send datagram
-  int64_t send = _socket->writeDatagram((const char *)msg, txlen, _peer.addr(), _peer.port());
-  if (0 > send) {
-    logError() << "SecureSocket: Cannot send datagram: " << _socket->errorString();
+  if (! _dht.sendData(_streamId, msg, txlen, _peer)) {
     return false;
   }
-  // Check if datagram was send completely
-  if (txlen != send)
-    return false;
-  // Update seq
+
+  // Update seq, done
   _outSeq += txlen;
-  // done.
   return true;
 }
 
 bool
 SecureSocket::sendNull() {
   // send only stream id
-  return DHT_HASH_SIZE == _socket->writeDatagram(
-        (const char *)_streamId.data(), DHT_HASH_SIZE, _peer.addr(), _peer.port());
+  return _dht.sendData(_streamId, 0, 0, _peer);
 }
 
 

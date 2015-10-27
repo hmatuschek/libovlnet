@@ -151,6 +151,12 @@ protected:
   void sendAnnouncement(const NodeItem &to, const Identifier &what);
   /** Sends a Rendezvous request to the given node. */
   void sendRendezvous(const Identifier &with, const PeerItem &to);
+  /** Sends some data with the given connection id. */
+  bool sendData(const Identifier &id, const uint8_t *data, size_t len,
+                const PeerItem &peer);
+  /** Sends some data with the given connection id. */
+  bool sendData(const Identifier &id, const uint8_t *data, size_t len,
+                const QHostAddress &addr, uint16_t port);
 
 private:
   /** Processes a Ping response. */
@@ -184,7 +190,7 @@ private:
   void _processAnnounceRequest(const Message &msg, size_t size,
                                const QHostAddress &addr, uint16_t port);
   /** Processes a StartStream request. */
-  void _processStartStreamRequest(const Message &msg, size_t size,
+  void _processStartConnectionRequest(const Message &msg, size_t size,
                                   const QHostAddress &addr, uint16_t port);
   /** Processes a Rendezvous request. */
   void _processRendezvousRequest(Message &msg, size_t size,
@@ -195,11 +201,11 @@ private slots:
   void _onReadyRead();
   /** Gets called regulary to check the request timeouts. */
   void _onCheckRequestTimeout();
-  /** Gets called regulary to check the timeout of the node in the buckets. */
+  /** Gets called regularily to check the timeout of the node in the buckets. */
   void _onCheckNodeTimeout();
-  /** Gets called regulary to check the announcement timeouts. */
+  /** Gets called regularily to check the announcement timeouts. */
   void _onCheckAnnouncementTimeout();  
-  /** Gets called regulary to update the statistics. */
+  /** Gets called regularily to update the statistics. */
   void _onUpdateStatistics();
   /** Gets called when some data has been send. */
   void _onBytesWritten(qint64 n);
@@ -239,9 +245,9 @@ protected:
   QHash<Identifier, Request *> _pendingRequests;
 
   /** Socket handler instance. */
-  ServiceHandler *_streamHandler;
+  ServiceHandler *_connectionHandler;
   /** The list of open connection. */
-  QHash<Identifier, SecureSocket *> _streams;
+  QHash<Identifier, SecureSocket *> _connections;
 
   /** Timer to check timeouts of requests. */
   QTimer _requestTimer;
@@ -251,6 +257,9 @@ protected:
   QTimer _announcementTimer;
   /** Timer to update i/o statistics every 5 seconds. */
   QTimer _statisticsTimer;
+
+  // Allow SecureSocket to access sendData()
+  friend class SecureSocket;
 };
 
 
