@@ -266,7 +266,7 @@ BuddyList::hasNode(const Identifier &id) const {
 
 BuddyList::Buddy *
 BuddyList::getBuddy(size_t idx) const {
-  if (idx >= _buddies.size()) { return 0; }
+  if (qint64(idx) >= _buddies.size()) { return 0; }
   return _buddies[idx];
 }
 
