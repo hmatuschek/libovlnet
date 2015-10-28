@@ -10,11 +10,11 @@
 #include "lib/buckets.h"
 
 
-class SocksServiceWhiteList : public QSet<Identifier>
+class ServiceWhiteList : public QSet<Identifier>
 {
 public:
-  SocksServiceWhiteList();
-  SocksServiceWhiteList(const QJsonArray &lst = QJsonArray());
+  ServiceWhiteList();
+  ServiceWhiteList(const QJsonArray &lst = QJsonArray());
 
   QJsonArray toJson() const;
 };
@@ -38,8 +38,8 @@ public:
   bool allowWhiteListed() const;
   void setAllowWhiteListed(bool allow);
 
-  SocksServiceWhiteList &whitelist();
-  const SocksServiceWhiteList &whitelist() const;
+  ServiceWhiteList &whitelist();
+  const ServiceWhiteList &whitelist() const;
 
   QJsonObject toJson() const;
 
@@ -47,7 +47,7 @@ protected:
   bool _enabled;
   bool _allowBuddies;
   bool _allowWhitelist;
-  SocksServiceWhiteList _whitelist;
+  ServiceWhiteList _whitelist;
 };
 
 

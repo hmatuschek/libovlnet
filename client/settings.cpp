@@ -92,12 +92,12 @@ SocksServiceSettings::setAllowWhiteListed(bool allow) {
   _allowWhitelist = allow;
 }
 
-const SocksServiceWhiteList &
+const ServiceWhiteList &
 SocksServiceSettings::whitelist() const {
   return _whitelist;
 }
 
-SocksServiceWhiteList &
+ServiceWhiteList &
 SocksServiceSettings::whitelist() {
   return _whitelist;
 }
@@ -116,7 +116,7 @@ SocksServiceSettings::toJson() const {
 /* ********************************************************************************************* *
  * Implementation of SocksServiceWhiteList
  * ********************************************************************************************* */
-SocksServiceWhiteList::SocksServiceWhiteList(const QJsonArray &lst)
+ServiceWhiteList::ServiceWhiteList(const QJsonArray &lst)
   : QSet<Identifier>()
 {
   for (QJsonArray::const_iterator item = lst.begin(); item != lst.end(); item++) {
@@ -127,7 +127,7 @@ SocksServiceWhiteList::SocksServiceWhiteList(const QJsonArray &lst)
 }
 
 QJsonArray
-SocksServiceWhiteList::toJson() const {
+ServiceWhiteList::toJson() const {
   QJsonArray lst;
   QSet<Identifier>::const_iterator item = this->begin();
   for (; item != this->end(); item++) {

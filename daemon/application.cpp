@@ -2,12 +2,13 @@
 #include "echostream.h"
 #include "halchat.h"
 #include "lib/socks.h"
+#include "lib/secureshell.h"
 
 #include <QDir>
 #include <QFile>
 
 Application::Application(int argc, char *argv[])
-  : QCoreApplication(argc, argv), _model(), _socksWhiteList("/etc/vlfdaemon/sockswhitelist.json")
+  : QCoreApplication(argc, argv), _model(), _settings("/etc/ovlnetd/settings.json")
 {
   // Try to load identity from file
   QDir vlfDir("/etc");
@@ -44,12 +45,19 @@ Application::newSocket(uint16_t service) {
     // neat public chat service
     return new HalChat(*_dht, _model);
   } else if (5 == service) {
-    if (_socksWhiteList.empty()) {
+    if (_settings.socksServiceWhiteList().isEmpty()) {
       logInfo() << "No whitelisted nodes for SOCKS service -> deny.";
       return 0;
     }
     // create handler
     return new SocksOutStream(*_dht);
+  } else if (22 == service) {
+    if (_settings.shellServiceWhiteList().isEmpty()) {
+      logInfo() << "No whitelisted nodes for shell service -> deny.";
+      return 0;
+    }
+    // create handler
+    return new SecureShell(*_dht);
   }
   return 0;
 }
@@ -60,7 +68,7 @@ Application::allowConnection(uint16_t service, const NodeItem &peer) {
     // HalChat is public
     return true;
   } else if (5 == service) {
-    if (_socksWhiteList.allowed(peer.id())) {
+    if (_settings.socksServiceWhiteList().contains(peer.id())) {
       logDebug() << "Allow SOCKS connection from " << peer.id()
                  << " @" << peer.addr() << ":" << peer.port();
     } else {
@@ -68,7 +76,17 @@ Application::allowConnection(uint16_t service, const NodeItem &peer) {
                 << " @" << peer.addr() << ":" << peer.port();
     }
     // Check if node is allowed to use the SOCKS service
-    return _socksWhiteList.allowed(peer.id());
+    return _settings.socksServiceWhiteList().contains(peer.id());
+  } else if (22 == service) {
+    if (_settings.shellServiceWhiteList().contains(peer.id())) {
+      logDebug() << "Allow shell connection from " << peer.id()
+                 << " @" << peer.addr() << ":" << peer.port();
+    } else {
+      logInfo() << "Deny shell connection from " << peer.id()
+                << " @" << peer.addr() << ":" << peer.port();
+    }
+    // Check if node is allowed to use the shell service
+    return _settings.shellServiceWhiteList().contains(peer.id());
   }
   return true;
 }
@@ -76,14 +94,15 @@ Application::allowConnection(uint16_t service, const NodeItem &peer) {
 void
 Application::connectionStarted(SecureSocket *stream) {
   logDebug() << "Stream service " << stream << " started";
-  HalChat *chat = 0;
-  SocksOutStream *socks = 0;
-  if (0 != (chat = dynamic_cast<HalChat *>(stream))) {
+  if (HalChat *chat = dynamic_cast<HalChat *>(stream)) {
     // start chat (keep alive messages etc. )
     chat->started();
-  } else if (0 != (socks = dynamic_cast<SocksOutStream *>(stream))) {
+  } else if (SocksOutStream *socks = dynamic_cast<SocksOutStream *>(stream)) {
     // start SOCKS service.
     socks->open(QIODevice::ReadWrite);
+  } else if (SecureShell *shell = dynamic_cast<SecureShell *>(stream)) {
+    // start shell
+    shell->open(QIODevice::ReadWrite);
   }
 }
 
