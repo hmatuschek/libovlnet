@@ -8,7 +8,7 @@
 
 /** Returns a random byte.
  * @ingroup utils */
-inline uint16_t dht_rand8() {
+inline uint8_t dht_rand8() {
   return (qrand() & 0xff);
 }
 

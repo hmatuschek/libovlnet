@@ -5,7 +5,7 @@
 #include <QProcess>
 
 /** Implements a trivial secure shell service.
- * This class simply forwards any data to and from a @c SecureStream connection to a process.
+ * This class simply relays any data between a @c SecureStream connection and a process.
  * @ingroup services */
 class SecureShell : public SecureStream
 {
