@@ -1,3 +1,5 @@
+/** @defgroup filetransfer File transfer service
+ * @ingroup services */
 #ifndef FILETRANSFER_H
 #define FILETRANSFER_H
 
@@ -10,7 +12,7 @@
 
 
 /** Implements the file transfer sender side.
- * @ingroup services */
+ * @ingroup filetransfer */
 class FileUpload : public QObject, public SecureSocket
 {
   Q_OBJECT
@@ -78,7 +80,7 @@ protected:
 
 
 /** Implements the file transfer receiver side.
- * @ingroup services */
+ * @ingroup filetransfer */
 class FileDownload : public QObject, public SecureSocket
 {
   Q_OBJECT

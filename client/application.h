@@ -16,19 +16,13 @@
 #include "settings.h"
 
 
-class Application : public QApplication, public ServiceHandler
+class Application : public QApplication
 {
   Q_OBJECT
 
 public:
   explicit Application(int &argc, char *argv[]);
   virtual ~Application();
-
-  // Implementation of StreamHandler interface
-  SecureSocket *newSocket(uint16_t service);
-  bool allowConnection(uint16_t service, const NodeItem &peer);
-  void connectionStarted(SecureSocket *stream);
-  void connectionFailed(SecureSocket *stream);
 
   /** Initializes a chat with the specified node. */
   void startChatWith(const Identifier &id);
@@ -83,6 +77,19 @@ protected slots:
   void onDHTDisconnected();
   /** Gets called periodically on connection loss to bootstrap a connection to the network. */
   void onReconnect();
+
+protected:
+  class ChatService: public AbstractService
+  {
+  public:
+    ChatService(Application &app);
+    SecureSocket *newSocket();
+    bool allowConnection(const NodeItem &peer);
+    void connectionStarted(SecureSocket *socket);
+    void connectionFailed(SecureSocket *socket);
+  protected:
+    Application &_application;
+  };
 
 protected:
   /** The identity of this DHT node. */

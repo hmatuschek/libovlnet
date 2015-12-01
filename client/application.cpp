@@ -67,7 +67,9 @@ Application::Application(int &argc, char *argv[])
   Logger::addHandler(_logModel);
 
   // Create DHT instance
-  _dht = new DHT(*_identity, this, QHostAddress::Any, 7742);
+  _dht = new DHT(*_identity, QHostAddress::Any, 7742);
+  // register services
+  _dht->registerService(2, new ChatService(*this));
 
   // Load settings
   _settings = new Settings(nodeDir.canonicalPath()+"/settings.json");
@@ -387,13 +389,13 @@ Application::onNodeFound(const NodeItem &node) {
   // Dispatch by type
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     logInfo() << "Node " << node.id() << " found: Start chat.";
-    _dht->startStream(2, node, stream);
+    _dht->startConnection(2, node, stream);
   } else if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
     logInfo() << "Node " << node.id() << " found: Start call.";
-    _dht->startStream(1, node, stream);
+    _dht->startConnection(1, node, stream);
   } else if (0 != (upload = dynamic_cast<FileUpload *>(stream))) {
     logInfo() << "Node " << node.id() << "found: Start upload of file " << upload->fileName();
-    _dht->startStream(4, node, stream);
+    _dht->startConnection(4, node, stream);
   }
 }
 
@@ -433,4 +435,30 @@ Application::onReconnect() {
       _dht->ping(hostport.first, hostport.second);
     }
   }
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of ChatService
+ * ********************************************************************************************* */
+Application::ChatService::ChatService(Application &app)
+  : AbstractService(), _application(app)
+{
+  // pass...
+}
+
+SecureSocket *
+Application::ChatService::newSocket() {
+  logDebug() << "Application: Create new SecureCall instance.";
+  return new SecureChat(true, _application.dht());
+}
+
+bool
+Application::ChatService::allowConnection(const NodeItem &peer) {
+  return _buddies->hasNode(peer.id());
+}
+
+void
+Application::ChatService::connectionStarted(SecureSocket *socket) {
+  (new ChatWindow(*this, dynamic_cast<SecureChat *>(socket)))->show();
 }

@@ -20,6 +20,25 @@ SecureChat::~SecureChat() {
   // pass...
 }
 
+bool
+SecureChat::start(const Identifier &streamId, const PeerItem &peer) {
+  if (SecureSocket::start(streamId, peer)) {
+    // start timers
+    _keepAlive.start();
+    _timeout.start();
+    // signal chat started
+    emit started();
+    // done.
+    return true;
+  }
+  return false;
+}
+
+void
+SecureChat::failed() {
+  emit closed();
+}
+
 void
 SecureChat::handleDatagram(const uint8_t *data, size_t len) {
   // On any message -> reset timeout
@@ -35,13 +54,6 @@ void
 SecureChat::sendMessage(const QString &msg) {
   QByteArray data = msg.toUtf8();
   sendDatagram((uint8_t *)data.data(), data.size());
-}
-
-void
-SecureChat::started() {
-  // start timers
-  _keepAlive.start();
-  _timeout.start();
 }
 
 void

@@ -1,3 +1,6 @@
+/** @defgroup voip Secure VoIP service
+ * @ingroup services */
+
 #ifndef SECURECALL_H
 #define SECURECALL_H
 
@@ -13,7 +16,8 @@
 #include <QObject>
 
 /** Target bit rate about 12kb/s, mono, wide band and 20ms frame duration. At 48k sample rate,
- * this implies 960 samples per buffer/frame. */
+ * this implies 960 samples per buffer/frame.
+ * @ingroup voip */
 class SecureCall : public QObject, public SecureSocket
 {
   Q_OBJECT

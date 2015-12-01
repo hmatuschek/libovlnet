@@ -95,6 +95,8 @@ public:
   const Identifier &id() const;
   /** Peer identifier derived from its pubkey. */
   const Identifier &peerId() const;
+  /** Returns remote peer. */
+  const PeerItem &peer() const;
 
 protected:
   /** Needs to be implemented by any specialization to handle received datagrams. */
@@ -154,7 +156,9 @@ protected:
 
   /** Derives the session secret from the session keys & initializes the symmetric
    * encryption/decryption. */
-  bool start(const Identifier &streamId, const PeerItem &peer);
+  virtual bool start(const Identifier &streamId, const PeerItem &peer);
+  /** Signals that the connection failed. */
+  virtual void failed();
   /** Encrypts the given data @c in using the sequential number @c seq and stores the
    * result in the ouput buffer @c out. */
   int encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *out, uint8_t *tag);
@@ -229,6 +233,42 @@ public:
   virtual void connectionFailed(SecureSocket *stream) = 0;
 };
 
+
+/** Interface of a service provided via the OVL network.
+ * Such a handler acts as a gate keeper and dispatcher for incomming and established
+ * secure connections (@c SecureSocket).
+ *
+ * On an incomming connection, first @c newSocket gets called. This method should create the
+ * matching @c SecureSocket instance for the service. Then the @c DHT instance will initiate
+ * a secure connection. In that step, the identity of the peer will be verified. Once the connection
+ * is initiated, @c allowConnection will be called. If it returns @c true, the connection is
+ * considered as established and @c connectionStarted gets called passing the ownership of the
+ * socket. If @c allowConnection fails (returns @c false) or the identity of the node can not be
+ * verified, @c connectionFailed gets called also passing the ownership of the socket.
+ *
+ * On an outgoing connection, e.g. by calling @c DHT::startConnection, the DHT will try to establish
+ * a secure connection. On success, @c connectionStarted will be called and @c connectionFailed
+ * on error. Again, both methods transfer the ownership of the socket.
+ * @ingroup core */
+class AbstractService
+{
+protected:
+  /** Hidden constructor. */
+  AbstractService();
+
+public:
+  /** Destructor. */
+  virtual ~AbstractService();
+
+  /** Needs to be implemented to construct a socket for the incomming connection. */
+  virtual SecureSocket *newSocket() = 0;
+  /** Needs to be implemented to allow or deny connections from the given peer. */
+  virtual bool allowConnection(const NodeItem &peer) = 0;
+  /** Gets called if a connection is established. */
+  virtual void connectionStarted(SecureSocket *stream) = 0;
+  /** Gets called if a connection failed. */
+  virtual void connectionFailed(SecureSocket *stream) = 0;
+};
 
 
 #endif // IDENTITY_H

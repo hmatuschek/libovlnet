@@ -23,6 +23,7 @@ class FindNeighboursRequest;
 class RendezvousSearchRequest;
 class StartConnectionRequest;
 class Identity;
+class AbstractService;
 class ServiceHandler;
 class SecureSocket;
 
@@ -39,8 +40,8 @@ public:
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
-  explicit DHT(Identity &id, ServiceHandler *streamHandler=0,
-               const QHostAddress &addr=QHostAddress::Any, quint16 port=7741, QObject *parent=0);
+  explicit DHT(Identity &id, const QHostAddress &addr=QHostAddress::Any,
+               quint16 port=7741, QObject *parent=0);
 
   /** Destructor. */
   virtual ~DHT();
@@ -97,13 +98,19 @@ public:
   /** Announces a value. */
   void announce(const Identifier &id);
 
+  /** Returns @c true if a handler is associated with the given service. */
+  bool hasService(uint16_t service) const;
+  /** Registers a service.
+   * Retruns @c true on success and @c false if a handler is already associated with the given
+   * service. The ownership of the handler is transferred to the DHT. */
+  bool registerService(uint16_t no, AbstractService *handler);
   /** Retunrs the number of active connections. */
-  size_t numStreams() const;
+  size_t numSockets() const;
   /** Starts a secure connection.
    * The ownership of the @c SecureSocket instance is passed to the DHT and will be deleted if the
    * connection fails. If the connection is established, the ownership of the socket is passed to
    * the serivce handler instance. */
-  bool startStream(uint16_t service, const NodeItem &node, SecureSocket *stream);
+  bool startConnection(uint16_t service, const NodeItem &node, SecureSocket *stream);
   /** Unregister the socket with the DHT instance. */
   void socketClosed(const Identifier &id);
   
@@ -175,7 +182,7 @@ private:
   void _processRendezvousSearchResponse(const Message &msg, size_t size, RendezvousSearchRequest *req,
                                         const QHostAddress &addr, uint16_t port);
   /** Processes a StartStream response. */
-  void _processStartStreamResponse(const Message &msg, size_t size, StartConnectionRequest *req,
+  void _processStartConnectionResponse(const Message &msg, size_t size, StartConnectionRequest *req,
                                    const QHostAddress &addr, uint16_t port);
   /** Processes a Ping request. */
   void _processPingRequest(const Message &msg, size_t size,
@@ -244,8 +251,8 @@ protected:
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
 
-  /** Socket handler instance. */
-  ServiceHandler *_connectionHandler;
+  /** Table of services. */
+  QHash<uint16_t, AbstractService *> _services;
   /** The list of open connection. */
   QHash<Identifier, SecureSocket *> _connections;
 

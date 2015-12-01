@@ -1,3 +1,6 @@
+/** @defgroup socks Socks service
+ * @ingroup services */
+
 #ifndef SOCKS_H
 #define SOCKS_H
 
@@ -12,7 +15,7 @@
  * another node which acts as the exit point. This class is simple, once the connection to the node
  * is established, the data to and from the local TCP connection is forwarded to the node,
  * including the SOCKS messages. It is the remote node that implements the actual SOCKS proxy.
- * @ingroup services */
+ * @ingroup socks */
 class LocalSocksStream: public SecureStream
 {
   Q_OBJECT
@@ -61,7 +64,7 @@ protected:
  * This class listen on a local TCP port (1080 by default) for incomming connections. Once a
  * TCP connection is established, the remote node is contacted. If the connection to the remote
  * node is established, the client (at the TCP connection) can use the remote node as a proxy.
- * @ingroup services */
+ * @ingroup socks */
 class LocalSocksService : public QObject
 {
   Q_OBJECT
@@ -111,7 +114,7 @@ protected:
  * Once the connection with the client is made, the SOCKS request is parsed and a connection
  * to the requested host is established. Any further data to and from the client is then
  * proxied to that host.
- * @ingroup services */
+ * @ingroup socks */
 class SocksOutStream: public SecureStream
 {
   Q_OBJECT

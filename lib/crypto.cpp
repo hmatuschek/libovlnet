@@ -344,6 +344,11 @@ SecureSocket::peerId() const {
   return _peerId;
 }
 
+const PeerItem &
+SecureSocket::peer() const {
+  return _peer;
+}
+
 bool
 SecureSocket::verify(const uint8_t *msg, size_t len)
 {
@@ -448,6 +453,11 @@ error:
   if (ctx) { EVP_PKEY_CTX_free(ctx); }
   if (skey) { OPENSSL_free(skey); }
   return false;
+}
+
+void
+SecureSocket::failed() {
+  // pass...
 }
 
 int
@@ -627,4 +637,15 @@ ServiceHandler::~ServiceHandler() {
 }
 
 
+/* ******************************************************************************************** *
+ * Implementation of AbstractService
+ * ******************************************************************************************** */
+AbstractService::AbstractService()
+{
+  // pass...
+}
+
+AbstractService::~AbstractService() {
+  // pass...
+}
 

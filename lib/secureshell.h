@@ -1,3 +1,6 @@
+/** @defgroup rshell Secure remote shell service
+ * @ingroup services */
+
 #ifndef SECURESHELL_H
 #define SECURESHELL_H
 
@@ -5,8 +8,9 @@
 #include <QProcess>
 
 /** Implements a trivial secure shell service.
- * This class simply relays any data between a @c SecureStream connection and a process.
- * @ingroup services */
+ * This class simply relays any data between a @c SecureStream connection and a process
+ * (e.g. @c login) allowing for the implementation of a secure remote login service.
+ * @ingroup rshell */
 class SecureShell : public SecureStream
 {
   Q_OBJECT

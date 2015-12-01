@@ -27,10 +27,14 @@ Application::Application(int argc, char *argv[])
   }
 
   if (_identity) {
-    _dht = new DHT(*_identity, this);
+    _dht = new DHT(*_identity);
   } else {
     logError() << "Error while loading or creating my identity.";
   }
+
+  // Register services
+  _dht->registerService(2, new HalChatService(*this));
+  _dht->registerService(5, new SocksService(*this));
 }
 
 DHT &
@@ -38,56 +42,76 @@ Application::dht() {
   return *_dht;
 }
 
+
+/* ********************************************************************************************* *
+ * Implementation of HalChatService
+ * ********************************************************************************************* */
+Application::HalChatService::HalChatService(Application &app)
+  : AbstractService(), _application(app)
+{
+  // pass...
+}
+
 SecureSocket *
-Application::newSocket(uint16_t service) {
-  if (2 == service) {
-    // neat public chat service
-    return new HalChat(*_dht, _model);
-  } else if (5 == service) {
-    if (_socksWhiteList.empty()) {
-      logInfo() << "No whitelisted nodes for SOCKS service -> deny.";
-      return 0;
-    }
-    // create handler
-    return new SocksOutStream(*_dht);
-  }
-  return 0;
+Application::HalChatService::newSocket() {
+  // neat public chat service
+  return new HalChat(_application.dht(), _application._model);
 }
 
 bool
-Application::allowConnection(uint16_t service, const NodeItem &peer) {
-  if (2 == service) {
-    // HalChat is public
-    return true;
-  } else if (5 == service) {
-    if (_socksWhiteList.allowed(peer.id())) {
-      logDebug() << "Allow SOCKS connection from " << peer.id()
-                 << " @" << peer.addr() << ":" << peer.port();
-    } else {
-      logInfo() << "Deny SOCKS connection from " << peer.id()
-                << " @" << peer.addr() << ":" << peer.port();
-    }
-    // Check if node is allowed to use the SOCKS service
-    return _socksWhiteList.allowed(peer.id());
-  }
+Application::HalChatService::allowConnection(const NodeItem &peer) {
   return true;
 }
 
 void
-Application::connectionStarted(SecureSocket *stream) {
-  logDebug() << "Stream service " << stream << " started";
-  HalChat *chat = 0;
-  SocksOutStream *socks = 0;
-  if (0 != (chat = dynamic_cast<HalChat *>(stream))) {
-    // start chat (keep alive messages etc. )
-    chat->started();
-  } else if (0 != (socks = dynamic_cast<SocksOutStream *>(stream))) {
-    // start SOCKS service.
-    socks->open(QIODevice::ReadWrite);
-  }
+Application::HalChatService::connectionStarted(SecureSocket *stream) {
+  dynamic_cast<HalChat *>(stream)->started();
 }
 
 void
-Application::connectionFailed(SecureSocket *stream) {
-  // mhh, don't care.
+Application::HalChatService::connectionFailed(SecureSocket *stream) {
+  delete stream;
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of SocksService
+ * ********************************************************************************************* */
+Application::SocksService::SocksService(Application &app)
+  : AbstractService(), _application(app)
+{
+  // pass...
+}
+
+SecureSocket *
+Application::SocksService::newSocket() {
+  if (_application._socksWhiteList.empty()) {
+    logInfo() << "No whitelisted nodes for SOCKS service -> deny.";
+    return 0;
+  }
+  // create handler
+  return new SocksOutStream(_application.dht());
+}
+
+bool
+Application::SocksService::allowConnection(const NodeItem &peer) {
+  if (_application._socksWhiteList.allowed(peer.id())) {
+    logDebug() << "Allow SOCKS connection from " << peer.id()
+               << " @" << peer.addr() << ":" << peer.port();
+  } else {
+    logInfo() << "Deny SOCKS connection from " << peer.id()
+              << " @" << peer.addr() << ":" << peer.port();
+  }
+  // Check if node is allowed to use the SOCKS service
+  return _application._socksWhiteList.allowed(peer.id());
+}
+
+void
+Application::SocksService::connectionStarted(SecureSocket *stream) {
+  dynamic_cast<SocksOutStream *>(stream)->open(QIODevice::ReadWrite);
+}
+
+void
+Application::SocksService::connectionFailed(SecureSocket *stream) {
+  delete stream;
 }

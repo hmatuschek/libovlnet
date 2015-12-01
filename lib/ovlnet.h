@@ -101,13 +101,17 @@
  * These connections can then be used to provide different services to other nodes. The following
  * services are provided by Libovlnet:
  *
- *   - A simple chat service (SecureChat).
- *   - A simple VoIP/voice call service (SecureCall).
- *   - File transfer (FileUpload, FileDownload).
- *   - SOCKS proxy service (LocalSocksStream, LocalSocksService, SocksOutStream).
- *   - A secure shell service (SecureShell).
- *   - A HTTP server (HTTPService).
+ *   - A simple chat service (@ref chat).
+ *   - A simple VoIP/voice call service (@ref voip).
+ *   - File transfer (@ref filetransfer).
+ *   - SOCKS proxy service (@ref socks).
+ *   - A secure shell service (@ref rshell).
+ *   - A HTTP server (@ref http).
  */
+
+/** @defgroup services Services */
+
+/** @defgroup internal Internal used classes. */
 
 #ifndef __OVLNET_H__
 #define __OVLNET_H__
