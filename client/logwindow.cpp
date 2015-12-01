@@ -66,10 +66,18 @@ LogModel::data(const QModelIndex &index, int role) const {
 
 QVariant
 LogModel::headerData(int section, Qt::Orientation orientation, int role) const {
-  if (Qt::Vertical != orientation) { return QVariant(); }
-  if (Qt::DisplayRole != role) { return QVariant(); }
-  if (section >= _messages.size()) { return QVariant(); }
-  return _messages[section].timestamp().time().toString();
+  if (Qt::Horizontal == orientation) {
+    if (Qt::DisplayRole != role) { return QVariant(); }
+    if (0 == section) { return "File"; }
+    if (1 == section) { return "Message"; }
+    return QVariant();
+  }
+  if (Qt::Vertical == orientation){
+    if (Qt::DisplayRole != role) { return QVariant(); }
+    if (section >= _messages.size()) { return QVariant(); }
+    return _messages[section].timestamp().time().toString();
+  }
+  return QVariant();
 }
 
 void
@@ -88,7 +96,6 @@ LogWidget::LogWidget(Application &app)
 
   _table = new QTableView();
   _table->setModel(&app.log());
-  _table->horizontalHeader()->setVisible(false);
   _table->horizontalHeader()->setStretchLastSection(true);
 
   connect(&app.log(), SIGNAL(rowsInserted(QModelIndex,int,int)),

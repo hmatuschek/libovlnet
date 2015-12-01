@@ -888,7 +888,7 @@ DHT::sendData(const Identifier &id, const uint8_t *data, size_t len, const QHost
   memcpy(msg.cookie, id.constData(), DHT_COOKIE_SIZE);
   memcpy(msg.payload.datagram, data, len);
   // send it
-  return ((len+DHT_COOKIE_SIZE) ==
+  return (qint64(len+DHT_COOKIE_SIZE) ==
           _socket.writeDatagram((const char *)&msg, (len+DHT_COOKIE_SIZE), addr, port));
 }
 
