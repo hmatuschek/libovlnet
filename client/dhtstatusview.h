@@ -39,8 +39,6 @@ protected:
   DHTStatus *_status;
 
   QLabel *_numPeers;
-  QLabel *_numKeys;
-  QLabel *_numData;
   QLabel *_numStreams;
   QLabel *_bytesReceived;
   QLabel *_bytesSend;

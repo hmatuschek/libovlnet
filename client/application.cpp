@@ -237,85 +237,6 @@ Application::onQuit() {
   quit();
 }
 
-SecureSocket *
-Application::newSocket(uint16_t service) {
-  if (1 == service) {
-    // VoIP service
-    logDebug() << "Create new SecureCall instance.";
-    return new SecureCall(true, dht());
-  } else if (2 == service) {
-    // Chat service
-    logDebug() << "Create new SecureChat instance.";
-    return new SecureChat(dht());
-  } else if (4 == service) {
-    // File download
-    logDebug() << "Create new Download instance.";
-    return new FileDownload(dht());
-  } else if (5 == service) {
-    // If socks service is disabled -> return 0
-    if (! _settings->socksServiceSettings().enabled()) {
-      return 0;
-    }
-    // otherwise create SOCKS proxy stream
-    return new SocksOutStream(dht());
-  } else {
-    logWarning() << "Unknown service number " << service;
-  }
-  return 0;
-}
-
-bool
-Application::allowConnection(uint16_t service, const NodeItem &peer) {
-  if ((1 == service) || (2 == service) || (4 == service)) {
-    // File upload, VoIP or Chat services:
-    //  check if peer is buddy list
-    return _buddies->hasNode(peer.id());
-  } else if (5 == service) {
-    // If buddies are allowed to use the SOCKS service or
-    //  if whitelist is enabled and node is listed there
-    return ( (_settings->socksServiceSettings().allowBuddies() && _buddies->hasNode(peer.id())) ||
-             (_settings->socksServiceSettings().allowWhiteListed() &&
-              _settings->socksServiceSettings().whitelist().contains(peer.id())) );
-  }
-  return false;
-}
-
-void
-Application::connectionStarted(SecureSocket *stream) {
-  // Dispatch by stream type
-  if (SecureChat *chat = dynamic_cast<SecureChat *>(stream)) {
-    // Start keep alive timer
-    chat->started();
-    (new ChatWindow(*this, chat))->show();
-  } else if (SecureCall *call = dynamic_cast<SecureCall *>(stream)) {
-    // Start streaming
-    call->initialized();
-    (new CallWindow(*this, call))->show();
-  } else if (FileUpload *upload = dynamic_cast<FileUpload *>(stream)) {
-    // Send request
-    upload->sendRequest();
-    // Show upload dialog
-    (new FileUploadDialog(upload, *this))->show();
-  } else if (FileDownload *download = dynamic_cast<FileDownload *>(stream)) {
-    // Show download dialog
-    (new FileDownloadDialog(download, *this))->show();
-  } else if (LocalSocksStream *socksin = dynamic_cast<LocalSocksStream *>(stream)) {
-    // Simply open the stream
-    socksin->open(QIODevice::ReadWrite);
-  } else if (SocksOutStream *socksout = dynamic_cast<SocksOutStream *>(stream)) {
-    // start SOCKS service.
-    socksout->open(QIODevice::ReadWrite);
-  } else {
-    logWarning() << "Unknown service type. Close connection " << stream->id();
-    _dht->socketClosed(stream->id());
-    delete stream;
-  }
-}
-
-void
-Application::connectionFailed(SecureSocket *stream) {
-  /// @todo Handle stream errors;
-}
 
 void
 Application::startChatWith(const Identifier &id) {
@@ -450,15 +371,20 @@ Application::ChatService::ChatService(Application &app)
 SecureSocket *
 Application::ChatService::newSocket() {
   logDebug() << "Application: Create new SecureCall instance.";
-  return new SecureChat(true, _application.dht());
+  return new SecureChat(_application.dht());
 }
 
 bool
 Application::ChatService::allowConnection(const NodeItem &peer) {
-  return _buddies->hasNode(peer.id());
+  return _application._buddies->hasNode(peer.id());
 }
 
 void
 Application::ChatService::connectionStarted(SecureSocket *socket) {
-  (new ChatWindow(*this, dynamic_cast<SecureChat *>(socket)))->show();
+  (new ChatWindow(_application, dynamic_cast<SecureChat *>(socket)))->show();
+}
+
+void
+Application::ChatService::connectionFailed(SecureSocket *socket) {
+  logDebug() << "Application: Connection failed!";
 }

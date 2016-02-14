@@ -54,72 +54,43 @@ Application::HalChatService::HalChatService(Application &app)
 }
 
 SecureSocket *
-Application::newSocket(uint16_t service) {
-  if (2 == service) {
-    // neat public chat service
-    return new HalChat(*_dht, _model);
-  } else if (5 == service) {
-    if (_settings.socksServiceWhiteList().isEmpty()) {
-      logInfo() << "No whitelisted nodes for SOCKS service -> deny.";
-      return 0;
-    }
-    // create handler
-    return new SocksOutStream(*_dht);
-  } else if (22 == service) {
-    if (_settings.shellServiceWhiteList().isEmpty()) {
-      logInfo() << "No whitelisted nodes for shell service -> deny.";
-      return 0;
-    }
-    // create handler
-    return new SecureShell(*_dht);
-  }
-  return 0;
+Application::HalChatService::newSocket() {
+  return new HalChat(_application.dht(), _application._model);
 }
 
 bool
-Application::allowConnection(uint16_t service, const NodeItem &peer) {
-  if (2 == service) {
-    // HalChat is public
-    return true;
-  } else if (5 == service) {
-    if (_settings.socksServiceWhiteList().contains(peer.id())) {
-      logDebug() << "Allow SOCKS connection from " << peer.id()
-                 << " @" << peer.addr() << ":" << peer.port();
-    } else {
-      logInfo() << "Deny SOCKS connection from " << peer.id()
-                << " @" << peer.addr() << ":" << peer.port();
-    }
-    // Check if node is allowed to use the SOCKS service
-    return _settings.socksServiceWhiteList().contains(peer.id());
-  } else if (22 == service) {
-    if (_settings.shellServiceWhiteList().contains(peer.id())) {
-      logDebug() << "Allow shell connection from " << peer.id()
-                 << " @" << peer.addr() << ":" << peer.port();
-    } else {
-      logInfo() << "Deny shell connection from " << peer.id()
-                << " @" << peer.addr() << ":" << peer.port();
-    }
-    // Check if node is allowed to use the shell service
-    return _settings.shellServiceWhiteList().contains(peer.id());
-  }
+Application::HalChatService::allowConnection(const NodeItem &peer) {
   return true;
 }
 
 void
-Application::connectionStarted(SecureSocket *stream) {
-  logDebug() << "Stream service " << stream << " started";
-  if (HalChat *chat = dynamic_cast<HalChat *>(stream)) {
-    // start chat (keep alive messages etc. )
-    chat->started();
-  } else if (SocksOutStream *socks = dynamic_cast<SocksOutStream *>(stream)) {
-    // start SOCKS service.
-    socks->open(QIODevice::ReadWrite);
-  } else if (SecureShell *shell = dynamic_cast<SecureShell *>(stream)) {
-    // start shell
-    shell->open(QIODevice::ReadWrite);
-  }
-  // Check if node is allowed to use the SOCKS service
-  return _application._socksWhiteList.allowed(peer.id());
+Application::HalChatService::connectionStarted(SecureSocket *stream) {
+  static_cast<HalChat *>(stream)->started();
+}
+
+void
+Application::HalChatService::connectionFailed(SecureSocket *stream) {
+  delete stream;
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of SocksService
+ * ********************************************************************************************* */
+Application::SocksService::SocksService(Application &app)
+  : AbstractService(), _application(app)
+{
+  // pass...
+}
+
+SecureSocket *
+Application::SocksService::newSocket() {
+  return new SocksOutStream(_application.dht());
+}
+
+bool
+Application::SocksService::allowConnection(const NodeItem &peer) {
+  return _application._settings.socksServiceWhiteList().contains(peer.id());
 }
 
 void

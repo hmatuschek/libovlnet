@@ -89,15 +89,6 @@ public:
    * the neighbours. */
   void rendezvous(const Identifier &id);
 
-  /** Returns the number of keys held by this DHT node. */
-  size_t numKeys() const;
-  /** Retunrs the number of data items provided by this node. */
-  size_t numData() const;
-  /** Starts the search for a value with the given identifier. */
-  void findValue(const Identifier &id);
-  /** Announces a value. */
-  void announce(const Identifier &id);
-
   /** Returns @c true if a handler is associated with the given service. */
   bool hasService(uint16_t service) const;
   /** Registers a service.
@@ -130,10 +121,6 @@ signals:
   void nodeFound(const NodeItem &node);
   /** Gets emitted if the given node was not found. */
   void nodeNotFound(const Identifier &id, const QList<NodeItem> &best);
-  /** Gets emitted if the given value was found. */
-  void valueFound(const Identifier &id, const QList<NodeItem> &nodes);
-  /** Gets emitted if the given value was not found. */
-  void valueNotFound(const Identifier &id);
   /** Gets emitted if a search neighbours query finished. */
   void neighboursFound(const Identifier &id, const QList<NodeItem> &neighbours);
   /** Gets emitted if the node to date can be found. */
@@ -145,17 +132,10 @@ protected:
   /** Sends a FindNode message to the node @c to to search for the node specified by @c id.
    * Any response to that request will be forwarded to the specified @c query. */
   void sendFindNode(const NodeItem &to, SearchQuery *query);
-  /** Sends a FindValue message to the node @c to to search for the node specified by @c id.
-   * Any response to that request will be forwarded to the specified @c query. */
-  void sendFindValue(const NodeItem &to, SearchQuery *query);
   /** Sends a FindNode message to the node @c to to search for neighbours. */
   void sendFindNeighbours(const NodeItem &to, SearchQuery *query);
   /** Sends a RendezvousSearchRequest to the given node. */
   void sendRendezvousSearch(const NodeItem &to, SearchQuery *query);
-  /** Returns @c true if the given identifier belongs to a value being announced. */
-  bool isPendingAnnouncement(const Identifier &id) const;
-  /** Sends an Annouce message to the given node. */
-  void sendAnnouncement(const NodeItem &to, const Identifier &what);
   /** Sends a Rendezvous request to the given node. */
   void sendRendezvous(const Identifier &with, const PeerItem &to);
   /** Sends some data with the given connection id. */
@@ -172,9 +152,6 @@ private:
   /** Processes a FindNode response. */
   void _processFindNodeResponse(const Message &msg, size_t size, FindNodeRequest *req,
                                 const QHostAddress &addr, uint16_t port);
-  /** Processes a FindValue response. */
-  void _processFindValueResponse(const Message &msg, size_t size, FindValueRequest *req,
-                                const QHostAddress &addr, uint16_t port);
   /** Processes a FindNeighbours response. */
   void _processFindNeighboursResponse(const Message &msg, size_t size, FindNeighboursRequest *req,
                                       const QHostAddress &addr, uint16_t port);
@@ -190,9 +167,6 @@ private:
   /** Processes a FindNode request. */
   void _processFindNodeRequest(const Message &msg, size_t size,
                                const QHostAddress &addr, uint16_t port);
-  /** Processes a FindValue request. */
-  void _processFindValueRequest(const Message &msg, size_t size,
-                                const QHostAddress &addr, uint16_t port);
   /** Processes an Announce request. */
   void _processAnnounceRequest(const Message &msg, size_t size,
                                const QHostAddress &addr, uint16_t port);
@@ -210,8 +184,6 @@ private slots:
   void _onCheckRequestTimeout();
   /** Gets called regularily to check the timeout of the node in the buckets. */
   void _onCheckNodeTimeout();
-  /** Gets called regularily to check the announcement timeouts. */
-  void _onCheckAnnouncementTimeout();  
   /** Gets called regularily to update the statistics. */
   void _onUpdateStatistics();
   /** Gets called when some data has been send. */
@@ -244,10 +216,6 @@ protected:
   /** The routing table. */
   Buckets _buckets;
 
-  /** The key->value map of the received announcements. */
-  QHash<Identifier, QHash<Identifier, AnnouncementItem> > _announcements;
-  /** The kay->timestamp table of the data this node provides. */
-  QHash<Identifier, QDateTime> _announcedData;
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
 

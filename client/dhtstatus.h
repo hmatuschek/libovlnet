@@ -22,12 +22,6 @@ public:
   /** Returns the number of neighbors in the routing table of the DHT node. */
   size_t numNeighbors() const;
 
-  /** Returns the number of mappings in the hash table of this node. */
-  size_t numMappings() const;
-
-  /** Returns the number of data items provided by the node. */
-  size_t numDataItems() const;
-
   /** Returns the number of active streams. */
   size_t numStreams() const;
 

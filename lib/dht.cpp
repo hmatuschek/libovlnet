@@ -133,9 +133,8 @@ Message::Message()
 #define DHT_PING_RESP_SIZE             DHT_PING_REQU_SIZE
 #define DHT_FIND_NODE_MIN_REQU_SIZE    (DHT_COOKIE_SIZE+DHT_HASH_SIZE+1)
 #define DHT_FIND_NODE_MIN_RESP_SIZE    (DHT_COOKIE_SIZE+1)
-#define DHT_FIND_VALUE_MIN_REQU_SIZE   DHT_FIND_NODE_MIN_REQU_SIZE
-#define DHT_FIND_VALUE_MIN_RESP_SIZE   DHT_FIND_NODE_MIN_RESP_SIZE
-#define DHT_ANNOUNCE_REQU_SIZE         (DHT_COOKIE_SIZE+2*DHT_HASH_SIZE+1)
+#define DHT_FIND_NEIGHBOR_MIN_REQU_SIZE  (DHT_COOKIE_SIZE+DHT_HASH_SIZE+1)
+#define DHT_FIND_NEIGHBOR_MIN_RESP_SIZE  (DHT_COOKIE_SIZE+1)
 #define DHT_START_STREAM_MIN_REQU_SIZE (DHT_COOKIE_SIZE+DHT_HASH_SIZE+3)
 #define DHT_START_STREAM_MIN_RESP_SIZE (DHT_COOKIE_SIZE+3)
 #define DHT_RENDEZVOUS_REQU_SIZE       (DHT_COOKIE_SIZE+DHT_HASH_SIZE+19)
@@ -183,7 +182,6 @@ public:
   typedef enum {
     PING,              ///< A ping request.
     FIND_NODE,         ///< A find value request.
-    FIND_VALUE,        ///< A find value request.
     FIND_NEIGHBOURS,   ///< A find neighbours request.
     RENDEZVOUS_SEARCH, ///< A Rendezvous search request.
     START_CONNECTION   ///< A Start connection request.
@@ -419,12 +417,6 @@ FindNodeRequest::FindNodeRequest(SearchQuery *query)
   // pass...
 }
 
-FindValueRequest::FindValueRequest(SearchQuery *query)
-  : SearchRequest(FIND_VALUE, query)
-{
-  // pass...
-}
-
 FindNeighboursRequest::FindNeighboursRequest(SearchQuery *query)
   : SearchRequest(FIND_NEIGHBOURS, query)
 {
@@ -562,9 +554,6 @@ DHT::findNode(const Identifier &id) {
   if (! query->next(next)) {
     logInfo() << "Can not find node" << id << ". Buckets empty.";
     // Emmit signal if failiour is not a pending announcement
-    if (! isPendingAnnouncement(id)) {
-      emit nodeNotFound(id, query->best());
-    }
     delete query;
   } else {
     sendFindNode(next, query);
@@ -609,32 +598,6 @@ DHT::findNeighbours(const Identifier &id, const QList<NodeItem> &start) {
     sendFindNeighbours(next, query);
   }
 }
-
-void
-DHT::findValue(const Identifier &id) {
-  //logDebug() << "Search for value " << id;
-  // Create a query instance
-  SearchQuery *query = new SearchQuery(_self.id(), id);
-  // Collect DHT_K nearest nodes
-  _buckets.getNearest(id, query->best());
-  // Send request to the first element in the list
-  NodeItem next;
-  if (! query->next(next)) {
-    logInfo() << "Can not find value " << id << ". Buckets empty.";
-    delete query; emit valueNotFound(id);
-  } else {
-    sendFindValue(next, query);
-  }
-}
-
-void
-DHT::announce(const Identifier &id) {
-  //logDebug() << "Announce data " << id << " to the world.";
-  _announcedData[id] = QDateTime();
-  // lets search for the nodes closest to the data id
-  findNode(id);
-}
-
 
 bool
 DHT::hasService(uint16_t service) const {
@@ -722,16 +685,6 @@ DHT::nodes(QList<NodeItem> &lst) {
 }
 
 size_t
-DHT::numKeys() const {
-  return _announcements.size();
-}
-
-size_t
-DHT::numData() const {
-  return _announcedData.size();
-}
-
-size_t
 DHT::numSockets() const {
   return _connections.size();
 }
@@ -781,27 +734,6 @@ DHT::sendFindNode(const NodeItem &to, SearchQuery *query) {
 }
 
 void
-DHT::sendFindValue(const NodeItem &to, SearchQuery *query) {
-  /*logDebug() << "Send FindValue request to " << to.id()
-             << " @" << to.addr() << ":" << to.port(); */
-  // Construct request item
-  FindValueRequest *req = new FindValueRequest(query);
-  // Queue request
-  _pendingRequests.insert(req->cookie(), req);
-  // Assemble & send message
-  Message msg;
-  memcpy(msg.cookie, req->cookie().data(), DHT_COOKIE_SIZE);
-  msg.payload.find_node.type = Message::FIND_VALUE;
-  memcpy(msg.payload.find_node.id, query->id().data(), DHT_HASH_SIZE);
-  // Determine size of request
-  int size = DHT_COOKIE_SIZE+1+DHT_MAX_TRIPLES*DHT_TRIPLE_SIZE;
-  if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
-    logError() << "Failed to send FindNode request to " << to.id()
-               << " @" << to.addr() << ":" << to.port();
-  }
-}
-
-void
 DHT::sendFindNeighbours(const NodeItem &to, SearchQuery *query) {
   /*logDebug() << "Send FindNode request to " << to.id()
              << " @" << to.addr() << ":" << to.port(); */
@@ -837,25 +769,6 @@ DHT::sendRendezvousSearch(const NodeItem &to, SearchQuery *query) {
   int size = DHT_COOKIE_SIZE+1+DHT_K*DHT_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindNode request to " << to.id()
-               << " @" << to.addr() << ":" << to.port();
-  }
-}
-
-bool
-DHT::isPendingAnnouncement(const Identifier &id) const {
-  return _announcedData.contains(id);
-}
-
-void
-DHT::sendAnnouncement(const NodeItem &to, const Identifier &what) {
-  // Assemble & send message
-  struct Message msg;
-  memcpy(msg.cookie, Identifier::create().data(), DHT_COOKIE_SIZE);
-  memcpy(msg.payload.announce.what, what.data(), DHT_HASH_SIZE);
-  memcpy(msg.payload.announce.who, _self.id().data(), DHT_HASH_SIZE);
-  msg.payload.announce.type = Message::ANNOUNCE;
-  if (0 > _socket.writeDatagram((char *)&msg, DHT_COOKIE_SIZE+2*DHT_HASH_SIZE+1, to.addr(), to.port())) {
-    logError() << "Failed to send Announce request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
   }
 }
@@ -922,8 +835,6 @@ DHT::_onReadyRead() {
           _processPingResponse(msg, size, static_cast<PingRequest *>(item), addr, port);
         } else if (Request::FIND_NODE == item->type()) {
           _processFindNodeResponse(msg, size, static_cast<FindNodeRequest *>(item), addr, port);
-        } else if (Request::FIND_VALUE == item->type()) {
-          _processFindValueResponse(msg, size, static_cast<FindValueRequest *>(item), addr, port);
         } else if (Request::FIND_NEIGHBOURS == item->type()) {
           _processFindNeighboursResponse(msg, size, static_cast<FindNeighboursRequest *>(item), addr, port);
         } else if (Request::RENDEZVOUS_SEARCH == item->type()) {
@@ -940,10 +851,6 @@ DHT::_onReadyRead() {
           _processPingRequest(msg, size, addr, port);
         } else if ((size >= DHT_FIND_NODE_MIN_REQU_SIZE) && (Message::FIND_NODE == msg.payload.find_node.type)) {
           _processFindNodeRequest(msg, size, addr, port);
-        } else if ((size >= DHT_FIND_VALUE_MIN_REQU_SIZE) && (Message::FIND_VALUE == msg.payload.find_value.type)) {
-          _processFindValueRequest(msg, size, addr, port);
-        } else if ((size == DHT_ANNOUNCE_REQU_SIZE) && (Message::ANNOUNCE == msg.payload.announce.type)) {
-          _processAnnounceRequest(msg, size, addr, port);
         } else if ((size > DHT_START_STREAM_MIN_REQU_SIZE) && (Message::START_STREAM == msg.payload.start_connection.type)) {
           _processStartConnectionRequest(msg, size, addr, port);
         } else if ((size == DHT_RENDEZVOUS_REQU_SIZE) && (Message::RENDEZVOUS == msg.payload.rendezvous.type)) {
@@ -1023,17 +930,9 @@ DHT::_processFindNodeResponse(
   // get next node to query, if there is no next node -> search failed
   if (! req->query()->next(next)) {
     // If the node search is a pending announcement
-    if (isPendingAnnouncement(req->query()->id())) {
-      // -> send announcement to the best nodes
-      QList<NodeItem>::iterator node = req->query()->best().begin();
-      for (; node != req->query()->best().end(); node++) {
-        sendAnnouncement(*node, req->query()->id());
-      }
-    } else {
-      logInfo() << "Node " << req->query()->id() << " not found.";
-      // if it was a regular node search -> signal error
-      emit nodeNotFound(req->query()->id(), req->query()->best());
-    }
+    logInfo() << "Node " << req->query()->id() << " not found.";
+    // if it was a regular node search -> signal error
+    emit nodeNotFound(req->query()->id(), req->query()->best());
     // delete query
     delete req->query();
     // done.
@@ -1042,61 +941,6 @@ DHT::_processFindNodeResponse(
 
   // Send next request
   sendFindNode(next, req->query());
-}
-
-void
-DHT::_processFindValueResponse(
-    const struct Message &msg, size_t size, FindValueRequest *req, const QHostAddress &addr, uint16_t port)
-{
-  // payload length must be a multiple of triple length
-  if ( 0 != ((size-DHT_FIND_VALUE_MIN_RESP_SIZE)%DHT_TRIPLE_SIZE) ) {
-    logInfo() << "Received a malformed FIND_VALUE response from "
-              << addr << ":" << port;
-  } else {
-    // unpack and update query
-    size_t Ntriple = (size-DHT_FIND_VALUE_MIN_RESP_SIZE)/DHT_TRIPLE_SIZE;
-
-    // If queried node has value
-    if (msg.payload.result.success) {
-      // Get list of nodes providing the data
-      QList<NodeItem> nodes; nodes.reserve(Ntriple);
-      for (size_t i=0; i<Ntriple; i++) {
-        nodes.push_back(
-              NodeItem(msg.payload.result.triples[i].id,
-                       QHostAddress((const Q_IPV6ADDR &) *(msg.payload.result.triples[i].ip)),
-                       ntohs(msg.payload.result.triples[i].port)));
-      }
-      // signal success
-      emit valueFound(req->query()->id(), nodes);
-      // query done
-      delete req->query();
-      return;
-    }
-
-    // If value was not found -> proceed with returned nodes
-    for (size_t i=0; i<Ntriple; i++) {
-      Identifier id(msg.payload.result.triples[i].id);
-      NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)* (msg.payload.result.triples[i].ip)),
-                    ntohs(msg.payload.result.triples[i].port));
-      // Add discovered node to buckets
-      _buckets.addCandidate(id, item.addr(), item.port());
-      // Update node list of query
-      req->query()->update(item);
-    }
-  }
-
-  NodeItem next;
-  // get next node to query, if there is no next node -> search failed
-  if (! req->query()->next(next)) {
-    // signal error
-    emit valueNotFound(req->query()->id());
-    // delete query
-    delete req->query();
-    // done.
-    return;
-  }
-  // Send next request
-  sendFindValue(next, req->query());
 }
 
 void
@@ -1109,7 +953,7 @@ DHT::_processFindNeighboursResponse(const Message &msg, size_t size, FindNeighbo
               << addr << ":" << port;
   } else {
     // unpack and update query
-    size_t Ntriple = (size-DHT_FIND_VALUE_MIN_RESP_SIZE)/DHT_TRIPLE_SIZE;
+    size_t Ntriple = (size-DHT_FIND_NEIGHBOR_MIN_RESP_SIZE)/DHT_TRIPLE_SIZE;
     // proceed with returned nodes
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
@@ -1146,7 +990,7 @@ DHT::_processRendezvousSearchResponse(const Message &msg, size_t size, Rendezvou
               << addr << ":" << port;
   } else {
     // unpack and update query
-    size_t Ntriple = (size-DHT_FIND_VALUE_MIN_RESP_SIZE)/DHT_TRIPLE_SIZE;
+    size_t Ntriple = (size-DHT_FIND_NEIGHBOR_MIN_RESP_SIZE)/DHT_TRIPLE_SIZE;
     // proceed with returned nodes
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
@@ -1263,71 +1107,6 @@ DHT::_processFindNodeRequest(
 }
 
 void
-DHT::_processFindValueRequest(
-    const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
-{
-  struct Message resp;
-
-  if (_announcements.contains(msg.payload.find_value.id)) {
-    QHash<Identifier, AnnouncementItem> &owners
-        = _announcements[msg.payload.find_value.id];
-    // Assemble response
-    memcpy(resp.cookie, msg.cookie, DHT_COOKIE_SIZE);
-    resp.payload.result.success = 1;
-    // Determine the number of nodes to reply
-    int N = std::min(std::min(DHT_MAX_TRIPLES, owners.size()),
-                     int(size-DHT_FIND_VALUE_MIN_REQU_SIZE)/DHT_TRIPLE_SIZE);
-    //logDebug() << "Assemble FindValue response (N req.: " << N << ")";
-    QHash<Identifier, AnnouncementItem>::iterator item = owners.begin();
-    for (int i = 0; (item!=owners.end()) && (i<N); item++, i++) {
-      memcpy(resp.payload.result.triples[i].id, item.key().data(), DHT_HASH_SIZE);
-      memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
-      resp.payload.result.triples[i].port = htons(item->port());
-    }
-    // Compute size and send reponse
-    size_t resp_size = DHT_FIND_VALUE_MIN_RESP_SIZE+N*DHT_TRIPLE_SIZE;
-    _socket.writeDatagram((char *) &resp, resp_size, addr, port);
-  } else {
-    // Get best matching nodes from the buckets
-    QList<NodeItem> best;
-    _buckets.getNearest(msg.payload.find_node.id, best);
-    // Assemble response
-    memcpy(resp.cookie, msg.cookie, DHT_COOKIE_SIZE);
-    resp.payload.result.success = 0;
-    // Determine the number of nodes to reply
-    int N = std::min(std::min(DHT_K, best.size()),
-                     int(size-DHT_FIND_VALUE_MIN_REQU_SIZE)/DHT_TRIPLE_SIZE);
-    QList<NodeItem>::iterator item = best.begin();
-    for (int i = 0; (item!=best.end()) && (i<N); item++, i++) {
-      memcpy(resp.payload.result.triples[i].id, item->id().data(), DHT_HASH_SIZE);
-      memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
-      resp.payload.result.triples[i].port = htons(item->port());
-    }
-    // Compute size and send reponse
-    size_t resp_size = DHT_FIND_NODE_MIN_RESP_SIZE+N*DHT_TRIPLE_SIZE;
-    _socket.writeDatagram((char *) &resp, resp_size, addr, port);
-  }
-}
-
-void
-DHT::_processAnnounceRequest(
-    const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
-{
-  //
-  Identifier value(msg.payload.announce.what);
-  // Check if I am closer to the value than any of my nodes in the bucket
-  QList<NodeItem> best;
-  _buckets.getNearest(value, best);
-  if ((best.last().id()-value)>(_self.id()-value)) {
-    if (!_announcements.contains(value)) {
-      _announcements.insert(value, QHash<Identifier, AnnouncementItem>());
-    }
-    _announcements[value][msg.payload.announce.who]
-        = AnnouncementItem(addr, port);
-  }
-}
-
-void
 DHT::_processStartConnectionRequest(const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
   uint16_t service = ntohs(msg.payload.start_connection.service);
@@ -1431,38 +1210,13 @@ DHT::_onCheckRequestTimeout() {
       NodeItem next;
       // get next node to query, if there is no next node -> search failed
       if (! query->next(next)) {
-        // If the node search is a pending announcement
-        if (isPendingAnnouncement(query->id())) {
-          // -> send announcement to the best nodes
-          QList<NodeItem>::iterator node = query->best().begin();
-          for (; node != query->best().end(); node++) {
-            sendAnnouncement(*node, query->id());
-          }
-        } else {
-          // if it was a regular node search -> signal error
-          emit nodeNotFound(query->id(), query->best());
-        }
+        // if it was a regular node search -> signal error
+        emit nodeNotFound(query->id(), query->best());
         // delete request and query
         delete *req; delete query;
       } else {
         // Continue search
         sendFindNode(next, query); delete *req;
-      }
-    } else if (Request::FIND_VALUE == (*req)->type()) {
-      logDebug() << "FindValue request timeout...";
-      SearchQuery *query = static_cast<FindValueRequest *>(*req)->query();
-      // Get next node to query
-      NodeItem next;
-      // get next node to query, if there is no next node -> search failed
-      if (! query->next(next)) {
-        // signal error
-        emit valueNotFound(query->id());
-        // delete request & query
-        delete *req; delete query;
-      } else {
-        // Send next request
-        sendFindValue(next, query);
-        delete *req;
       }
     } else if (Request::FIND_NEIGHBOURS == (*req)->type()) {
       logDebug() << "FindNeighbours request timeout...";
@@ -1540,36 +1294,6 @@ DHT::_onCheckNodeTimeout() {
     // search for myself, this will certainly fail but results in a list
     // of the closest nodes, which will be added to the buckets as candidates
     findNeighbours(_self.id());
-  }
-}
-
-void
-DHT::_onCheckAnnouncementTimeout() {
-  // Check announcements I store for others
-  QHash<Identifier, QHash<Identifier, AnnouncementItem> >::iterator entry = _announcements.begin();
-  while (entry != _announcements.end()) {
-    QHash<Identifier, AnnouncementItem>::iterator ann = entry->begin();
-    while (ann != entry->end()) {
-      if (ann->olderThan(30*60)) {
-        ann = entry->erase(ann);
-      } else {
-        ann++;
-      }
-    }
-    if (entry->empty()) {
-      entry = _announcements.erase(entry);
-    } else {
-      entry++;
-    }
-  }
-
-  // Check announcements I have to make (data that I provide).
-  QHash<Identifier, QDateTime>::iterator item = _announcedData.begin();
-  for (; item != _announcedData.end(); item++) {
-    // re-announce the data every 20minutes
-    if (item->addSecs(20*60) < QDateTime::currentDateTime()) {
-      announce(item.key());
-    }
   }
 }
 

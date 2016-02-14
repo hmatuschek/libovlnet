@@ -45,8 +45,6 @@ DHTStatusView::DHTStatusView(Application &app, QWidget *parent) :
   _updateTimer.setSingleShot(false);
 
   _numPeers = new QLabel(QString::number(_status->numNeighbors()));
-  _numKeys  = new QLabel(QString::number(_status->numMappings()));
-  _numData  = new QLabel(QString::number(_status->numDataItems()));
   _numStreams = new QLabel(QString::number(_status->numStreams()));
 
 
@@ -64,8 +62,6 @@ DHTStatusView::DHTStatusView(Application &app, QWidget *parent) :
   QHBoxLayout *row = new QHBoxLayout();
   QFormLayout *form = new QFormLayout();
   form->addRow(tr("Peers:"), _numPeers);
-  form->addRow(tr("Keys:"), _numKeys);
-  form->addRow(tr("Values:"), _numData);
   form->addRow(tr("Active streams:"), _numStreams);
   row->addLayout(form);
   form = new QFormLayout();
@@ -86,8 +82,6 @@ DHTStatusView::DHTStatusView(Application &app, QWidget *parent) :
 void
 DHTStatusView::_onUpdate() {
   _numPeers->setText(QString::number(_status->numNeighbors()));
-  _numKeys->setText(QString::number(_status->numMappings()));
-  _numData->setText(QString::number(_status->numDataItems()));
   _numStreams->setText(QString::number(_status->numStreams()));
   _bytesReceived->setText(_formatBytes(_status->bytesReceived()));
   _bytesSend->setText(_formatBytes(_status->bytesSend()));

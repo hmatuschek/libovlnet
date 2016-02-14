@@ -22,16 +22,6 @@ DHTStatus::numNeighbors() const {
 }
 
 size_t
-DHTStatus::numMappings() const {
-  return _application.dht().numKeys();
-}
-
-size_t
-DHTStatus::numDataItems() const {
-  return _application.dht().numData();
-}
-
-size_t
 DHTStatus::numStreams() const {
   return _application.dht().numSockets();
 }
