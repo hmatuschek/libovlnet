@@ -166,7 +166,7 @@ LocalSocksService::_onNewConnection() {
     connect(conn, SIGNAL(destroyed()), this, SLOT(_onConnectionClosed()));
     _connectionCount++;
     emit connectionCountChanged(_connectionCount);
-    _dht.startStream(5, _remote, conn);
+    _dht.startConnection(5, _remote, conn);
   }
 }
 

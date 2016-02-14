@@ -447,13 +447,12 @@ StartConnectionRequest::StartConnectionRequest(uint16_t service, const Identifie
 /* ******************************************************************************************** *
  * Implementation of DHT
  * ******************************************************************************************** */
-DHT::DHT(Identity &id, ServiceHandler *streamHandler,
+DHT::DHT(Identity &id,
          const QHostAddress &addr, quint16 port, QObject *parent)
   : QObject(parent), _self(id), _socket(), _started(false),
     _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
     _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),
-    _connectionHandler(streamHandler), _connections(),
-    _requestTimer(), _nodeTimer(), _announcementTimer(), _statisticsTimer()
+    _connections(), _requestTimer(), _nodeTimer(), _announcementTimer(), _statisticsTimer()
 {
   logInfo() << "Start node #" << id.id() << " @ " << addr << ":" << port;
 
@@ -636,13 +635,24 @@ DHT::announce(const Identifier &id) {
   findNode(id);
 }
 
+
 bool
-DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
-  if (0 == _connectionHandler) { delete stream; return false; }
+DHT::hasService(uint16_t service) const {
+  return _services.contains(service);
+}
+
+bool
+DHT::registerService(uint16_t no, AbstractService *handler) {
+  if (_services.contains(no)) { return false; }
+  _services.insert(no, handler);
+  return true;
+}
+
+bool
+DHT::startConnection(uint16_t service, const NodeItem &node, SecureSocket *stream) {
   logDebug() << "Send start secure connection id=" << stream->id()
              << " to " << node.id()
              << " @" << node.addr() << ":" << node.port();
-  if (! stream) { delete stream; return false; }
   StartConnectionRequest *req = new StartConnectionRequest(service, node.id(), stream);
 
   // Assemble message
@@ -652,7 +662,9 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
   msg.payload.start_connection.service = htons(service);
   int keyLen = 0;
   if (0 > (keyLen = stream->prepare(msg.payload.start_connection.pubkey, DHT_MAX_PUBKEY_SIZE)) ) {
-    delete stream; delete req; return false;
+    stream->failed();
+    delete req;
+    return false;
   }
 
   // Compute total size
@@ -661,10 +673,13 @@ DHT::startStream(uint16_t service, const NodeItem &node, SecureSocket *stream) {
   // add to pending request list & send it
   _pendingRequests.insert(req->cookie(), req);
   if (keyLen != _socket.writeDatagram((char *)&msg, keyLen, node.addr(), node.port())) {
-    // one error
+    // one error remove from list of pending request and free connection & request
     _pendingRequests.remove(req->cookie());
-    delete stream; delete req; return false;
+    stream->failed();
+    delete req;
+    return false;
   }
+
   return true;
 }
 
@@ -717,7 +732,7 @@ DHT::numData() const {
 }
 
 size_t
-DHT::numStreams() const {
+DHT::numSockets() const {
   return _connections.size();
 }
 
@@ -914,7 +929,7 @@ DHT::_onReadyRead() {
         } else if (Request::RENDEZVOUS_SEARCH == item->type()) {
           _processRendezvousSearchResponse(msg, size, static_cast<RendezvousSearchRequest *>(item), addr, port);
         } else if (Request::START_CONNECTION == item->type()) {
-          _processStartStreamResponse(msg, size, static_cast<StartConnectionRequest *>(item), addr, port);
+          _processStartConnectionResponse(msg, size, static_cast<StartConnectionRequest *>(item), addr, port);
         }else {
           logInfo() << "Unknown response from " << addr << ":" << port;
         }
@@ -1167,30 +1182,33 @@ DHT::_processRendezvousSearchResponse(const Message &msg, size_t size, Rendezvou
 }
 
 void
-DHT::_processStartStreamResponse(
+DHT::_processStartConnectionResponse(
     const Message &msg, size_t size, StartConnectionRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // Verify session key
   if (! req->socket()->verify(msg.payload.start_connection.pubkey, size-DHT_COOKIE_SIZE-3)) {
     logError() << "Verification of peer session key failed.";
-    delete req->socket(); return;
+    req->socket()->failed();
+    return;
   }
-  // Verify fingerprints
+
+  // verify fingerprints
   if (!(req->socket()->peerId() == req->peedId())) {
     logError() << "Peer fingerprint mismatch: " << req->socket()->peerId()
                << " != " << req->peedId();
-    delete req->socket(); return;
+    req->socket()->failed();
+    return;
   }
 
-  // Success -> start stream
+  // success -> start connection
   if (! req->socket()->start(req->cookie(), PeerItem(addr, port))) {
-    logError() << "Can not start sym. crypt.";
-    delete req->socket(); return;
+    logError() << "Can not initialize symmetric chipher.";
+    req->socket()->failed();
+    return;
   }
 
   // Stream started: register stream & notify stream handler
   _connections[req->cookie()] = req->socket();
-  _connectionHandler->connectionStarted(req->socket());
 }
 
 void
@@ -1312,31 +1330,30 @@ DHT::_processAnnounceRequest(
 void
 DHT::_processStartConnectionRequest(const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
-  logDebug() << "Received StartConnection request, service: " << ntohs(msg.payload.start_connection.service);
-  // check if a connection handler is installed
-  if (0 == _connectionHandler) {
-    logInfo() << "No connection handler installed -> ignore request";
-    return;
-  }
-  // Request new connection from connection handler
+  uint16_t service = ntohs(msg.payload.start_connection.service);
+  logDebug() << "Received StartConnection request, service: " << service;
+  if (! _services.contains(service)) { return; }
+  AbstractService *serviceHandler = _services[service];
+
+  // request new connection from service handler
   SecureSocket *connection = 0;
-  if (0 == (connection = _connectionHandler->newSocket(ntohs(msg.payload.start_connection.service))) ) {
-    logInfo() << "Connection handler refuses to create a new connection.";
-    return;
+  if (0 == (connection = serviceHandler->newSocket()) ) {
+    logInfo() << "Connection handler refuses to create a new connection."; return;
   }
-  // Verify
+
+  // verify request
   if (! connection->verify(msg.payload.start_connection.pubkey, size-DHT_COOKIE_SIZE-3)) {
     logError() << "Can not verify connection peer.";
     delete connection; return;
   }
+
   // check if connection is allowed
-  if (! _connectionHandler->allowConnection(ntohs(msg.payload.start_connection.service),
-                                            NodeItem(connection->peerId(), addr, port))) {
-    logInfo() << "Connection recjected by ConnectionHandler.";
+  if (! serviceHandler->allowConnection(NodeItem(connection->peerId(), addr, port))) {
+    logInfo() << "Connection recjected by Service.";
     delete connection; return;
   }
 
-  // Assemble response
+  // assemble response
   Message resp; int keyLen=0;
   memcpy(resp.cookie, msg.cookie, DHT_COOKIE_SIZE);
   resp.payload.start_connection.type = Message::START_STREAM;
@@ -1361,7 +1378,7 @@ DHT::_processStartConnectionRequest(const Message &msg, size_t size, const QHost
 
   // Connection started..
   _connections[resp.cookie] = connection;
-  _connectionHandler->connectionStarted(connection);
+  serviceHandler->connectionStarted(connection);
 }
 
 void
@@ -1486,12 +1503,7 @@ DHT::_onCheckRequestTimeout() {
       }
     } else if (Request::START_CONNECTION == (*req)->type()) {
       logDebug() << "StartConnection request timeout...";
-      if (_connectionHandler) {
-        _connectionHandler->connectionFailed(
-              static_cast<StartConnectionRequest *>(*req)->socket());
-      }
-      // delete stream
-      delete static_cast<StartConnectionRequest *>(*req)->socket();
+      static_cast<StartConnectionRequest *>(*req)->socket()->failed();
       delete *req;
     }
   }

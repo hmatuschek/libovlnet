@@ -8,20 +8,38 @@
 #include "settings.h"
 
 
-class Application : public QCoreApplication, public ServiceHandler
+class Application : public QCoreApplication
 {
   Q_OBJECT
-
 public:
   explicit Application(int argc, char *argv[]);
 
   DHT &dht();
 
 protected:
-  SecureSocket *newSocket(uint16_t service);
-  bool allowConnection(uint16_t service, const NodeItem &peer);
-  void connectionStarted(SecureSocket *stream);
-  void connectionFailed(SecureSocket *stream);
+  class HalChatService: public AbstractService
+  {
+  public:
+    HalChatService(Application &app);
+    SecureSocket *newSocket();
+    bool allowConnection(const NodeItem &peer);
+    void connectionStarted(SecureSocket *stream);
+    void connectionFailed(SecureSocket *stream);
+  protected:
+    Application &_application;
+  };
+
+  class SocksService: public AbstractService
+  {
+  public:
+    SocksService(Application &app);
+    SecureSocket *newSocket();
+    bool allowConnection(const NodeItem &peer);
+    void connectionStarted(SecureSocket *stream);
+    void connectionFailed(SecureSocket *stream);
+  protected:
+    Application &_application;
+  };
 
 protected:
   Identity *_identity;

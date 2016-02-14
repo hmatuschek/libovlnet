@@ -33,7 +33,7 @@ DHTStatus::numDataItems() const {
 
 size_t
 DHTStatus::numStreams() const {
-  return _application.dht().numStreams();
+  return _application.dht().numSockets();
 }
 
 size_t

@@ -1,4 +1,9 @@
 #include "httpservice.h"
+#include "logger.h"
+#include "stream.h"
+#include "buckets.h"
+
+#include <QTcpSocket>
 
 
 /* ********************************************************************************************* *
@@ -7,8 +12,13 @@
 HttpRequest::HttpRequest(HttpConnection *connection)
   : QObject(connection), _connection(connection), _parserState(READ_REQUEST), _headers()
 {
-  QObject::connect(_connection->socket(), SIGNAL(readyRead()),
-                   this, SLOT(_onReadyRead()));
+  // pass..
+}
+
+void
+HttpRequest::parse() {
+  connect(_connection->socket(), SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+  _onReadyRead();
 }
 
 void
@@ -17,8 +27,10 @@ HttpRequest::_onReadyRead() {
   while (_connection->socket()->canReadLine()) {
     if (READ_REQUEST == _parserState) {
       QByteArray line = _connection->socket()->readLine();
-      if (!line.endsWith("\r\n")) {
+      if (! line.endsWith("\r\n")) {
         // Invalid format
+        emit badRequest();
+        return;
       }
       // drop last two chars ("\r\n")
       line.chop(2);
@@ -27,19 +39,25 @@ HttpRequest::_onReadyRead() {
       int offset = 0, idx = 0;
       // Read method
       if (0 > (idx = line.indexOf(' ', offset))) {
-        // MEHTOD not found
+        // Invalid format
+        emit badRequest();
+        return;
       }
       _method = _getMethod(line, idx);
       // check method
       if (HTTP_INVALID_METHOD == _method) {
-        // INVALID METHOD
+        // Invalid method
+        emit badRequest();
+        return;
       }
       // Update offset
       offset = idx+1;
 
       // Read path
       if (0 > (idx = line.indexOf(' ', offset))) {
-        // path not set!!!
+        // Invalid format
+        emit badRequest();
+        return;
       }
       _path = QString::fromLatin1(line.constData()+offset, idx-offset);
       offset = idx+1;
@@ -48,7 +66,9 @@ HttpRequest::_onReadyRead() {
       _version = _getVersion(line.constData()+offset, line.size()-offset);
       // Check version
       if (HTTP_INVALID_VERSION == _version) {
-        // Invalid version
+        // Invalid format
+        emit badRequest();
+        return;
       }
       // done
       _parserState = READ_HEADER;
@@ -56,6 +76,8 @@ HttpRequest::_onReadyRead() {
       QByteArray line = _connection->socket()->readLine();
       if (!line.endsWith("\r\n")) {
         // Invalid format
+        emit badRequest();
+        return;
       }
       // drop last two chars ("\r\n")
       line.chop(2);
@@ -65,12 +87,15 @@ HttpRequest::_onReadyRead() {
         // done, disconnect from readyRead signal. Any additional data will be processed by the
         // request handler or by the next request
         disconnect(_connection->socket(), SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+        emit headerRead();
         return;
       }
       // Seach for first colon
       int idx=0;
       if (0 > (idx = line.indexOf(':'))) {
-        // Invalid header format
+        // Invalid format
+        emit badRequest();
+        return;
       }
       _headers.insert(QString::fromLatin1(line.constData(), idx),
                       QString::fromLatin1(line.constData()+idx+1, line.length()-idx-1));
@@ -106,16 +131,19 @@ HttpResponse::HttpResponse(HttpResponseCode resp, HttpConnection *connection)
 {
   // Connect to bytesWritten signal
   connect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
-          this, SLOT(onBytesWritten(qint64)));
+          this, SLOT(_onBytesWritten(qint64)));
 }
 
 void
 HttpResponse::sendHeaders() {
-  // Skip if headers are serialized already
-  if (0 != _headerBuffer.size()) { return; }
+  // Skip if headers are serialized already or even has been send
+  if (_headersSend || (0 != _headerBuffer.size())) { return; }
   // Dispatch by response type
   switch (_code) {
     case HTTP_OK: _headerBuffer.append("200 OK\r\n"); break;
+    case HTTP_BAD_REQUEST: _headerBuffer.append("400 BAD REQUEST\r\n"); break;
+    case HTTP_FORBIDDEN: _headerBuffer.append("403 FORBIDDEN\r\n"); break;
+    case HTTP_NOT_FOUND: _headerBuffer.append("404 NOT FOUND\r\n"); break;
     case HTTP_SERVER_ERROR: _headerBuffer.append("500 Internal Server error\r\n"); break;
   }
   // Serialize headers
@@ -127,26 +155,232 @@ HttpResponse::sendHeaders() {
     _headerBuffer.append("\r\n");
   }
   _headerBuffer.append("\r\n");
+
   // Try to send some part of the serialized response
   qint64 len = _connection->socket()->write(_headerBuffer);
   if (len > 0) { _headerSendIdx = len; }
 }
 
 void
-HttpResponse::onBytesWritten(qint64 bytes) {
+HttpResponse::_onBytesWritten(qint64 bytes) {
+  // If headers already send -> done
   if (_headersSend) { return; }
+  // If headers are just send
   if (_headerBuffer.size() == _headerSendIdx) {
-    // Headers send
+    // mark headers send
     _headersSend = true;
-    // Disconnect from bytesWritten() signal
+    // disconnect from bytesWritten() signal
     disconnect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
-               this, SLOT(onBytesWritten(qint64)));
+               this, SLOT(_onBytesWritten(qint64)));
+    // signal headers send
+    emit headersSend();
+    // done
     return;
   }
-  // Try to write some data to the socket
+
+  // Try to write some more data to the socket
   qint64 len = _connection->socket()->write(_headerBuffer.constData()+_headerSendIdx,
                                             _headerBuffer.size()-_headerSendIdx);
   if (0 < len) { _headerSendIdx += len; }
 }
 
 
+/* ********************************************************************************************* *
+ * Implementation of HttpResponse
+ * ********************************************************************************************* */
+HttpStringResponse::HttpStringResponse(HttpResponseCode resp, const QString &text,
+                                       HttpConnection *connection, const QString contentType)
+  : HttpResponse(resp, connection), _textIdx(0), _text(text.toUtf8())
+{
+  // set content length
+  setHeader("Content-Length", QString::number(_text.size()));
+  // set content type
+  setHeader("Content-Type", contentType);
+  // Connect to headersSend signal
+  connect(this, SIGNAL(headersSend()), this, SLOT(_onHeadersSend()));
+}
+
+void
+HttpStringResponse::_onHeadersSend() {
+  connect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
+          this, SLOT(_onBytesWritten(qint64)));
+}
+
+void
+HttpStringResponse::_onBytesWritten(qint64 bytes) {
+  if (! _headersSend) { return; }
+  if (_textIdx == _text.size()) {
+    disconnect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
+               this, SLOT(_onBytesWritten(qint64)));
+    emit completed();
+    return;
+  }
+  // Try to write some data to the socket
+  qint64 len = _connection->socket()->write(_text.constData()+_textIdx,
+                                            _text.size()-_textIdx);
+  if (0 < len) { _textIdx += len; }
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of HttpConnection
+ * ********************************************************************************************* */
+HttpConnection::HttpConnection(HttpRequestHandler *service, const NodeItem &remote, QIODevice *socket)
+  : QObject(service), _service(service), _remote(remote), _socket(socket)
+{
+  // Create new request parser (request)
+  _currentRequest = new HttpRequest(this);
+  // no response yet
+  _currentResponse = 0;
+  // get notified on fishy requests
+  connect(_currentRequest, SIGNAL(badRequest()), this, SLOT(_badRequest()));
+  // get notified if the request headers has been read
+  connect(_currentRequest, SIGNAL(headerRead()), this, SLOT(_requestHeadersRead()));
+  // start parsing HTTP request
+  _currentRequest->parse();
+}
+
+HttpConnection::~HttpConnection() {
+  if (_socket) {
+    // close socket
+    _socket->close();
+    // free it
+    delete _socket;
+    // done.
+    _socket = 0;
+  }
+  // Do not need to free _currentRequest or _currentResponse.
+  // They are children of this QObject.
+}
+
+void
+HttpConnection::_requestHeadersRead() {
+  // this should not happen
+  if (! _currentRequest) { return; }
+  // disconnect from signel
+  disconnect(_currentRequest, SIGNAL(headerRead()), this, SLOT(_requestHeadersRead()));
+  // If request is not accepted -> response with "Forbidden"
+  if (! _service->acceptReqest(_currentRequest)) {
+    // If not accepted send forbidden
+    _currentResponse = new HttpStringResponse(HTTP_FORBIDDEN, "Forbidden", this);
+  } else if (0 == (_currentResponse = _service->processRequest(_currentRequest))) {
+    // If not processed -> not found
+    _currentResponse = new HttpStringResponse(HTTP_NOT_FOUND, "Not found", this);
+  }
+  // Get notified if the response has been completed
+  connect(_currentResponse, SIGNAL(completed()), this, SLOT(_responseCompleted()));
+  // start response
+  _currentResponse->sendHeaders();
+}
+
+void
+HttpConnection::_badRequest() {
+  // Do not further process request.
+  disconnect(_currentRequest, SIGNAL(headerRead()), this, SLOT(_requestHeadersRead()));
+  // Now we are in a undefined state for the connection -> better we close it
+  deleteLater();
+}
+
+void
+HttpConnection::_responseCompleted() {
+  // Free "old" request & response
+  delete _currentRequest;  _currentRequest = 0;
+  delete _currentResponse; _currentResponse = 0;
+  // If not keep alive
+  if (! _currentRequest->isKeepAlive()) {
+    deleteLater();
+  } else {
+    // Get a new request
+    _currentRequest = new HttpRequest(this);
+    // get notified on fishy requests
+    connect(_currentRequest, SIGNAL(badRequest()), this, SLOT(_badRequest()));
+    // get notified if the request headers has been read
+    connect(_currentRequest, SIGNAL(headerRead()), this, SLOT(_requestHeadersRead()));
+    // start parsing HTTP request
+    _currentRequest->parse();
+  }
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of HttpService
+ * ********************************************************************************************* */
+HttpRequestHandler::HttpRequestHandler(QObject *parent)
+  : QObject(parent)
+{
+  // pass...
+}
+
+HttpRequestHandler::~HttpRequestHandler() {
+  // pass...
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of LocalHttpServer
+ * ********************************************************************************************* */
+LocalHttpServer::LocalHttpServer(HttpRequestHandler *dispatcher, uint16_t port)
+  : QObject(dispatcher), _dispatcher(dispatcher), _server()
+{
+  if (_server.listen(QHostAddress::LocalHost, port)) {
+    logDebug() << "Started LocalHttpService @localhost:" << port;
+  } else {
+    logError() << "Failed to start LocalHttpService @localhost:" << port;
+  }
+
+  connect(&_server, SIGNAL(newConnection()), this, SLOT(_onNewConnection()));
+}
+
+LocalHttpServer::~LocalHttpServer() {
+  // close the socket
+  _server.close();
+}
+
+void
+LocalHttpServer::_onNewConnection() {
+  // trivial, create a HttpConnection instance for every incomming TCP connection
+  while (_server.hasPendingConnections()) {
+    QTcpSocket *socket = _server.nextPendingConnection();
+    new HttpConnection(
+          _dispatcher,NodeItem(Identifier(), socket->peerAddress(), socket->peerPort()), socket);
+  }
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of HttpService
+ * ********************************************************************************************* */
+HttpService::HttpService(DHT &dht, HttpRequestHandler *handler, QObject *parent)
+  : QObject(parent), _dht(dht), _handler(handler)
+{
+  // pass...
+}
+
+HttpService::~HttpService() {
+  // pass...
+}
+
+SecureSocket *
+HttpService::newSocket() {
+  return new SecureStream(_dht, _handler);
+}
+
+void
+HttpService::connectionStarted(SecureSocket *socket) {
+  SecureStream *connection = dynamic_cast<SecureStream *>(socket);
+  if (! connection) {
+    logError() << "Invalid connection type.";
+    delete socket;
+  }
+  new HttpConnection(_handler, NodeItem(socket->peerId(), socket->peer()), connection);
+}
+
+bool
+HttpService::allowConnection(const NodeItem &peer) {
+  return true;
+}
+
+void
+HttpService::connectionFailed(SecureSocket *socket) {
+  delete socket;
+}

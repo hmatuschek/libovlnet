@@ -1,3 +1,6 @@
+/** @defgroup chat Secure chat service
+ * @ingroup services */
+
 #ifndef SECURECHAT_H
 #define SECURECHAT_H
 
@@ -9,7 +12,7 @@
 /** Implements a trivial chat message connection.
  * This connection is not reliable, meaning it is not ensured that chat message will reach its
  * destination.
- * @ingroup services */
+ * @ingroup chat */
 class SecureChat : public QObject, public SecureSocket
 {
   Q_OBJECT
@@ -22,18 +25,21 @@ public:
   virtual ~SecureChat();
 
 public slots:
-  /** Gets called once the connection is established. */
-  void started();
   /** Sets a message to the remote. */
   void sendMessage(const QString &msg);
 
 signals:
+  void started();
   /** Gets emitted if a message was received. */
   void messageReceived(const QString &msg);
   /** Gets emitted if the connection to the remote is closed or got lost. */
   void closed();
 
 protected:
+  /** Initializes the chat once the connection is established. */
+  bool start(const Identifier &streamId, const PeerItem &peer);
+  /** Gets called if the connection cannot be established. */
+  void failed();
   /** Implemetes the SecureSocket interface. */
   void handleDatagram(const uint8_t *data, size_t len);
 

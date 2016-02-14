@@ -28,15 +28,29 @@ Application::Application(int argc, char *argv[])
   }
 
   if (_identity) {
-    _dht = new DHT(*_identity, this);
+    _dht = new DHT(*_identity);
   } else {
     logError() << "Error while loading or creating my identity.";
   }
+
+  // Register services
+  _dht->registerService(2, new HalChatService(*this));
+  _dht->registerService(5, new SocksService(*this));
 }
 
 DHT &
 Application::dht() {
   return *_dht;
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of HalChatService
+ * ********************************************************************************************* */
+Application::HalChatService::HalChatService(Application &app)
+  : AbstractService(), _application(app)
+{
+  // pass...
 }
 
 SecureSocket *
@@ -104,9 +118,16 @@ Application::connectionStarted(SecureSocket *stream) {
     // start shell
     shell->open(QIODevice::ReadWrite);
   }
+  // Check if node is allowed to use the SOCKS service
+  return _application._socksWhiteList.allowed(peer.id());
 }
 
 void
-Application::connectionFailed(SecureSocket *stream) {
-  // mhh, don't care.
+Application::SocksService::connectionStarted(SecureSocket *stream) {
+  dynamic_cast<SocksOutStream *>(stream)->open(QIODevice::ReadWrite);
+}
+
+void
+Application::SocksService::connectionFailed(SecureSocket *stream) {
+  delete stream;
 }
