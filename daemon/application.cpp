@@ -13,8 +13,8 @@ Application::Application(int argc, char *argv[])
   // Try to load identity from file
   QDir vlfDir("/etc");
   // if deamon directory does not exists -> create it
-  if (! vlfDir.cd("vlfdaemon")) {
-    vlfDir.mkdir("vlfdaemon"); vlfDir.cd("vlfdaemon");
+  if (! vlfDir.cd("ovlnetd")) {
+    vlfDir.mkdir("ovlnetd"); vlfDir.cd("ovlnetd");
   }
   // Create identity if not present
   QString idFile(vlfDir.canonicalPath()+"/identity.pem");
