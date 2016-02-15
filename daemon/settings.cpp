@@ -14,7 +14,7 @@ Settings::Settings(const QString &filename, QObject *parent)
   QJsonDocument doc = QJsonDocument::fromJson(_file.readAll());
   _file.close();
 
-  qDebug() << doc;
+  qDebug() << doc.toJson();
 
   // Check for socks service whitelist
   if (doc.object().contains("socks_whitelist") && doc.object().value("socks_whitelist").isArray()) {
