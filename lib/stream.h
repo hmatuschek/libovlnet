@@ -166,7 +166,12 @@ public:
   /** Updates the internal buffer with the given data at the specified sequence number. */
   uint32_t putPacket(uint32_t seq, const uint8_t *data, uint32_t len) {
     // check if seq fits into window [_nextSequence, _nextSequence+window()), if not -> done
-    if (!_in_window(seq)) { return 0; }
+    if (!_in_window(seq)) {
+      logDebug() << "StreamInBuffer: Ignore packet seq=" << seq
+                 << ", len=" << len << ": Not in window: ["
+                 << _nextSequence << ", " << (_nextSequence+window()) << "].";
+      return 0;
+    }
     // Compute offset w.r.t. buffer-start, where to store the data
     uint32_t offset = _available + uint32_t(seq - _nextSequence);
     // If offset >= buffer size -> done
@@ -259,8 +264,8 @@ public:
 
   /** Sequence number of the first unACKed byte. */
   uint32_t firstSequence() const { return _firstSequence; }
-  /** Sequence number of the first byte of a segement that will be added to the buffer,
-   * i.e. the sequence number of the last unACKed byte in buffer + 1. */
+  /** Sequence number of the first byte of a segement that will be added to the buffer.
+   * I.e. the sequence number of the last unACKed byte in buffer + 1. */
   uint32_t nextSequence() const { return _nextSequence; }
 
   /** Writes some data to the buffer. */

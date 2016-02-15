@@ -127,15 +127,16 @@ SecureStream::_onKeepAlive() {
 
 void
 SecureStream::_onCheckPacketTimeout() {
-  if ((! _outBuffer.timeout()) || (!_outBuffer.bytesToWrite()) ) { return; }
+  if ((! _outBuffer.bytesToWrite()) || (! _outBuffer.timeout())) { return; }
   // Resent some data
   Message msg(Message::DATA); uint32_t seq=0;
   uint32_t len = _outBuffer.resend(msg.payload.data, DHT_STREAM_MAX_DATA_SIZE, seq);
   msg.seq = htonl(seq);
   if (sendDatagram((const uint8_t *) &msg, len+5)) {
+    logDebug() << "Resend seq=" << seq << ", len=" << len << ".";
     _keepalive.start();
   } else {
-    logWarning() << "SecureStream: Failed to resend data.";
+    logWarning() << "SecureStream: Failed to resend data: seq=" << seq << ", len=" << len << ".";
   }
 }
 
@@ -207,14 +208,18 @@ SecureStream::bytesToWrite() const {
 
 qint64
 SecureStream::writeData(const char *data, qint64 len) {
+  // shortcut
+  if (0 == len) { return 0; }
+
   // Determine maximum data length as the minimum of
   // maximum length (len), space in output buffer, window-size of the remote,
   // and maximum payload length
   len = std::min(len, qint64(_outBuffer.free()));
   len = std::min(len, qint64(DHT_STREAM_MAX_DATA_SIZE));
-  if (0 == len) { return 0; }
-
-  logDebug() << "Write up to" << len << "b into output buffer.";
+  if (0 == len) {
+    logDebug() << "Do not send data: window=" << _outBuffer.free() << ".";
+    return 0;
+  }
 
   // Assemble message
   Message msg(Message::DATA);
@@ -222,7 +227,9 @@ SecureStream::writeData(const char *data, qint64 len) {
   msg.seq = htonl(_outBuffer.nextSequence());
 
   // put in output buffer, updates sequence number
-  if(0 == (len = _outBuffer.write((const uint8_t *)data, len))) { return 0; }
+  if(0 == (len = _outBuffer.write((const uint8_t *)data, len))) {
+    return 0;
+  }
 
   // If some data was added to the buffer
   // and the packet timer is not started -> start it
@@ -244,9 +251,7 @@ SecureStream::writeData(const char *data, qint64 len) {
 
 qint64
 SecureStream::readData(char *data, qint64 maxlen) {
-  qint64 len = _inBuffer.read((uint8_t *)data, std::min(maxlen, qint64(0x10000)));
-  logDebug() << "Read " << len << "b from input buffer.";
-  return len;
+  return _inBuffer.read((uint8_t *)data, std::min(maxlen, qint64(0x10000)));
 }
 
 bool
@@ -291,6 +296,8 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       if (OPEN == _state) {
         emit readyRead();
       }
+    } else {
+      logDebug() << "Unexpected data: Drop seq=" << seq << ", len=" << (len-5) << ".";
     }
     // done
     return;
@@ -298,7 +305,10 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
 
   if (Message::ACK == msg->type) {
     // check message size
-    if (len!=7) { return; }
+    if (len!=7) {
+      logInfo() << "SecureStream: Malformed ACK received.";
+      return;
+    }
     // Get sequence number
     uint32_t seq = ntohl(msg->seq);
     // ACK data in output buffer
@@ -310,10 +320,10 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       }
       // If the last byte in the output buffer was ACKed and the _packettimer is
       // runnning -> stop it.
-      if ((!_outBuffer.bytesToWrite()) && _packetTimer.isActive()) {
+      if ((0 == _outBuffer.bytesToWrite()) && _packetTimer.isActive()) {
         _packetTimer.stop();
       }
-      if ((FIN_RECEIVED == _state) && (! bytesToWrite())) {
+      if ((FIN_RECEIVED == _state) && (0 == bytesToWrite())) {
         // close connection
         cancel();
       }

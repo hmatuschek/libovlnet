@@ -40,9 +40,12 @@ void
 ChatWindow::_onMessageReceived(const QString &msg) {
   QTextCursor cursor = _view->textCursor();
   cursor.movePosition(QTextCursor::End);
-  if (!cursor.atStart())
+  if (! cursor.atStart())
     cursor.insertBlock();
   cursor.beginEditBlock();
+  QTextBlockFormat fmt;
+  fmt.setAlignment(Qt::AlignLeft);
+  cursor.setBlockFormat(fmt);
   cursor.insertText("(");
   cursor.insertText(QTime::currentTime().toString());
   cursor.insertText(") ");
@@ -61,6 +64,9 @@ ChatWindow::_onMessageSend() {
   if (!cursor.atStart())
     cursor.insertBlock();
   cursor.beginEditBlock();
+  QTextBlockFormat fmt;
+  fmt.setAlignment(Qt::AlignRight);
+  cursor.setBlockFormat(fmt);
   cursor.insertText("(");
   cursor.insertText(QTime::currentTime().toString());
   cursor.insertText(") you:\n");
