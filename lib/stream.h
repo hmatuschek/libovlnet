@@ -175,7 +175,10 @@ public:
     // Compute offset w.r.t. buffer-start, where to store the data
     uint32_t offset = _available + uint32_t(seq - _nextSequence);
     // If offset >= buffer size -> done
-    if (offset >= 0x10000) { return 0; }
+    if (offset >= 0x10000) {
+      logError() << "StreamInBuffer: Ignore packet out of buffer range. (This should not happen!)";
+      return 0;
+    }
     // Check if some space must be allocated
     if ((offset+len)>_buffer.available()) {
       // Get as much as possible

@@ -210,14 +210,14 @@ qint64
 SecureStream::writeData(const char *data, qint64 len) {
   // shortcut
   if (0 == len) { return 0; }
-  qint64 inlen = len;
+  //qint64 inlen = len;
   // Determine maximum data length as the minimum of
   // maximum length (len), space in output buffer, window-size of the remote,
   // and maximum payload length
   len = std::min(len, qint64(_outBuffer.free()));
   len = std::min(len, qint64(DHT_STREAM_MAX_DATA_SIZE));
   if (0 == len) {
-    logDebug() << "Do not send data len=" << inlen << ": window=" << _outBuffer.free() << ".";
+    //logDebug() << "Do not send data len=" << inlen << ": window=" << _outBuffer.free() << ".";
     return 0;
   }
 
@@ -293,7 +293,12 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       // Set window size
       resp.payload.window = htons(_inBuffer.window());
       // Send ACK & reset keep-alive timer
-      if (sendDatagram((const uint8_t*) &resp, 7)) { _keepalive.start(); }
+      if (sendDatagram((const uint8_t*) &resp, 7)) {
+        logDebug() << "Send ACK seq=" << _inBuffer.nextSequence() << ", win=" <<_inBuffer.window();
+        _keepalive.start();
+      } else {
+        logError() << "Failed to send ACK seq=" << _inBuffer.nextSequence() << ", win=" << _inBuffer.window();
+      }
       // Signal new data got available if stream is open
       if (OPEN == _state) {
         emit readyRead();
