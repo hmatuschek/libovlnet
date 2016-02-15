@@ -214,6 +214,8 @@ SecureStream::writeData(const char *data, qint64 len) {
   len = std::min(len, qint64(DHT_STREAM_MAX_DATA_SIZE));
   if (0 == len) { return 0; }
 
+  logDebug() << "Write up to" << len << "b into output buffer.";
+
   // Assemble message
   Message msg(Message::DATA);
   // store seq number
@@ -242,7 +244,9 @@ SecureStream::writeData(const char *data, qint64 len) {
 
 qint64
 SecureStream::readData(char *data, qint64 maxlen) {
-  return _inBuffer.read((uint8_t *)data, std::min(maxlen, qint64(0x10000)));
+  qint64 len = _inBuffer.read((uint8_t *)data, std::min(maxlen, qint64(0x10000)));
+  logDebug() << "Read " << len << "b from input buffer.";
+  return len;
 }
 
 void
