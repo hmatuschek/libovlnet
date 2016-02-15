@@ -20,7 +20,7 @@ Settings::Settings(const QString &filename, QObject *parent)
   }
   // Check for shell service whitelist
   if (doc.object().contains("shell_whitelist") && doc.object().value("shell_whitelist").isArray()) {
-    _socksServiceWhitelist = ServiceWhiteList(doc.object().value("shell_whitelist").toArray());
+    _shellServiceWhitelist = ServiceWhiteList(doc.object().value("shell_whitelist").toArray());
   }
 }
 
@@ -34,7 +34,7 @@ Settings::save() {
 
   QJsonObject obj;
   obj.insert("socks_whitelist", _socksServiceWhitelist.toJson());
-  obj.insert("shell_whitelist", _shellServiceWhiteList.toJson());
+  obj.insert("shell_whitelist", _shellServiceWhitelist.toJson());
   QJsonDocument doc(obj);
   _file.write(doc.toJson());
   _file.close();
@@ -47,7 +47,7 @@ Settings::socksServiceWhiteList() {
 
 ServiceWhiteList &
 Settings::shellServiceWhiteList() {
-  return _shellServiceWhiteList;
+  return _shellServiceWhitelist;
 }
 
 

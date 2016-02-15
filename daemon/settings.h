@@ -44,7 +44,7 @@ protected:
   /** Whitelist for the socks proxy service. */
   ServiceWhiteList _socksServiceWhitelist;
   /** Whitelist for the shell service. */
-  ServiceWhiteList _shellServiceWhiteList;
+  ServiceWhiteList _shellServiceWhitelist;
 };
 
 #endif // SETTINGS_H
