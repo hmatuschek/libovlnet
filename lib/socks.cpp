@@ -461,8 +461,8 @@ SocksOutStream::_clientBytesWritten(qint64 bytes) {
   uint8_t buffer[DHT_STREAM_MAX_DATA_SIZE];
   // As long as there is data to read from the remote socket,
   // the connection is established and there is space left in the output buffer.
-  while (_outStream->bytesAvailable() && ((1<<20)>bytesToWrite())) {
-    qint64 len = std::min((1<<20)-bytesToWrite(),
+  while (_outStream->bytesAvailable() && (0xffff>bytesToWrite())) {
+    qint64 len = std::min(0xffff-bytesToWrite(),
                           qint64(DHT_STREAM_MAX_DATA_SIZE));
     // Read from remote
     if (0 < (len = _outStream->read((char *) buffer, len))) {
