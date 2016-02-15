@@ -299,6 +299,9 @@ public:
       _firstSequence = seq;
       // update window
       _window = window;
+    } else {
+      logDebug() << "Ignore ACK seq=" << seq << ", window=" << window
+                 << ": not in range [" << _firstSequence << ", " << _nextSequence << "].";
     }
     // Return number of bytes ACKed
     return _buffer.drop(drop);
