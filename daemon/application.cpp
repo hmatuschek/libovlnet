@@ -94,15 +94,22 @@ Application::SocksService::newSocket() {
 
 bool
 Application::SocksService::allowConnection(const NodeItem &peer) {
+  if (_application._settings.socksServiceWhiteList().contains(peer.id())) {
+    logDebug() << "SocksService: Allow SOCKS connection from " << peer.id() << ".";
+  } else {
+    logDebug() << "SocksService: Deny SOCKS connection from " << peer.id() << ".";
+  }
   return _application._settings.socksServiceWhiteList().contains(peer.id());
 }
 
 void
 Application::SocksService::connectionStarted(SecureSocket *stream) {
+  logDebug() << "SocksService: SOCKS connection to " << stream->peerId() << " started.";
   dynamic_cast<SocksOutStream *>(stream)->open(QIODevice::ReadWrite);
 }
 
 void
 Application::SocksService::connectionFailed(SecureSocket *stream) {
+  logDebug() << "SocksService: SOCKS connection to " << stream->peerId() << " failed.";
   delete stream;
 }

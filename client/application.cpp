@@ -310,6 +310,7 @@ Application::onNodeFound(const NodeItem &node) {
   // Dispatch by type
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     logInfo() << "Node " << node.id() << " found: Start chat.";
+    (new ChatWindow(*this, chat))->show();
     _dht->startConnection(2, node, stream);
   } else if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
     logInfo() << "Node " << node.id() << " found: Start call.";

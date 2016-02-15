@@ -23,6 +23,7 @@ SecureChat::~SecureChat() {
 bool
 SecureChat::start(const Identifier &streamId, const PeerItem &peer) {
   if (SecureSocket::start(streamId, peer)) {
+    logDebug() << "SecureChat: Connection to " << peer.addr() << " started.";
     // start timers
     _keepAlive.start();
     _timeout.start();
@@ -31,6 +32,7 @@ SecureChat::start(const Identifier &streamId, const PeerItem &peer) {
     // done.
     return true;
   }
+  logDebug() << "SecureChat: Connection to " << peer.addr() << " failed.";
   return false;
 }
 
