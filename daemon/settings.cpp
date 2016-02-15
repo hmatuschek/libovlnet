@@ -59,7 +59,9 @@ ServiceWhiteList::ServiceWhiteList(const QJsonArray &lst)
 {
   for (QJsonArray::const_iterator item = lst.begin(); item != lst.end(); item++) {
     if ((*item).isString()) {
-      this->insert(Identifier::fromBase32((*item).toString()));
+      Identifier id = Identifier::fromBase32((*item).toString());
+      logDebug() << "Add node " << id << " to SOCKS white list.";
+      this->insert(id);
     }
   }
 }
