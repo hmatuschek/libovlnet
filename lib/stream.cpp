@@ -141,7 +141,7 @@ SecureStream::_onCheckPacketTimeout() {
 
 void
 SecureStream::_onTimeOut() {
-  logDebug() << "SecureStream: Connection timeout -> reset connection.";
+  logInfo() << "SecureStream: Connection timeout -> reset connection.";
   // abort connection
   cancel();
 }
@@ -247,6 +247,14 @@ SecureStream::readData(char *data, qint64 maxlen) {
   qint64 len = _inBuffer.read((uint8_t *)data, std::min(maxlen, qint64(0x10000)));
   logDebug() << "Read " << len << "b from input buffer.";
   return len;
+}
+
+bool
+SecureStream::start(const Identifier &streamId, const PeerItem &peer) {
+  if (SecureSocket::start(streamId, peer)) {
+    return open(QIODevice::ReadWrite);
+  }
+  return false;
 }
 
 void

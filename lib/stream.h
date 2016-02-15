@@ -413,6 +413,7 @@ public:
   qint64 bytesToWrite() const;
 
 protected:
+  bool start(const Identifier &streamId, const PeerItem &peer);
   /** Gets called for every received decrypted datagram. */
   void handleDatagram(const uint8_t *data, size_t len);
   /** Read some data from the input buffer. */

@@ -1050,7 +1050,7 @@ DHT::_processStartConnectionResponse(
     return;
   }
 
-  // Stream started: register stream & notify stream handler
+  // Stream started: register stream
   _connections[req->cookie()] = req->socket();
 }
 
