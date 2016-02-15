@@ -38,7 +38,7 @@ struct __attribute__((packed)) Message
  * Implementation of FixedBuffer
  * ********************************************************************************************* */
 FixedRingBuffer::FixedRingBuffer()
-  : _inptr(0), _outptr(0), _full(false)
+  : _outptr(0), _size(0)
 {
   // pass...
 }

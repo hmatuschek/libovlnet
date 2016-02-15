@@ -20,28 +20,21 @@ public:
   FixedRingBuffer();
 
   /** Returns the number of bytes available for reading. */
-  inline uint32_t available() const {
-    // If full -> 2^16, else (inptr-outptr) modulo 2^16.
-    // The latter works even if outptr > inptr.
-    return (_full ? 0x10000 : uint16_t(_inptr-_outptr));
+  inline uint16_t available() const {
+    return _size;
   }
 
   /** Returns the number of free bytes (available for writing). */
   inline uint32_t free() const {
-    // If empty -> 2^16, else (outptr-inptr) modulo 2^16.
-    // The latter works even if inptr > outptr.
-    if ((!_full) && (_outptr==_inptr)) { return 0x10000; }
-    return uint16_t(_outptr-_inptr);
+    return 0xffff-_size;
   }
 
   /** Reads some segement without removing it from the buffer. */
-  inline uint32_t peek(uint16_t offset, uint8_t *buffer, uint32_t len) {
-    // If empty or no byte requested -> done
-    if (((_outptr==_inptr) && (!_full)) || (0 == len)) { return 0; }
+  inline uint32_t peek(uint16_t offset, uint8_t *buffer, uint16_t len) {
     // If offset is larger than the available bytes -> done
     if (offset>=available()) { return 0; }
     // Determine howmany bytes to read
-    len = std::min(uint32_t(offset)+len, available())-offset;
+    len = std::min(uint32_t(offset)+len, uint32_t(available()))-offset;
     // Get offset in terms of buffer index == (offset+_outptr) modulo 2^16
     offset += _outptr;
     // read first half (at maximum up to the end of the buffer)
@@ -54,7 +47,7 @@ public:
   }
 
   /** Reads from the ring buffer. */
-  inline uint32_t read(uint8_t *buffer, uint32_t len) {
+  inline uint32_t read(uint8_t *buffer, uint16_t len) {
     // Read some data from the buffer
     len = peek(0, buffer, len);
     // Drop some data
@@ -62,26 +55,21 @@ public:
   }
 
   /** Drops some data from the ring-buffer. */
-  inline uint32_t drop(uint32_t len) {
-    // If empty or no byte requested -> done
-    if (((_outptr==_inptr) && (!_full)) || (0 == len)) { return 0; }
+  inline uint32_t drop(uint16_t len) {
     // Get bytes to drop
     len = std::min(len, available());
     // drop data
     _outptr += len;
-    // Update _full flag
-    if (len) { _full = false; }
+    _size -= len;
     return len;
   }
 
   /** Puts some data in the already available area. */
-  inline uint32_t put(uint16_t offset, const uint8_t *data, uint32_t len) {
-    // If empty or no byte requested -> done
-    if (((_outptr==_inptr) && (!_full)) || (0 == len)) { return 0; }
+  inline uint32_t put(uint16_t offset, const uint8_t *data, uint16_t len) {
     // If offset is larger than the available bytes -> done
     if (offset>=available()) { return 0; }
-    // Determine howmany bytes to put
-    len = std::min(uint32_t(offset)+len, available())-offset;
+    // Determine how many bytes to put
+    len = std::min(uint32_t(offset)+len, uint32_t(available()))-offset;
     // Get offset in terms of buffer index
     offset += _outptr;
     // put first half (at maximum up to the end of the buffer)
@@ -98,15 +86,13 @@ public:
     // Howmany bytes can be allocated
     len = std::min(len, free());
     // Allocate data
-    _inptr += len;
-    // Update full ptr;
-    _full = (_inptr == _outptr);
+    _size += len;
     // done.
     return len;
   }
 
   /** Appends some data to the ring buffer. */
-  inline uint32_t write(const uint8_t *buffer, uint32_t len) {
+  inline uint32_t write(const uint8_t *buffer, uint16_t len) {
     // Where to put the data
     uint32_t offset = available();
     // Allocate some space
@@ -117,13 +103,11 @@ public:
 
 protected:
   /** The actual buffer. */
-  uint8_t _buffer[0x10000];
-  /** Write pointer. */
-  uint16_t _inptr;
+  uint8_t _buffer[0xffff];
   /** Read pointer. */
   uint16_t _outptr;
-  /** If true, the buffer is full. */
-  bool _full;
+  /** Number of elements in the buffer. */
+  uint16_t _size;
 };
 
 
