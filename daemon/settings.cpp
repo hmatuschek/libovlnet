@@ -11,10 +11,19 @@ Settings::Settings(const QString &filename, QObject *parent)
 {
   if (!_file.open(QIODevice::ReadOnly)) { return; }
   logDebug() << "Settings: Load settings from " << filename;
-  QJsonDocument doc = QJsonDocument::fromJson(_file.readAll());
+  QJsonParseError err;
+  QJsonDocument doc = QJsonDocument::fromJson(_file.readAll(), &err);
   _file.close();
 
-  qDebug() << doc.toJson();
+  if (QJsonParseError::NoError != err.error) {
+    logError() << "Settings: Parser error: " << err.errorString() << ".";
+    return;
+  }
+
+  if (! doc.isObject()) {
+    logError() << "Settings: Malformed settings file.";
+    return;
+  }
 
   // Check for socks service whitelist
   if (doc.object().contains("socks_whitelist") && doc.object().value("socks_whitelist").isArray()) {
