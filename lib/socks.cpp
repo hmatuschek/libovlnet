@@ -58,6 +58,7 @@ LocalSocksStream::_clientReadyRead() {
                           (1<<20)-_inStream->bytesToWrite());
     // Read from client
     if (0 < (len = _inStream->read((char *)buffer, len))) {
+      logDebug() << "Forward " << len << " bytes to remote.";
       // Forward to SOCKS server
       write((const char *)buffer, len);
     }
@@ -220,6 +221,7 @@ SocksOutStream::open(OpenMode mode) {
 void
 SocksOutStream::_clientParse() {
   while (bytesAvailable()) {
+    logDebug() << "Parse " << bytesAvailable() << "b.";
     /*
      * Dispatch by state.
      */
