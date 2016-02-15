@@ -97,6 +97,7 @@ public:
   bool registerService(uint16_t no, AbstractService *handler);
   /** Retunrs the number of active connections. */
   size_t numSockets() const;
+
   /** Starts a secure connection.
    * The ownership of the @c SecureSocket instance is passed to the DHT and will be deleted if the
    * connection fails. If the connection is established, the ownership of the socket is passed to

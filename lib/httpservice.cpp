@@ -140,6 +140,7 @@ HttpResponse::sendHeaders() {
   if (_headersSend || (0 != _headerBuffer.size())) { return; }
   // Dispatch by response type
   switch (_code) {
+    case HTTP_RESP_INCOMPLETE: return;
     case HTTP_OK: _headerBuffer.append("200 OK\r\n"); break;
     case HTTP_BAD_REQUEST: _headerBuffer.append("400 BAD REQUEST\r\n"); break;
     case HTTP_FORBIDDEN: _headerBuffer.append("403 FORBIDDEN\r\n"); break;
@@ -267,6 +268,8 @@ HttpConnection::_requestHeadersRead() {
     // If not processed -> not found
     _currentResponse = new HttpStringResponse(HTTP_NOT_FOUND, "Not found", this);
   }
+  // Get notified if the response has started
+  connect(_currentResponse, SIGNAL(started()), this, SLOT(_responseStarted()));
   // Get notified if the response has been completed
   connect(_currentResponse, SIGNAL(completed()), this, SLOT(_responseCompleted()));
   // start response
@@ -279,6 +282,11 @@ HttpConnection::_badRequest() {
   disconnect(_currentRequest, SIGNAL(headerRead()), this, SLOT(_requestHeadersRead()));
   // Now we are in a undefined state for the connection -> better we close it
   deleteLater();
+}
+
+void
+HttpConnection::_responseStarted() {
+  _currentResponse->sendHeaders();
 }
 
 void
@@ -342,7 +350,7 @@ LocalHttpServer::_onNewConnection() {
   while (_server.hasPendingConnections()) {
     QTcpSocket *socket = _server.nextPendingConnection();
     new HttpConnection(
-          _dispatcher,NodeItem(Identifier(), socket->peerAddress(), socket->peerPort()), socket);
+          _dispatcher, NodeItem(Identifier(), socket->peerAddress(), socket->peerPort()), socket);
   }
 }
 
@@ -383,4 +391,52 @@ HttpService::allowConnection(const NodeItem &peer) {
 void
 HttpService::connectionFailed(SecureSocket *socket) {
   delete socket;
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of LocalHttpProxyServer
+ * ********************************************************************************************* */
+LocalHttpProxyServer::LocalHttpProxyServer(DHT &dht, uint16_t port)
+  : LocalHttpServer(new HttpProxyHandler(dht, this), port)
+{
+  // pass...
+}
+
+LocalHttpProxyServer::~LocalHttpProxyServer() {
+  // pass...
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of HttpProxyHandler
+ * ********************************************************************************************* */
+HttpProxyHandler::HttpProxyHandler(DHT &dht, QObject *parent)
+  : HttpRequestHandler(parent), _dht(dht)
+{
+  // pass...
+}
+
+HttpProxyHandler::~HttpProxyHandler() {
+  // pass...
+}
+
+bool
+HttpProxyHandler::acceptReqest(HttpRequest *request) {
+  if (! request->hasHeader("Host")) {
+    logInfo() << "HttpProxyHandler: Request without a host!";
+    return false;
+  }
+  return true;
+}
+
+HttpResponse *
+HttpProxyHandler::processRequest(HttpRequest *request) {
+  // Dispatch by TLD
+  if (request->header("Host").endsWith(".ovl")) {
+    // if host domain is of form ID.ovl -> connect to ID's HTTP server
+
+  } else {
+
+  }
 }

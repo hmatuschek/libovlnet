@@ -11,13 +11,13 @@ Application::Application(int argc, char *argv[])
   : QCoreApplication(argc, argv), _model(), _settings("/etc/ovlnetd/settings.json")
 {
   // Try to load identity from file
-  QDir vlfDir("/etc");
+  QDir ovlDir("/etc");
   // if deamon directory does not exists -> create it
-  if (! vlfDir.cd("ovlnetd")) {
-    vlfDir.mkdir("ovlnetd"); vlfDir.cd("ovlnetd");
+  if (! ovlDir.cd("ovlnetd")) {
+    ovlDir.mkdir("ovlnetd"); ovlDir.cd("ovlnetd");
   }
   // Create identity if not present
-  QString idFile(vlfDir.canonicalPath()+"/identity.pem");
+  QString idFile(ovlDir.canonicalPath()+"/identity.pem");
   if (!QFile::exists(idFile)) {
     logInfo() << "No identity found -> create one.";
     _identity = Identity::newIdentity();
@@ -60,16 +60,20 @@ Application::HalChatService::newSocket() {
 
 bool
 Application::HalChatService::allowConnection(const NodeItem &peer) {
+  logDebug() << "ChatService: Allow connection to " << peer.id()
+             << " @" << peer.addr() << ".";
   return true;
 }
 
 void
 Application::HalChatService::connectionStarted(SecureSocket *stream) {
+  logDebug() << "ChatService: Connection to " << stream->peerId() << " started.";
   static_cast<HalChat *>(stream)->started();
 }
 
 void
 Application::HalChatService::connectionFailed(SecureSocket *stream) {
+  logDebug() << "ChatService: Connection to " << stream->peerId() << " failed.";
   delete stream;
 }
 

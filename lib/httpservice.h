@@ -34,11 +34,12 @@ typedef enum {
 /** Possible HTTP response codes.
  * @ingroup http */
 typedef enum {
-  HTTP_OK = 200,           ///< OK.
-  HTTP_BAD_REQUEST = 400,  ///< Bad requrst.
-  HTTP_FORBIDDEN = 403,    ///< Forbidden.
-  HTTP_NOT_FOUND = 404,    ///< Resource not found.
-  HTTP_SERVER_ERROR = 500  ///< Internal error.
+  HTTP_RESP_INCOMPLETE = 0, ///< A dummy response code to indicate an incomplete response header.
+  HTTP_OK = 200,            ///< OK.
+  HTTP_BAD_REQUEST = 400,   ///< Bad requrst.
+  HTTP_FORBIDDEN = 403,     ///< Forbidden.
+  HTTP_NOT_FOUND = 404,     ///< Resource not found.
+  HTTP_SERVER_ERROR = 500   ///< Internal error.
 } HttpResponseCode;
 
 
@@ -120,6 +121,8 @@ protected slots:
   void _requestHeadersRead();
   /** Gets called if a request is malformed. */
   void _badRequest();
+  /** Gets called once a response started. */
+  void _responseStarted();
   /** Gets called once a response is completed. */
   void _responseCompleted();
 
@@ -227,6 +230,8 @@ protected:
 public:
   /** Returns the response code. */
   inline HttpResponseCode responseCode() const { return _code; }
+  /** Resets the response code. */
+  inline void setResponseCode(HttpResponseCode code) { _code = code; }
   /** Returns @c true if the given header has been set. */
   inline bool hasHeader(const QString &name) const { return _headers.contains(name); }
   /** Set a header. */
@@ -242,6 +247,8 @@ public:
   void sendHeaders();
 
 signals:
+  /** Gets emitted once the response has been started. That is, the headers are ready to be send. */
+  void started();
   /** Gets emitted once the response headers has been send. */
   void headersSend();
   /** Gets emitted once the response is completed. */
@@ -327,6 +334,36 @@ protected:
   HttpRequestHandler *_handler;
 };
 
+
+/** A simple proxy request handler.
+ * @ingroup http */
+class HttpProxyHandler: public HttpRequestHandler
+{
+  Q_OBJECT
+
+public:
+  /** Constructor. */
+  HttpProxyHandler(DHT &dht, QObject *parent=0);
+  virtual ~HttpProxyHandler();
+
+  /** Accepts all requests. */
+  bool acceptReqest(HttpRequest *request);
+  /** Forwards the request. */
+  HttpResponse *processRequest(HttpRequest *request);
+
+protected:
+  DHT &_dht;
+};
+
+
+class LocalHttpProxyServer: public LocalHttpServer
+{
+  Q_OBJECT
+
+public:
+  LocalHttpProxyServer(DHT &dht, uint16_t port=8080);
+  virtual ~LocalHttpProxyServer();
+};
 
 
 #endif // HTTPSERVICE_H
