@@ -13,14 +13,25 @@ Settings::Settings(const QString &filename, QObject *parent)
   logDebug() << "Settings: Load settings from " << filename;
   QJsonDocument doc = QJsonDocument::fromJson(_file.readAll());
   _file.close();
-  if (! doc.isObject()) { return; }
+
+  if (! doc.isObject()) {
+    logDebug() << "Settings: Malformed settings file.";
+    return;
+  }
+
   // Check for socks service whitelist
   if (doc.object().contains("socks_whitelist") && doc.object().value("socks_whitelist").isArray()) {
+    logDebug() << "Settings: Read SOCKS white list.";
     _socksServiceWhitelist = ServiceWhiteList(doc.object().value("socks_whitelist").toArray());
+  } else {
+    logDebug() << "Settings: No SOCKS white list specified.";
   }
   // Check for shell service whitelist
   if (doc.object().contains("shell_whitelist") && doc.object().value("shell_whitelist").isArray()) {
+    logDebug() << "Settings: Read shell white list.";
     _shellServiceWhitelist = ServiceWhiteList(doc.object().value("shell_whitelist").toArray());
+  } else {
+    logDebug() << "Settings: No shell white list specified.";
   }
 }
 
