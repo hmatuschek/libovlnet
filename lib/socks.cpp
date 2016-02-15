@@ -228,7 +228,8 @@ SocksOutStream::_clientParse() {
     if (RX_VERSION == _state) {
       // Expect version number and length of auth method
       if (2 > bytesAvailable()) { return; }
-      uint8_t buffer[2]; read((char *) buffer, 2);
+      uint8_t buffer[2];
+      if (2 != read((char *) buffer, 2)) { return; }
       // Check version number
       if (5 != buffer[0]) {
         logInfo() << "SOCKS: Unknown version number " << int(buffer[0]);
