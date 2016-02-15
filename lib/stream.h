@@ -166,7 +166,7 @@ public:
   /** Updates the internal buffer with the given data at the specified sequence number. */
   uint32_t putPacket(uint32_t seq, const uint8_t *data, uint32_t len) {
     // check if seq fits into window [_nextSequence, _nextSequence+window()), if not -> done
-    if (!_in_window(seq)) {
+    if (! _in_window(seq)) {
       logDebug() << "StreamInBuffer: Ignore packet seq=" << seq
                  << ", len=" << len << ": Not in window: ["
                  << _nextSequence << ", " << (_nextSequence+window()) << "].";

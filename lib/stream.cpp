@@ -296,8 +296,6 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       if (OPEN == _state) {
         emit readyRead();
       }
-    } else {
-      logDebug() << "Unexpected data: Drop seq=" << seq << ", len=" << (len-5) << ".";
     }
     // done
     return;
