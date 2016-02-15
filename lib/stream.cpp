@@ -210,14 +210,14 @@ qint64
 SecureStream::writeData(const char *data, qint64 len) {
   // shortcut
   if (0 == len) { return 0; }
-
+  qint64 inlen=len;
   // Determine maximum data length as the minimum of
   // maximum length (len), space in output buffer, window-size of the remote,
   // and maximum payload length
   len = std::min(len, qint64(_outBuffer.free()));
   len = std::min(len, qint64(DHT_STREAM_MAX_DATA_SIZE));
   if (0 == len) {
-    logDebug() << "Do not send data len=" << len << ": window=" << _outBuffer.free() << ".";
+    logDebug() << "Do not send data len=" << inlen << ": window=" << _outBuffer.free() << ".";
     return 0;
   }
 
