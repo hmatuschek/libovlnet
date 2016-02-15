@@ -161,7 +161,7 @@ SecureStream::close() {
     emit readChannelFinished();
     _state = FIN_RECEIVED;
     // If all data has been send -> closed
-    if (! bytesToWrite()) {
+    if (0 == bytesToWrite()) {
       // sends RST & closes the connection
       cancel();
     }
@@ -217,7 +217,7 @@ SecureStream::writeData(const char *data, qint64 len) {
   len = std::min(len, qint64(_outBuffer.free()));
   len = std::min(len, qint64(DHT_STREAM_MAX_DATA_SIZE));
   if (0 == len) {
-    logDebug() << "Do not send data: window=" << _outBuffer.free() << ".";
+    logDebug() << "Do not send data len=" << len << ": window=" << _outBuffer.free() << ".";
     return 0;
   }
 
