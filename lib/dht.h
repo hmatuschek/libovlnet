@@ -92,7 +92,7 @@ public:
   /** Returns @c true if a handler is associated with the given service. */
   bool hasService(uint16_t service) const;
   /** Registers a service.
-   * Retruns @c true on success and @c false if a handler is already associated with the given
+   * Returns @c true on success and @c false if a handler is already associated with the given
    * service. The ownership of the handler is transferred to the DHT. */
   bool registerService(uint16_t no, AbstractService *handler);
   /** Retunrs the number of active connections. */

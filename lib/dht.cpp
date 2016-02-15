@@ -478,7 +478,6 @@ DHT::DHT(Identity &id,
   connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
   connect(&_requestTimer, SIGNAL(timeout()), this, SLOT(_onCheckRequestTimeout()));
   connect(&_nodeTimer, SIGNAL(timeout()), this, SLOT(_onCheckNodeTimeout()));
-  connect(&_announcementTimer, SIGNAL(timeout()), this, SLOT(_onCheckAnnouncementTimeout()));
   connect(&_statisticsTimer, SIGNAL(timeout()), this, SLOT(_onUpdateStatistics()));
 
   _requestTimer.start();

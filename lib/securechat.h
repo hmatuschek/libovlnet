@@ -29,6 +29,7 @@ public slots:
   void sendMessage(const QString &msg);
 
 signals:
+  /** Gets emitted once the connection is established. */
   void started();
   /** Gets emitted if a message was received. */
   void messageReceived(const QString &msg);
