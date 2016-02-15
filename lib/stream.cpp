@@ -210,7 +210,7 @@ qint64
 SecureStream::writeData(const char *data, qint64 len) {
   // shortcut
   if (0 == len) { return 0; }
-  qint64 inlen=len;
+  qint64 inlen = len;
   // Determine maximum data length as the minimum of
   // maximum length (len), space in output buffer, window-size of the remote,
   // and maximum payload length
@@ -228,8 +228,10 @@ SecureStream::writeData(const char *data, qint64 len) {
 
   // put in output buffer, updates sequence number
   if(0 == (len = _outBuffer.write((const uint8_t *)data, len))) {
+    logDebug() << "Cannot write to outBuffer. Full?";
     return 0;
   }
+  logDebug() << "Send seq=" << ntohl(msg.seq) << ", len=" << len << ".";
 
   // If some data was added to the buffer
   // and the packet timer is not started -> start it
@@ -244,7 +246,7 @@ SecureStream::writeData(const char *data, qint64 len) {
     _keepalive.start();
     return len;
   }
-
+  logError() << "Can not send datagram!";
   // on error
   return -1;
 }

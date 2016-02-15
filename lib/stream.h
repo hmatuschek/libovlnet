@@ -291,6 +291,7 @@ public:
     if (_in_between(seq, _firstSequence, _nextSequence)) {
       // howmany bytes dropped
       drop = uint32_t(seq-_firstSequence);
+      logDebug() << "ACKed seq=" << seq << " -> dropped " << drop << "b.";
       // update round-trip time
       _update_rt(age());
       // Update timestamp of "oldest" bytes
