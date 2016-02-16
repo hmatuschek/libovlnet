@@ -1,5 +1,5 @@
-#include "filetransferdialog.h"
-#include "application.h"
+#include "filetransferdialog.hh"
+#include "application.hh"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFileInfo>

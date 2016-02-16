@@ -1,4 +1,4 @@
-#include "sockswhitelist.h"
+#include "sockswhitelist.hh"
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonValue>

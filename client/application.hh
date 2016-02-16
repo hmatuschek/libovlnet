@@ -9,11 +9,11 @@
 
 #include "lib/crypto.h"
 #include "lib/dht.h"
-#include "dhtstatus.h"
-#include "buddylist.h"
-#include "bootstrapnodelist.h"
-#include "logwindow.h"
-#include "settings.h"
+#include "dhtstatus.hh"
+#include "buddylist.hh"
+#include "bootstrapnodelist.hh"
+#include "logwindow.hh"
+#include "settings.hh"
 
 
 class Application : public QApplication

@@ -1,4 +1,4 @@
-#include "echostream.h"
+#include "echostream.hh"
 
 EchoStream::EchoStream(DHT &dht)
   : SecureSocket(dht)

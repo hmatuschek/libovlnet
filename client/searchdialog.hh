@@ -2,7 +2,7 @@
 #define SEARCHDIALOG_H
 
 #include "lib/dht.h"
-#include "buddylist.h"
+#include "buddylist.hh"
 
 #include <QWidget>
 #include <QLineEdit>

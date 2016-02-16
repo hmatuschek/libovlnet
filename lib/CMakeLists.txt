@@ -1,12 +1,11 @@
-set(ovl_SOURCES 
-    ntp.cpp dht.cpp pcp.cpp natpmp.cpp crypto.cpp utils.cpp stream.cpp socks.cpp buckets.cpp
-    logger.cpp filetransfer.cpp securechat.cpp securecall.cpp httpservice.cpp secureshell.cpp
-    httpproxy.cpp)
+set(ovl_SOURCES crypto.cc utils.cc buckets.cc logger.cc
+    ntp.cc dht.cc pcp.cc natpmp.cc stream.cc socks.cc filetransfer.cc securechat.cc securecall.cc
+    httpservice.cc secureshell.cc httpproxy.cc)
 set(ovl_MOC_HEADERS 
-    ntp.h dht.h pcp.h natpmp.h stream.h socks.h filetransfer.h securechat.h securecall.h
-    httpservice.h secureshell.h httpproxy.h)
+    ntp.hh dht.hh pcp.hh natpmp.hh stream.hh socks.hh filetransfer.hh securechat.hh securecall.hh
+    httpservice.hh secureshell.hh httpproxy.hh)
 set(ovl_HEADERS ${ovl_MOC_HEADERS}
-    ovlnet.h buckets.h utils.h crypto.h logger.h)
+    ovlnet.hh buckets.hh utils.hh crypto.hh logger.hh)
 
 qt5_wrap_cpp(ovl_MOC_SOURCES ${ovl_MOC_HEADERS})
 

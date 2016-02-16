@@ -3,7 +3,7 @@
 #include "lib/crypto.h"
 #include "lib/logger.h"
 
-#include "application.h"
+#include "application.hh"
 #include <time.h>
 #include <stdio.h>
 

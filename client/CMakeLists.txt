@@ -1,4 +1,4 @@
-set(VLF_CLIENT_SOURCES main.cpp bootstrapnodelist.cc
+set(VLF_CLIENT_SOURCES main.cc bootstrapnodelist.cc
     application.cc dhtstatus.cc dhtstatusview.cc dhtnetgraph.cc searchdialog.cc buddylist.cc
     buddylistview.cc chatwindow.cc callwindow.cc filetransferdialog.cc sockswindow.cc logwindow.cc
     settings.cc settingsdialog.cc searchcompletion.cc)

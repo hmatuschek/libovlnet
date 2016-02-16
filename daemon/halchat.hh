@@ -3,7 +3,7 @@
 
 #include "lib/dht.h"
 #include "lib/crypto.h"
-#include "qhal.h"
+#include "qhal.hh"
 
 #include <QObject>
 #include <QTimer>

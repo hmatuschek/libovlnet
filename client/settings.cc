@@ -1,4 +1,4 @@
-#include "settings.h"
+#include "settings.hh"
 #include "lib/logger.h"
 #include <QJsonArray>
 

@@ -1,5 +1,5 @@
-#include "sockswindow.h"
-#include "application.h"
+#include "sockswindow.hh"
+#include "application.hh"
 #include <QImage>
 #include <QPushButton>
 #include <QHBoxLayout>

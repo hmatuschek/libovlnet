@@ -1,5 +1,5 @@
-#include "chatwindow.h"
-#include "application.h"
+#include "chatwindow.hh"
+#include "application.hh"
 #include <QTextCursor>
 #include <QVBoxLayout>
 #include <QTextBlockFormat>

@@ -4,7 +4,7 @@
 #include <QDialog>
 #include <QCheckBox>
 #include <QListWidget>
-#include "settings.h"
+#include "settings.hh"
 
 
 class WhiteListView: public QWidget

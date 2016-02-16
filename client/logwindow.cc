@@ -1,4 +1,4 @@
-#include "logwindow.h"
+#include "logwindow.hh"
 #include <QTableView>
 #include <QVBoxLayout>
 #include <QBrush>
@@ -8,7 +8,7 @@
 #include <QCloseEvent>
 #include <QFileInfo>
 
-#include "application.h"
+#include "application.hh"
 
 
 LogModel::LogModel(QObject *parent)

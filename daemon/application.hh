@@ -4,8 +4,8 @@
 #include <QCoreApplication>
 #include "lib/crypto.h"
 #include "lib/dht.h"
-#include "qhal.h"
-#include "settings.h"
+#include "qhal.hh"
+#include "settings.hh"
 
 
 class Application : public QCoreApplication

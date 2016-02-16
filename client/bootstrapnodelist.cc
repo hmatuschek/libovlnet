@@ -1,4 +1,4 @@
-#include "bootstrapnodelist.h"
+#include "bootstrapnodelist.hh"
 #include <QIODevice>
 #include <QJsonDocument>
 #include <QJsonArray>

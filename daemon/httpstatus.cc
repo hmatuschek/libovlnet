@@ -1,4 +1,4 @@
-#include "httpstatus.h"
+#include "httpstatus.hh"
 #include "lib/dht.h"
 
 HttpStatus::HttpStatus(DHT &dht, QObject *parent)

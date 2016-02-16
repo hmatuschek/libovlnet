@@ -1,5 +1,5 @@
-#include "dhtstatusview.h"
-#include "logwindow.h"
+#include "dhtstatusview.hh"
+#include "logwindow.hh"
 
 #include <QString>
 #include <QFormLayout>
@@ -8,7 +8,7 @@
 #include <QCloseEvent>
 #include <QTabWidget>
 
-#include "application.h"
+#include "application.hh"
 
 
 /* ******************************************************************************************** *

@@ -1,10 +1,10 @@
-#include "callwindow.h"
+#include "callwindow.hh"
 #include <QCloseEvent>
 #include <QToolBar>
 #include <QAction>
 #include <QVBoxLayout>
 #include <QLabel>
-#include "application.h"
+#include "application.hh"
 
 
 CallWindow::CallWindow(Application &application, SecureCall *call, QWidget *parent)

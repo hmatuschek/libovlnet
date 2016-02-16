@@ -1,4 +1,4 @@
-#include "searchdialog.h"
+#include "searchdialog.hh"
 #include "lib/dht_config.h"
 
 #include <QLabel>

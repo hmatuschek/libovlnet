@@ -1,4 +1,4 @@
-#include "searchcompletion.h"
+#include "searchcompletion.hh"
 
 SearchCompletionModel::SearchCompletionModel(DHT &dht, QObject *parent)
   : QAbstractListModel(parent), _dht(dht), _results()

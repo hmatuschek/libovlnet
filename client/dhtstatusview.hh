@@ -1,8 +1,8 @@
 #ifndef DHTSTATUSVIEW_H
 #define DHTSTATUSVIEW_H
 
-#include "dhtstatus.h"
-#include "dhtnetgraph.h"
+#include "dhtstatus.hh"
+#include "dhtnetgraph.hh"
 #include <QWidget>
 #include <QTimer>
 #include <QLabel>

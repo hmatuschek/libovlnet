@@ -1,9 +1,9 @@
-#include "application.h"
-#include "echostream.h"
-#include "halchat.h"
+#include "application.hh"
+#include "echostream.hh"
+#include "halchat.hh"
 #include "lib/socks.h"
 #include "lib/secureshell.h"
-#include "httpstatus.h"
+#include "httpstatus.hh"
 
 #include <QDir>
 #include <QFile>

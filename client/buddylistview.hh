@@ -3,7 +3,7 @@
 
 #include <QWidget>
 #include <QTreeView>
-#include "buddylist.h"
+#include "buddylist.hh"
 
 class Application;
 

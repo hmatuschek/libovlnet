@@ -1,7 +1,7 @@
-#include "buddylistview.h"
-#include "application.h"
-#include "searchdialog.h"
-#include "sockswindow.h"
+#include "buddylistview.hh"
+#include "application.hh"
+#include "searchdialog.hh"
+#include "sockswindow.hh"
 
 #include <QVBoxLayout>
 #include <QToolBar>

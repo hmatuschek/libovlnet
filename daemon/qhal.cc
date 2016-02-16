@@ -1,4 +1,4 @@
-#include "qhal.h"
+#include "qhal.hh"
 #include <QListIterator>
 #include <QString>
 #include <cmath>

@@ -1,4 +1,4 @@
-#include "settingsdialog.h"
+#include "settingsdialog.hh"
 #include <QVBoxLayout>
 #include <QFormLayout>
 #include <QHBoxLayout>

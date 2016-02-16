@@ -1,6 +1,6 @@
-#include "dhtstatus.h"
+#include "dhtstatus.hh"
 #include "lib/dht_config.h"
-#include "application.h"
+#include "application.hh"
 
 #include <cmath>
 

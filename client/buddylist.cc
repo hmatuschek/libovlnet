@@ -1,5 +1,5 @@
-#include "buddylist.h"
-#include "application.h"
+#include "buddylist.hh"
+#include "application.hh"
 
 #include <QString>
 #include <QIODevice>

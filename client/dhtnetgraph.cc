@@ -1,4 +1,4 @@
-#include "dhtnetgraph.h"
+#include "dhtnetgraph.hh"
 #include <QPainter>
 #include <QPen>
 #include <QBrush>

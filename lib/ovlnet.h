@@ -116,20 +116,20 @@
 #ifndef __OVLNET_H__
 #define __OVLNET_H__
 
-#include "dht_config.h"
-#include "dht.h"
-#include "crypto.h"
-#include "stream.h"
+#include "dht_config.hh"
+#include "dht.hh"
+#include "crypto.hh"
+#include "stream.hh"
 
-#include "securechat.h"
-#include "securecall.h"
-#include "filetransfer.h"
-#include "socks.h"
+#include "securechat.hh"
+#include "securecall.hh"
+#include "filetransfer.hh"
+#include "socks.hh"
 
-#include "logger.h"
-#include "ntp.h"
-#include "pcp.h"
-#include "natpmp.h"
+#include "logger.hh"
+#include "ntp.hh"
+#include "pcp.hh"
+#include "natpmp.hh"
 
 
 #endif // __OVLNET_H__
