@@ -372,7 +372,7 @@ void
 SecureStream::_onTimeOut() {
   logInfo() << "SecureStream: Connection timeout -> reset connection.";
   // abort connection
-  reset();
+  abort();
 }
 
 void
@@ -525,7 +525,6 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       resp.payload.window = htons(_inBuffer.window());
       // Send ACK & reset keep-alive timer
       if (sendDatagram((const uint8_t*) &resp, 7)) {
-        logDebug() << "Send ACK seq=" << _inBuffer.nextSequence() << ", win=" <<_inBuffer.window();
         _keepalive.start();
       } else {
         logError() << "Failed to send ACK seq=" << _inBuffer.nextSequence() << ", win=" << _inBuffer.window();
