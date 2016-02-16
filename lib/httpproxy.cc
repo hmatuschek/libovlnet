@@ -31,12 +31,12 @@ LocalHttpProxyServerHandler::~LocalHttpProxyServerHandler() {
 
 bool
 LocalHttpProxyServerHandler::acceptReqest(HttpRequest *request) {
-  if (! request->hasHeader("Host")) {
-    logInfo() << "HttpProxyHandler: Request without a host!";
-    return false;
+  if (request->hasHeader("Host") && request->header("Host").endsWith(".ovl")) {
+    logDebug() << "HTTP Proxy: Accecpt request for '" << request->header("Host") << "'.";
+    return true;
   }
-  logDebug() << "HTTP Proxy: Accecpt request for '" << request->header("Host") << "'.";
-  return true;
+  logInfo() << "HttpProxyHandler: Neglect request.";
+  return false;
 }
 
 HttpResponse *
@@ -49,7 +49,7 @@ LocalHttpProxyServerHandler::processRequest(HttpRequest *request) {
     return new LocalHttpProxyResponse(_dht, Identifier::fromBase32(id), request);
   }
 
-  return new HttpStringResponse(HTTP_BAD_GATEWAY,
+  return new HttpStringResponse(request->version(), HTTP_BAD_GATEWAY,
                                 "<h1>Bad Gateway</h1> Do not support request outside of OVL net.",
                                 request->connection());
 }
@@ -59,8 +59,8 @@ LocalHttpProxyServerHandler::processRequest(HttpRequest *request) {
  * Implementation of LocalHttpProxyResponse
  * ********************************************************************************************* */
 LocalHttpProxyResponse::LocalHttpProxyResponse(DHT &dht, const Identifier &id, HttpRequest *request)
-  : HttpResponse(HTTP_RESP_INCOMPLETE, request->connection()), _dht(dht), _destination(id), _request(request),
-    _stream(0)
+  : HttpResponse(request->version(), HTTP_RESP_INCOMPLETE, request->connection()),
+    _dht(dht), _destination(id), _request(request), _stream(0)
 {
   connect(&_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(_onNodeFound(NodeItem)));
   connect(&_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),

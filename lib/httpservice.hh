@@ -122,8 +122,6 @@ protected slots:
   void _requestHeadersRead();
   /** Gets called if a request is malformed. */
   void _badRequest();
-  /** Gets called once a response started. */
-  void _responseStarted();
   /** Gets called once a response is completed. */
   void _responseCompleted();
 
@@ -232,7 +230,7 @@ protected:
   /** Hidden constructor.
    * @param resp Specifies the response code.
    * @param connection Specifies the HTTP connection for the response. */
-  HttpResponse(HttpResponseCode resp, HttpConnection *connection);
+  HttpResponse(HttpVersion version, HttpResponseCode resp, HttpConnection *connection);
 
 public:
   /** Returns the response code. */
@@ -268,6 +266,7 @@ protected slots:
 protected:
   /** The HTTP connection. */
   HttpConnection *_connection;
+  HttpVersion _version;
   /** The response code. */
   HttpResponseCode _code;
   /** If @c true, the headers has been send. */
@@ -293,7 +292,7 @@ public:
    * @param text Specifies the response text.
    * @param connection Specifies the connection.
    * @param contentType Specifies the content type of the response. */
-  HttpStringResponse(HttpResponseCode resp, const QString &text,
+  HttpStringResponse(HttpVersion version, HttpResponseCode resp, const QString &text,
                      HttpConnection *connection, const QString contentType="text/text");
 
 protected slots:

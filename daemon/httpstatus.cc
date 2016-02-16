@@ -26,7 +26,7 @@ HttpStatus::processRequest(HttpRequest *request) {
       " <tr><td>Bytes send</td> <td>%4</td></tr>"
       "</table>"
       "</body></html>";
-  return new HttpStringResponse(
+  return new HttpStringResponse(request->version(),
         HTTP_OK, resp.arg(_dht.id().toBase32()).arg(_dht.numSockets()).arg(_dht.bytesReceived()).arg(_dht.bytesSend()),
         request->connection());
 }

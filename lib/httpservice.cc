@@ -126,8 +126,8 @@ HttpRequest::_getVersion(const char *str, int len) {
 /* ********************************************************************************************* *
  * Implementation of HttpResponse
  * ********************************************************************************************* */
-HttpResponse::HttpResponse(HttpResponseCode resp, HttpConnection *connection)
-  : QObject(connection), _connection(connection), _code(resp),
+HttpResponse::HttpResponse(HttpVersion version, HttpResponseCode resp, HttpConnection *connection)
+  : QObject(connection), _connection(connection), _version(version), _code(resp),
     _headersSend(false), _headerSendIdx(0), _headers()
 {
   // Connect to bytesWritten signal
@@ -138,7 +138,13 @@ HttpResponse::HttpResponse(HttpResponseCode resp, HttpConnection *connection)
 void
 HttpResponse::sendHeaders() {
   // Skip if headers are serialized already or even has been send
-  if (_headersSend || (0 != _headerBuffer.size())) { return; }
+  if (_headersSend || (0 != _headerBuffer.size()) || (HTTP_RESP_INCOMPLETE == _code)) { return; }
+  // Send version
+  switch (_version) {
+    case HTTP_1_0: _headerBuffer.append("HTTP/1.0 "); break;
+    case HTTP_1_1: _headerBuffer.append("HTTP/1.1 "); break;
+    case HTTP_INVALID_VERSION: break;
+  }
   // Dispatch by response type
   switch (_code) {
     case HTTP_RESP_INCOMPLETE: return;
@@ -166,6 +172,7 @@ HttpResponse::sendHeaders() {
 
 void
 HttpResponse::_onBytesWritten(qint64 bytes) {
+  logDebug() << "Continue send headers.";
   // If headers already send -> done
   if (_headersSend) { return; }
   // If headers are just send
@@ -175,12 +182,12 @@ HttpResponse::_onBytesWritten(qint64 bytes) {
     // disconnect from bytesWritten() signal
     disconnect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
                this, SLOT(_onBytesWritten(qint64)));
+    logDebug() << "HTTPResponse: ... headers send.";
     // signal headers send
     emit headersSend();
     // done
     return;
   }
-
   // Try to write some more data to the socket
   qint64 len = _connection->socket()->write(_headerBuffer.constData()+_headerSendIdx,
                                             _headerBuffer.size()-_headerSendIdx);
@@ -191,9 +198,9 @@ HttpResponse::_onBytesWritten(qint64 bytes) {
 /* ********************************************************************************************* *
  * Implementation of HttpResponse
  * ********************************************************************************************* */
-HttpStringResponse::HttpStringResponse(HttpResponseCode resp, const QString &text,
+HttpStringResponse::HttpStringResponse(HttpVersion version, HttpResponseCode resp, const QString &text,
                                        HttpConnection *connection, const QString contentType)
-  : HttpResponse(resp, connection), _textIdx(0), _text(text.toUtf8())
+  : HttpResponse(version, resp, connection), _textIdx(0), _text(text.toUtf8())
 {
   // set content length
   setHeader("Content-Length", QString::number(_text.size()));
@@ -205,8 +212,10 @@ HttpStringResponse::HttpStringResponse(HttpResponseCode resp, const QString &tex
 
 void
 HttpStringResponse::_onHeadersSend() {
+  logDebug() << "HttpStringResponse: Headers send: Send content.";
   connect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
           this, SLOT(_onBytesWritten(qint64)));
+  _onBytesWritten(0);
 }
 
 void
@@ -265,13 +274,11 @@ HttpConnection::_requestHeadersRead() {
   // If request is not accepted -> response with "Forbidden"
   if (! _service->acceptReqest(_currentRequest)) {
     // If not accepted send forbidden
-    _currentResponse = new HttpStringResponse(HTTP_FORBIDDEN, "Forbidden", this);
+    _currentResponse = new HttpStringResponse(_currentRequest->version(), HTTP_FORBIDDEN, "Forbidden", this);
   } else if (0 == (_currentResponse = _service->processRequest(_currentRequest))) {
     // If not processed -> not found
-    _currentResponse = new HttpStringResponse(HTTP_NOT_FOUND, "Not found", this);
+    _currentResponse = new HttpStringResponse(_currentRequest->version(), HTTP_NOT_FOUND, "Not found", this);
   }
-  // Get notified if the response has started
-  connect(_currentResponse, SIGNAL(started()), this, SLOT(_responseStarted()));
   // Get notified if the response has been completed
   connect(_currentResponse, SIGNAL(completed()), this, SLOT(_responseCompleted()));
   // start response
@@ -287,17 +294,13 @@ HttpConnection::_badRequest() {
 }
 
 void
-HttpConnection::_responseStarted() {
-  _currentResponse->sendHeaders();
-}
-
-void
 HttpConnection::_responseCompleted() {
+  bool keepAlive = _currentRequest->isKeepAlive();
   // Free "old" request & response
   delete _currentRequest;  _currentRequest = 0;
   delete _currentResponse; _currentResponse = 0;
   // If not keep alive
-  if (! _currentRequest->isKeepAlive()) {
+  if (! keepAlive) {
     deleteLater();
   } else {
     // Get a new request

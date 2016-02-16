@@ -56,7 +56,7 @@ protected:
 /** Implements the input buffer of a TCP like stream.
  * This buffer re-assembles the data stream by reordereing the received segments according to
  * their sequence number (call @c putPacket). Whenever a part of the sequence was received,
- * @c availabl() increases and the received data can be @c read.
+ * @c available increases and the received data can be @c read.
  * @ingroup internal */
 class StreamInBuffer
 {
@@ -104,7 +104,7 @@ protected:
 
 /** Implements the output buffer (64k) of a TCP like data stream.
  * This buffer keeps track of the timeout of the first tranmitted but unACKed packet. It also
- * re-computes the timeout bases on the time between sending a packet and receiving its ACK.
+ * re-computes the timeout based on the time between sending a packet and receiving its ACK.
  * @ingroup internal */
 class StreamOutBuffer
 {
