@@ -225,7 +225,7 @@ public:
   /** Close the stream. */
   void close();
   /** Reset the connection. */
-  void cancel();
+  void abort();
 
   /** Returns the number of bytes in the input buffer. */
   qint64 bytesAvailable() const;

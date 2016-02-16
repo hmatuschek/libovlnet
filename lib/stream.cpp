@@ -147,8 +147,6 @@ uint32_t
 StreamInBuffer::putPacket(uint32_t seq, const uint8_t *data, uint16_t len) {
   // check if sequence matches expected sequence
   if (_nextSequence != seq) {
-    logDebug() << "StreamInBuffer: Ignore packet seq=" << seq
-               << ": Not matching expected seq=" << _nextSequence;
     return 0;
   }
   // store in buffer
@@ -249,7 +247,6 @@ StreamOutBuffer::ack(uint32_t seq, uint16_t window) {
   if (_in_between(seq, _firstSequence, _nextSequence)) {
     // howmany bytes dropped
     drop = seq-_firstSequence;
-    logDebug() << "ACKed seq=" << seq << " -> dropped " << drop << "b.";
     // update round-trip time
     _update_rt(age());
     // Update timestamp of "oldest" bytes
@@ -258,9 +255,6 @@ StreamOutBuffer::ack(uint32_t seq, uint16_t window) {
     _firstSequence = seq;
     // update window
     _window = _firstSequence+window;
-  } else {
-    logDebug() << "Ignore ACK seq=" << seq << ", window=" << window
-               << ": not in range [" << _firstSequence << ", " << _nextSequence << "].";
   }
   // Return number of bytes ACKed
   return _buffer.drop(drop);
@@ -368,7 +362,6 @@ SecureStream::_onCheckPacketTimeout() {
   uint32_t len = _outBuffer.resend(msg.payload.data, DHT_STREAM_MAX_DATA_SIZE, seq);
   msg.seq = htonl(seq);
   if (sendDatagram((const uint8_t *) &msg, len+5)) {
-    logDebug() << "Resend seq=" << seq << ", len=" << len << ".";
     _keepalive.start();
   } else {
     logWarning() << "SecureStream: Failed to resend data: seq=" << seq << ", len=" << len << ".";
@@ -379,7 +372,7 @@ void
 SecureStream::_onTimeOut() {
   logInfo() << "SecureStream: Connection timeout -> reset connection.";
   // abort connection
-  cancel();
+  reset();
 }
 
 void
@@ -398,13 +391,13 @@ SecureStream::close() {
     // If all data has been send -> closed
     if (0 == bytesToWrite()) {
       // sends RST & closes the connection
-      cancel();
+      abort();
     }
   }
 }
 
 void
-SecureStream::cancel() {
+SecureStream::abort() {
   // Stop keep alive timer
   _keepalive.stop();
   // Stop packet timer.
@@ -511,6 +504,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
 
   // Check size and unpack message
   if (len > sizeof(Message)) { return; }
+  // Get ref to message
   const Message *msg = (const Message *)data;
 
   /* Dispatch by type */
@@ -566,8 +560,8 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
         _packetTimer.stop();
       }
       if ((FIN_RECEIVED == _state) && (0 == bytesToWrite())) {
-        // close connection
-        cancel();
+        // reset the connection
+        abort();
       }
       // done.
       return;
@@ -589,9 +583,9 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   }
 
   if (Message::RESET == msg->type) {
-    if (len!=1) { return; }
-    emit readChannelFinished();
-    cancel();
+    // check message length
+    if (1 != len) { return; }
+    close();
     // done.
     return;
   }
