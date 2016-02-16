@@ -24,7 +24,6 @@ LocalSocksStream::~LocalSocksStream() {
 bool
 LocalSocksStream::open(OpenMode mode) {
   if (! SecureStream::open(mode)) { return false; }
-  logDebug() << "SOCKS in stream started.";
   // Connect to client signals
   connect(_inStream, SIGNAL(readyRead()), this, SLOT(_clientReadyRead()));
   connect(_inStream, SIGNAL(bytesWritten(qint64)), this, SLOT(_clientBytesWritten(qint64)));
@@ -163,7 +162,6 @@ LocalSocksService::_onNewConnection() {
   while (_server.hasPendingConnections()) {
     // Get for each incomming connection -> create a separate stream to the remote
     QTcpSocket *socket = _server.nextPendingConnection();
-    logDebug() << "New incomming SOCKS connection...";
     LocalSocksStream *conn = new LocalSocksStream(_dht, socket);
     connect(conn, SIGNAL(destroyed()), this, SLOT(_onConnectionClosed()));
     _connectionCount++;
@@ -333,7 +331,6 @@ SocksOutStream::_clientParse() {
 void
 SocksOutStream::_remoteConnected() {
   if (CONNECTING == _state) {
-    logDebug() << "SOCKS: Remote " << _addr << ":" << _port << " connected -> start proxy session";
     // connect proxy client
     connect(this, SIGNAL(readyRead()), this, SLOT(_clientReadyRead()));
     connect(this, SIGNAL(bytesWritten(qint64)), this, SLOT(_clientBytesWritten(qint64)));

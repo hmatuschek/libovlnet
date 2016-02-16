@@ -2,6 +2,7 @@
 #include "logger.h"
 #include "stream.h"
 #include "buckets.h"
+#include "dht.h"
 
 #include <QTcpSocket>
 
@@ -146,6 +147,7 @@ HttpResponse::sendHeaders() {
     case HTTP_FORBIDDEN: _headerBuffer.append("403 FORBIDDEN\r\n"); break;
     case HTTP_NOT_FOUND: _headerBuffer.append("404 NOT FOUND\r\n"); break;
     case HTTP_SERVER_ERROR: _headerBuffer.append("500 Internal Server error\r\n"); break;
+    case HTTP_BAD_GATEWAY: _headerBuffer.append("502 Bad Gateway\r\n"); break;
   }
   // Serialize headers
   QHash<QString, QString>::iterator header = _headers.begin();
@@ -391,52 +393,4 @@ HttpService::allowConnection(const NodeItem &peer) {
 void
 HttpService::connectionFailed(SecureSocket *socket) {
   delete socket;
-}
-
-
-/* ********************************************************************************************* *
- * Implementation of LocalHttpProxyServer
- * ********************************************************************************************* */
-LocalHttpProxyServer::LocalHttpProxyServer(DHT &dht, uint16_t port)
-  : LocalHttpServer(new HttpProxyHandler(dht, this), port)
-{
-  // pass...
-}
-
-LocalHttpProxyServer::~LocalHttpProxyServer() {
-  // pass...
-}
-
-
-/* ********************************************************************************************* *
- * Implementation of HttpProxyHandler
- * ********************************************************************************************* */
-HttpProxyHandler::HttpProxyHandler(DHT &dht, QObject *parent)
-  : HttpRequestHandler(parent), _dht(dht)
-{
-  // pass...
-}
-
-HttpProxyHandler::~HttpProxyHandler() {
-  // pass...
-}
-
-bool
-HttpProxyHandler::acceptReqest(HttpRequest *request) {
-  if (! request->hasHeader("Host")) {
-    logInfo() << "HttpProxyHandler: Request without a host!";
-    return false;
-  }
-  return true;
-}
-
-HttpResponse *
-HttpProxyHandler::processRequest(HttpRequest *request) {
-  // Dispatch by TLD
-  if (request->header("Host").endsWith(".ovl")) {
-    // if host domain is of form ID.ovl -> connect to ID's HTTP server
-
-  } else {
-
-  }
 }

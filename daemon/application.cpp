@@ -3,6 +3,7 @@
 #include "halchat.h"
 #include "lib/socks.h"
 #include "lib/secureshell.h"
+#include "httpstatus.h"
 
 #include <QDir>
 #include <QFile>
@@ -36,6 +37,7 @@ Application::Application(int argc, char *argv[])
   // Register services
   _dht->registerService(2, new HalChatService(*this));
   _dht->registerService(5, new SocksService(*this));
+  _dht->registerService(80, new HttpService(*this->_dht, new HttpStatus(*this->_dht)));
 }
 
 DHT &

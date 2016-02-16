@@ -1,9 +1,10 @@
 set(ovl_SOURCES 
     ntp.cpp dht.cpp pcp.cpp natpmp.cpp crypto.cpp utils.cpp stream.cpp socks.cpp buckets.cpp
-    logger.cpp filetransfer.cpp securechat.cpp securecall.cpp httpservice.cpp secureshell.cpp)
+    logger.cpp filetransfer.cpp securechat.cpp securecall.cpp httpservice.cpp secureshell.cpp
+    httpproxy.cpp)
 set(ovl_MOC_HEADERS 
     ntp.h dht.h pcp.h natpmp.h stream.h socks.h filetransfer.h securechat.h securecall.h
-    httpservice.h secureshell.h)
+    httpservice.h secureshell.h httpproxy.h)
 set(ovl_HEADERS ${ovl_MOC_HEADERS}
     ovlnet.h buckets.h utils.h crypto.h logger.h)
 

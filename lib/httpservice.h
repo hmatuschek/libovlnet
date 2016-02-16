@@ -10,7 +10,7 @@
 #include <QTcpServer>
 
 #include "crypto.h"
-
+#include "stream.h"
 
 /** Enum of implemented HTTP methods.
  * @ingroup http */
@@ -39,7 +39,8 @@ typedef enum {
   HTTP_BAD_REQUEST = 400,   ///< Bad requrst.
   HTTP_FORBIDDEN = 403,     ///< Forbidden.
   HTTP_NOT_FOUND = 404,     ///< Resource not found.
-  HTTP_SERVER_ERROR = 500   ///< Internal error.
+  HTTP_SERVER_ERROR = 500,  ///< Internal error.
+  HTTP_BAD_GATEWAY = 502    ///< Bad Gateway
 } HttpResponseCode;
 
 
@@ -147,6 +148,9 @@ class HttpRequest : public QObject
   Q_OBJECT
 
 public:
+  typedef QHash<QString, QString>::const_iterator iterator;
+
+public:
   /** Constructs a request parser for the given connection. */
   HttpRequest(HttpConnection *connection);
 
@@ -174,6 +178,9 @@ public:
     return ((HTTP_1_1 == _version) ||
             (hasHeader("Connection") && ("keep-alive"==header("Connection"))));
   }
+
+  inline iterator begin() const { return _headers.begin(); }
+  inline iterator end() const { return _headers.end(); }
 
 signals:
   /** Gets emitted once the headers has been read. */
@@ -332,37 +339,6 @@ protected:
   DHT &_dht;
   /** The HTTP request handler. */
   HttpRequestHandler *_handler;
-};
-
-
-/** A simple proxy request handler.
- * @ingroup http */
-class HttpProxyHandler: public HttpRequestHandler
-{
-  Q_OBJECT
-
-public:
-  /** Constructor. */
-  HttpProxyHandler(DHT &dht, QObject *parent=0);
-  virtual ~HttpProxyHandler();
-
-  /** Accepts all requests. */
-  bool acceptReqest(HttpRequest *request);
-  /** Forwards the request. */
-  HttpResponse *processRequest(HttpRequest *request);
-
-protected:
-  DHT &_dht;
-};
-
-
-class LocalHttpProxyServer: public LocalHttpServer
-{
-  Q_OBJECT
-
-public:
-  LocalHttpProxyServer(DHT &dht, uint16_t port=8080);
-  virtual ~LocalHttpProxyServer();
 };
 
 
