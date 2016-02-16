@@ -57,7 +57,7 @@ ENDIF(UNIX AND NOT APPLE)
 add_subdirectory(lib)
 add_subdirectory(client)
 add_subdirectory(daemon)
-add_subdirectory(test)
+add_subdirectory(tools)
 
 # Source distribution packages:
 set(CPACK_PACKAGE_VERSION_MAJOR "1")
