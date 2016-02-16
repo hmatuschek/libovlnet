@@ -43,6 +43,88 @@ FixedRingBuffer::FixedRingBuffer()
   // pass...
 }
 
+uint16_t
+FixedRingBuffer::available() const {
+  return _size;
+}
+
+uint16_t
+FixedRingBuffer::free() const {
+  return 0xffff-_size;
+}
+
+uint16_t
+FixedRingBuffer::peek(uint16_t offset, uint8_t *buffer, uint16_t len) const {
+  // If offset is larger than the available bytes -> done
+  if (offset>=available()) { return 0; }
+  // Determine howmany bytes to read
+  len = std::min(uint32_t(offset)+len, uint32_t(available()))-offset;
+  // Get offset in terms of buffer index == (offset+_outptr) modulo 2^16
+  offset += _outptr;
+  // read first half (at maximum up to the end of the buffer)
+  uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U) - offset );
+  memcpy(buffer, _buffer+offset, n);
+  // read remaining bytes (wrap-around)
+  memcpy(buffer+n, _buffer, len-n);
+  // does not update outptr
+  return len;
+}
+
+uint16_t
+FixedRingBuffer::read(uint8_t *buffer, uint16_t len) {
+  // Read some data from the buffer
+  len = peek(0, buffer, len);
+  // Drop some data
+  return drop(len);
+}
+
+uint16_t
+FixedRingBuffer::drop(uint16_t len) {
+  // Get bytes to drop
+  len = std::min(len, available());
+  // drop data
+  _outptr += len;
+  _size -= len;
+  return len;
+}
+
+uint16_t
+FixedRingBuffer::put(uint16_t offset, const uint8_t *data, uint16_t len) {
+  // If offset is larger than the available bytes -> done
+  if (offset>=available()) { return 0; }
+  // Determine how many bytes to put
+  len = std::min(uint32_t(offset)+len, uint32_t(available()))-offset;
+  // Get offset in terms of buffer index
+  offset += _outptr;
+  // put first half (at maximum up to the end of the buffer)
+  uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U) - offset );
+  memcpy(_buffer+offset, data, n);
+  // put remaining bytes (wrap-around)
+  memcpy(_buffer, data+n, len-n);
+  // done
+  return len;
+}
+
+uint16_t
+FixedRingBuffer::allocate(uint16_t len) {
+  // Howmany bytes can be allocated
+  len = std::min(len, free());
+  // Allocate data
+  _size += len;
+  // done.
+  return len;
+}
+
+uint16_t
+FixedRingBuffer::write(const uint8_t *buffer, uint16_t len) {
+  // Where to put the data
+  uint32_t offset = available();
+  // Allocate some space
+  len = allocate(len);
+  // store data
+  return put(offset, buffer, len);
+}
+
 
 /* ********************************************************************************************* *
  * Implementation of StreamInBuffer
@@ -53,15 +135,168 @@ StreamInBuffer::StreamInBuffer()
   // pass...
 }
 
+uint16_t
+StreamInBuffer::read(uint8_t *buffer, uint16_t len) {
+  len = std::min(len, _available);
+  len = _buffer.read(buffer, len);
+  _available -= len;
+  return len;
+}
+
+uint32_t
+StreamInBuffer::putPacket(uint32_t seq, const uint8_t *data, uint16_t len) {
+  // check if sequence matches expected sequence
+  if (_nextSequence != seq) {
+    logDebug() << "StreamInBuffer: Ignore packet seq=" << seq
+               << ": Not matching expected seq=" << _nextSequence;
+    return 0;
+  }
+  // store in buffer
+  len = _buffer.write(data, len);
+  // Update sequence
+  _nextSequence += len;
+  _available += len;
+  return len;
+
+  // check if seq fits into window [_nextSequence, _nextSequence-_available+window()), if not -> done
+  /*if (! _in_window(seq)) {
+    logDebug() << "StreamInBuffer: Ignore packet seq=" << seq
+               << ", len=" << len << ": Not in window: ["
+               << _nextSequence << ", " << (_nextSequence+window()) << "].";
+    return 0;
+  }
+  // Compute offset w.r.t. buffer-start, where to store the data
+  uint32_t offset = _available + uint32_t(seq - _nextSequence);
+  // If offset >= buffer size -> done
+  if (offset >= 0xffff) {
+    logError() << "StreamInBuffer: Ignore packet out of buffer range. (This should not happen!)";
+    return 0;
+  }
+  // Check if some space must be allocated
+  if ((offset+len)>_buffer.available()) {
+    // Get as much as possible
+    _buffer.allocate((offset+len)-_buffer.available());
+  }
+  // store in buffer, data will be truncated if not enougth space was allocated
+  if (0 == (len = _buffer.put(offset, data, len)) ) {
+    return 0;
+  }
+  // Store packet in queue
+  if (0 == _packets.size()) {
+    // if queue is empty -> append
+    _packets.append(QPair<uint32_t, uint32_t>(seq, len));
+  } else {
+    // Insort according to sequence number
+    uint32_t lastSeq = _nextSequence; int i=0;
+    while ((i<_packets.size()) && (!_in_between(seq, lastSeq, _packets[i].first))) {
+      lastSeq = _packets[i].first; i++;
+    }
+    _packets.insert(i, QPair<uint32_t, uint32_t>(seq, len));
+  }
+  // Get number of bytes that got available by this packet
+  uint32_t newbytes = 0;
+  while ( _packets.size() && _in_packet(_nextSequence, _packets.first())) {
+    uint32_t acked = ((_packets.first().first+_packets.first().second)-_nextSequence);
+    _nextSequence  = (_packets.first().first+_packets.first().second);
+    /// @bug Ohh, this can be wrong!
+    _available    += acked;
+    newbytes      += acked;
+    _packets.pop_front();
+  }
+  return newbytes;*/
+}
+
 
 /* ********************************************************************************************* *
- * Implementation of StreamInBuffer
+ * Implementation of StreamOutBuffer
  * ********************************************************************************************* */
 StreamOutBuffer::StreamOutBuffer(uint64_t timeout)
   : _buffer(), _firstSequence(0), _nextSequence(0), _window(0xffff), _timestamp(),
     _rt_sum(0), _rt_sumsq(0), _rt_count(0), _timeout(timeout)
 {
   // pass...
+}
+
+uint16_t
+StreamOutBuffer::free() const {
+  return _window-_firstSequence;
+}
+
+uint16_t
+StreamOutBuffer::bytesToWrite() const {
+  return _nextSequence - _firstSequence;
+}
+
+uint16_t
+StreamOutBuffer::write(const uint8_t *buffer, uint16_t len) {
+  // store in ring-buffer
+  if ( (len = _buffer.write(buffer, std::min(free(), len))) ) {
+    // Update timestamp if buffer was empty
+    if (_firstSequence == _nextSequence) {
+      _timestamp = QDateTime::currentDateTime();
+    }
+    // update next sequence number.
+    _nextSequence += len;
+  }
+  // return length of bytes added.
+  return len;
+}
+
+uint32_t
+StreamOutBuffer::ack(uint32_t seq, uint16_t window) {
+  // Find the ACKed byte
+  uint32_t drop = 0;
+  if (_in_between(seq, _firstSequence, _nextSequence)) {
+    // howmany bytes dropped
+    drop = seq-_firstSequence;
+    logDebug() << "ACKed seq=" << seq << " -> dropped " << drop << "b.";
+    // update round-trip time
+    _update_rt(age());
+    // Update timestamp of "oldest" bytes
+    _timestamp = QDateTime::currentDateTime();
+    // Update first sequence
+    _firstSequence = seq;
+    // update window
+    _window = _firstSequence+window;
+  } else {
+    logDebug() << "Ignore ACK seq=" << seq << ", window=" << window
+               << ": not in range [" << _firstSequence << ", " << _nextSequence << "].";
+  }
+  // Return number of bytes ACKed
+  return _buffer.drop(drop);
+}
+
+uint64_t
+StreamOutBuffer::age() const {
+  int64_t age = _timestamp.msecsTo(QDateTime::currentDateTime());
+  return ((age>0) ? age : 0);
+}
+
+uint16_t
+StreamOutBuffer::resend(uint8_t *buffer, uint16_t len, uint32_t &sequence) {
+  // Set sequence
+  sequence = _firstSequence;
+  len = _buffer.peek(0, buffer, len);
+  // update the timestamp of the oldest byte
+  _timestamp = QDateTime::currentDateTime();
+  // Return the number of bytes stored in the buffer
+  return len;
+}
+
+void
+StreamOutBuffer::_update_rt(size_t ms) {
+  // Update sums
+  _rt_sum += ms; _rt_sumsq  += ms*ms; _rt_count++;
+  // If sufficient data is available
+  //  -> update timeout as mean + 3*sd (99% quantile)
+  if ((1<<6) == _rt_count) {
+    // Integer division by (1<<6)=64
+    _rt_sum >>= 6; _rt_sumsq  >>= 6;
+    // compute new timeout
+    _timeout = _rt_sum + 3*std::sqrt(_rt_sumsq -_rt_sum*_rt_sum);
+    // reset counts and sums
+    _rt_sum = 0; _rt_sumsq = 0; _rt_count = 0;
+  }
 }
 
 
@@ -259,7 +494,9 @@ SecureStream::readData(char *data, qint64 maxlen) {
 bool
 SecureStream::start(const Identifier &streamId, const PeerItem &peer) {
   if (SecureSocket::start(streamId, peer)) {
-    return open(QIODevice::ReadWrite);
+    bool res = open(QIODevice::ReadWrite);
+    if (res) { emit established(); }
+    return res;
   }
   return false;
 }

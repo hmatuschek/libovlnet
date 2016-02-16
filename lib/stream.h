@@ -10,7 +10,7 @@
 #define DHT_STREAM_MAX_DATA_SIZE (DHT_SEC_MAX_DATA_SIZE-5)
 
 
-/** A ring buffer of size 64k (65536 bytes). This ring buffer can be implemented efficiently
+/** A ring buffer of size 64k (65535 bytes). This ring buffer can be implemented efficiently
  * using 2-complement integer arithmetic of 16-bit integers. Hence no modulo operation is needed.
  * @ingroup internal */
 class FixedRingBuffer
@@ -20,90 +20,32 @@ public:
   FixedRingBuffer();
 
   /** Returns the number of bytes available for reading. */
-  inline uint16_t available() const {
-    return _size;
-  }
+  uint16_t available() const;
 
   /** Returns the number of free bytes (available for writing). */
-  inline uint32_t free() const {
-    return 0xffff-_size;
-  }
+  uint16_t free() const;
 
   /** Reads some segement without removing it from the buffer. */
-  inline uint32_t peek(uint16_t offset, uint8_t *buffer, uint16_t len) {
-    // If offset is larger than the available bytes -> done
-    if (offset>=available()) { return 0; }
-    // Determine howmany bytes to read
-    len = std::min(uint32_t(offset)+len, uint32_t(available()))-offset;
-    // Get offset in terms of buffer index == (offset+_outptr) modulo 2^16
-    offset += _outptr;
-    // read first half (at maximum up to the end of the buffer)
-    uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U) - offset );
-    memcpy(buffer, _buffer+offset, n);
-    // read remaining bytes (wrap-around)
-    memcpy(buffer+n, _buffer, len-n);
-    // does not update outptr
-    return len;
-  }
+  uint16_t peek(uint16_t offset, uint8_t *buffer, uint16_t len) const;
 
   /** Reads from the ring buffer. */
-  inline uint32_t read(uint8_t *buffer, uint16_t len) {
-    // Read some data from the buffer
-    len = peek(0, buffer, len);
-    // Drop some data
-    return drop(len);
-  }
+  uint16_t read(uint8_t *buffer, uint16_t len);
 
   /** Drops some data from the ring-buffer. */
-  inline uint32_t drop(uint16_t len) {
-    // Get bytes to drop
-    len = std::min(len, available());
-    // drop data
-    _outptr += len;
-    _size -= len;
-    return len;
-  }
+  uint16_t drop(uint16_t len);
 
   /** Puts some data in the already available area. */
-  inline uint32_t put(uint16_t offset, const uint8_t *data, uint16_t len) {
-    // If offset is larger than the available bytes -> done
-    if (offset>=available()) { return 0; }
-    // Determine how many bytes to put
-    len = std::min(uint32_t(offset)+len, uint32_t(available()))-offset;
-    // Get offset in terms of buffer index
-    offset += _outptr;
-    // put first half (at maximum up to the end of the buffer)
-    uint32_t n = ( std::min(uint32_t(offset)+len, 0x10000U) - offset );
-    memcpy(_buffer+offset, data, n);
-    // put remaining bytes (wrap-around)
-    memcpy(_buffer, data+n, len-n);
-    // done
-    return len;
-  }
+  uint16_t put(uint16_t offset, const uint8_t *data, uint16_t len);
 
   /** Allocates some space at the end of the ring-buffer. */
-  inline uint32_t allocate(uint32_t len) {
-    // Howmany bytes can be allocated
-    len = std::min(len, free());
-    // Allocate data
-    _size += len;
-    // done.
-    return len;
-  }
+  uint16_t allocate(uint16_t len);
 
   /** Appends some data to the ring buffer. */
-  inline uint32_t write(const uint8_t *buffer, uint16_t len) {
-    // Where to put the data
-    uint32_t offset = available();
-    // Allocate some space
-    len = allocate(len);
-    // store data
-    return put(offset, buffer, len);
-  }
+  uint16_t write(const uint8_t *buffer, uint16_t len);
 
 protected:
   /** The actual buffer. */
-  uint8_t _buffer[0xffff];
+  uint8_t _buffer[0x10000];
   /** Read pointer. */
   uint16_t _outptr;
   /** Number of elements in the buffer. */
@@ -123,76 +65,22 @@ public:
   StreamInBuffer();
 
   /** Returns the number of bytes available for reading. */
-  inline uint32_t available() const {
-    return _available;
-  }
+  inline uint32_t available() const { return _available; }
 
   /** Returns the next expected sequence number. */
-  uint32_t nextSequence() const {
-    return _nextSequence;
-  }
+  uint32_t nextSequence() const { return _nextSequence; }
 
   /** Returns the number of bytes starting at the next expected sequence number (@c nextSequence)
    * the buffer will accept. */
   uint16_t window() const {
-    if (0xffff <= _available) { return 0; }
-    return (0xffff-_available);
+    return _buffer.free()-_available;
   }
 
   /** Reads some ACKed data . */
-  uint32_t read(uint8_t *buffer, uint32_t len) {
-    len = std::min(len, _available);
-    len = _buffer.read(buffer, len);
-    _available -= len;
-    return len;
-  }
+  uint16_t read(uint8_t *buffer, uint16_t len);
 
   /** Updates the internal buffer with the given data at the specified sequence number. */
-  uint32_t putPacket(uint32_t seq, const uint8_t *data, uint32_t len) {
-    // check if seq fits into window [_nextSequence, _nextSequence+window()), if not -> done
-    if (! _in_window(seq)) {
-      logDebug() << "StreamInBuffer: Ignore packet seq=" << seq
-                 << ", len=" << len << ": Not in window: ["
-                 << _nextSequence << ", " << (_nextSequence+window()) << "].";
-      return 0;
-    }
-    // Compute offset w.r.t. buffer-start, where to store the data
-    uint32_t offset = _available + uint32_t(seq - _nextSequence);
-    // If offset >= buffer size -> done
-    if (offset >= 0x10000) {
-      logError() << "StreamInBuffer: Ignore packet out of buffer range. (This should not happen!)";
-      return 0;
-    }
-    // Check if some space must be allocated
-    if ((offset+len)>_buffer.available()) {
-      // Get as much as possible
-      _buffer.allocate((offset+len)-_buffer.available());
-    }
-    // store in buffer, data will be truncated if not enougth space was allocated
-    if (0 == (len = _buffer.put(offset, data, len)) ) { return 0; }
-    // Store packet in queue
-    if (0 == _packets.size()) {
-      // if queue is empty -> append
-      _packets.append(QPair<uint32_t, uint32_t>(seq, len));
-    } else {
-      // Insort according to sequence number
-      uint32_t lastSeq = _nextSequence; int i=0;
-      while ((i<_packets.size()) && (!_in_between(seq, lastSeq, _packets[i].first))) {
-        lastSeq = _packets[i].first; i++;
-      }
-      _packets.insert(i, QPair<uint32_t, uint32_t>(seq, len));
-    }
-    // Get number of bytes that got available by this packet
-    uint32_t newbytes = 0;
-    while ( (_packets.size()) && _in_packet(_nextSequence, _packets.first())) {
-      uint32_t acked = ((_packets.first().first+_packets.first().second)-_nextSequence);
-      _nextSequence  = (_packets.first().first+_packets.first().second);
-      _available    += acked;
-      newbytes      += acked;
-      _packets.pop_front();
-    }
-    return newbytes;
-  }
+  uint32_t putPacket(uint32_t seq, const uint8_t *data, uint16_t len);
 
 protected:
   /** Returns @c true if @c seq is within the interval [@c a, @c b) modulo 2^32. */
@@ -203,7 +91,7 @@ protected:
   /** Returns @c true if the sequence number is within the reception window. */
   bool _in_window(uint32_t seq) {
     uint32_t a = _nextSequence;
-    uint32_t b = (_nextSequence+window());
+    uint32_t b = (_nextSequence-_available+window());
     return _in_between(seq, a, b);
   }
 
@@ -216,7 +104,7 @@ protected:
   /** The input buffer (64kb). */
   FixedRingBuffer _buffer;
   /** The number of bytes available for reading. */
-  uint32_t _available;
+  uint16_t _available;
   /** The next sequence number. */
   uint32_t _nextSequence;
   /** The received packets (sequence, length). */
@@ -237,17 +125,10 @@ public:
 
   /** Returns the number of bytes that can be added to the buffer without exceeding the
    * reception window of the remote. */
-  inline uint32_t free() const {
-    // Do not exceed the reception window of the remote
-    if (_buffer.available() > _window) { return 0; }
-    // Do not exceed the buffer size.
-    return std::min(_buffer.free(), (uint32_t(_window)-_buffer.available()));
-  }
+  uint16_t free() const;
 
   /** Returns the number of bytes that are not ACKed yet. */
-  inline uint32_t bytesToWrite() const {
-    return _buffer.available();
-  }
+  uint16_t bytesToWrite() const;
 
   /** Sequence number of the first unACKed byte. */
   uint32_t firstSequence() const { return _firstSequence; }
@@ -256,50 +137,14 @@ public:
   uint32_t nextSequence() const { return _nextSequence; }
 
   /** Writes some data to the buffer. */
-  uint32_t write(const uint8_t *buffer, uint32_t len) {
-    // store in ring-buffer
-    if ( (len = _buffer.write(buffer, std::min(free(), len))) ) {
-      // Update timestamp if buffer was empty
-      if (_firstSequence == _nextSequence) {
-        _timestamp = QDateTime::currentDateTime();
-      }
-      // update next sequence number.
-      _nextSequence += len;
-    }
-    // return length of bytes added.
-    return len;
-  }
+  uint16_t write(const uint8_t *buffer, uint16_t len);
 
   /** ACKs the given sequence number and returns the number of bytes removed from the output
    * buffer. */
-  uint32_t ack(uint32_t seq, uint16_t window) {
-    // Find the ACKed byte
-    uint32_t drop = 0;
-    if (_in_between(seq, _firstSequence, _nextSequence)) {
-      // howmany bytes dropped
-      drop = uint32_t(seq-_firstSequence);
-      logDebug() << "ACKed seq=" << seq << " -> dropped " << drop << "b.";
-      // update round-trip time
-      _update_rt(age());
-      // Update timestamp of "oldest" bytes
-      _timestamp = QDateTime::currentDateTime();
-      // Update first sequence
-      _firstSequence = seq;
-      // update window
-      _window = window;
-    } else {
-      logDebug() << "Ignore ACK seq=" << seq << ", window=" << window
-                 << ": not in range [" << _firstSequence << ", " << _nextSequence << "].";
-    }
-    // Return number of bytes ACKed
-    return _buffer.drop(drop);
-  }
+  uint32_t ack(uint32_t seq, uint16_t window);
 
   /** Returns the age of the oldest byte in the buffer. */
-  inline uint64_t age() const {
-    int64_t age = _timestamp.msecsTo(QDateTime::currentDateTime());
-    return ((age>0) ? age : 0);
-  }
+  uint64_t age() const;
 
   /** Returns @c true if the oldest byte in the buffer is older than the timeout. */
   inline bool timeout() const {
@@ -311,15 +156,7 @@ public:
    * @param len Length of the buffer, specifies the maximum number of bytes returned.
    * @param sequence On exit, holds the sequence number of the first byte in @c buffer.
    * @returns The number of bytes stored in @c buffer. */
-  uint32_t resend(uint8_t *buffer, uint32_t len, uint32_t &sequence) {
-    // Set sequence
-    sequence = _firstSequence;
-    len = _buffer.peek(0, buffer, len);
-    // update the timestamp of the oldest byte
-    _timestamp = QDateTime::currentDateTime();
-    // Return the number of bytes stored in the buffer
-    return len;
-  }
+  uint16_t resend(uint8_t *buffer, uint16_t len, uint32_t &sequence);
 
 protected:
   /** Returns @c true if @c x is in (@c a, @c b]. */
@@ -328,20 +165,7 @@ protected:
   }
 
   /** Updates the round trip time statistics. Every 64 samples, the timeout is updated. */
-  inline void _update_rt(size_t ms) {
-    // Update sums
-    _rt_sum += ms; _rt_sumsq  += ms*ms; _rt_count++;
-    // If sufficient data is available
-    //  -> update timeout as mean + 3*sd (99% quantile)
-    if ((1<<6) == _rt_count) {
-      // Integer division by (1<<6)=64
-      _rt_sum >>= 6; _rt_sumsq  >>= 6;
-      // compute new timeout
-      _timeout = _rt_sum + 3*std::sqrt(_rt_sumsq -_rt_sum*_rt_sum);
-      // reset counts and sums
-      _rt_sum = 0; _rt_sumsq = 0; _rt_count = 0;
-    }
-  }
+  inline void _update_rt(size_t ms);
 
 protected:
   /** The ring buffer. */
@@ -350,8 +174,8 @@ protected:
   uint32_t      _firstSequence;
   /** The sequence number of the next byte added to the buffer. */
   uint32_t      _nextSequence;
-  /** Window w.r.t @c _firstSequence. */
-  uint16_t      _window;
+  /** Window sequence. */
+  uint32_t      _window;
   /** Timestamp of the "oldest" byte in buffer. */
   QDateTime     _timestamp;
   /** Sum of round trip times. */
@@ -407,6 +231,9 @@ public:
   qint64 bytesAvailable() const;
   /** Returns the number of bytes in the output buffer. */
   qint64 bytesToWrite() const;
+
+signals:
+  void established();
 
 protected:
   bool start(const Identifier &streamId, const PeerItem &peer);
