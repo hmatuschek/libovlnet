@@ -1,6 +1,6 @@
 #include "application.hh"
-#include "lib/crypto.h"
-#include "lib/logger.h"
+#include "lib/crypto.hh"
+#include "lib/logger.hh"
 
 #include <time.h>
 #include <iostream>

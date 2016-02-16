@@ -1,5 +1,5 @@
 #include "searchdialog.hh"
-#include "lib/dht_config.h"
+#include "lib/dht_config.hh"
 
 #include <QLabel>
 #include <QVBoxLayout>

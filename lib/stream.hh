@@ -1,7 +1,7 @@
 #ifndef STREAM_H
 #define STREAM_H
 
-#include "crypto.h"
+#include "crypto.hh"
 #include <cmath>
 #include <QTimer>
 

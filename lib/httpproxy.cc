@@ -1,5 +1,5 @@
-#include "httpproxy.h"
-#include "dht.h"
+#include "httpproxy.hh"
+#include "dht.hh"
 
 
 /* ********************************************************************************************* *

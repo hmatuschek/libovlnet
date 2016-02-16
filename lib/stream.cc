@@ -1,6 +1,6 @@
-#include "stream.h"
+#include "stream.hh"
 
-#include "dht.h"
+#include "dht.hh"
 #include <netinet/in.h>
 
 /** The format of the stream messages. */

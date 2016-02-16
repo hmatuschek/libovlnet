@@ -4,9 +4,9 @@
 #ifndef SECURECALL_H
 #define SECURECALL_H
 
-#include "lib/crypto.h"
-#include "opus.h"
-#include "portaudio.h"
+#include "lib/crypto.hh"
+#include <opus.h>
+#include <portaudio.h>
 
 /** Specifies the number of frames per datagram. */
 #define DHT_CALL_NUM_FRAMES 960

@@ -1,7 +1,7 @@
 #ifndef __OVL_DHT_H__
 #define __OVL_DHT_H__
 
-#include "buckets.h"
+#include "buckets.hh"
 
 #include <inttypes.h>
 

@@ -2,7 +2,7 @@
 #define SOCKSCONNECTION_H
 
 #include <QObject>
-#include "lib/buckets.h"
+#include "lib/buckets.hh"
 
 
 class SOCKSWhitelist

@@ -4,8 +4,8 @@
 #ifndef SOCKS_H
 #define SOCKS_H
 
-#include "crypto.h"
-#include "stream.h"
+#include "crypto.hh"
+#include "stream.hh"
 
 #include <QTcpSocket>
 #include <QTcpServer>

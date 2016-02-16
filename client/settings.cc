@@ -1,5 +1,5 @@
 #include "settings.hh"
-#include "lib/logger.h"
+#include "lib/logger.hh"
 #include <QJsonArray>
 
 

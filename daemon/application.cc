@@ -1,8 +1,8 @@
 #include "application.hh"
 #include "echostream.hh"
 #include "halchat.hh"
-#include "lib/socks.h"
-#include "lib/secureshell.h"
+#include "lib/socks.hh"
+#include "lib/secureshell.hh"
 #include "httpstatus.hh"
 
 #include <QDir>

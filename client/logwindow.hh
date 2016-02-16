@@ -4,7 +4,7 @@
 #include <QWidget>
 #include <QAbstractTableModel>
 #include <QTableView>
-#include "lib/logger.h"
+#include "lib/logger.hh"
 
 class Application;
 

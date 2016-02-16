@@ -7,8 +7,8 @@
 #include <QAbstractSocket>
 #include <QFile>
 
-#include "buckets.h"
-#include "dht_config.h"
+#include "buckets.hh"
+#include "dht_config.hh"
 
 #include <openssl/evp.h>
 

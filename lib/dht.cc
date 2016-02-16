@@ -1,6 +1,6 @@
-#include "dht.h"
-#include "crypto.h"
-#include "dht_config.h"
+#include "dht.hh"
+#include "crypto.hh"
+#include "dht_config.hh"
 
 #include <QHostInfo>
 #include <netinet/in.h>

@@ -1,7 +1,7 @@
 #ifndef ECHOSTREAM_H
 #define ECHOSTREAM_H
 
-#include "lib/crypto.h"
+#include "lib/crypto.hh"
 
 class EchoStream : public SecureSocket
 {

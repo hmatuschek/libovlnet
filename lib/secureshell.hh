@@ -4,7 +4,7 @@
 #ifndef SECURESHELL_H
 #define SECURESHELL_H
 
-#include "stream.h"
+#include "stream.hh"
 #include <QProcess>
 
 /** Implements a trivial secure shell service.

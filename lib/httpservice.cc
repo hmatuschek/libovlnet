@@ -1,8 +1,8 @@
-#include "httpservice.h"
-#include "logger.h"
-#include "stream.h"
-#include "buckets.h"
-#include "dht.h"
+#include "httpservice.hh"
+#include "logger.hh"
+#include "stream.hh"
+#include "buckets.hh"
+#include "dht.hh"
 
 #include <QTcpSocket>
 

@@ -7,7 +7,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include "lib/buckets.h"
+#include "lib/buckets.hh"
 
 
 class ServiceWhiteList : public QSet<Identifier>

@@ -1,5 +1,5 @@
-#include "securecall.h"
-#include "dht.h"
+#include "securecall.hh"
+#include "dht.hh"
 #include <netinet/in.h>
 
 SecureCall::SecureCall(bool incomming, DHT &dht)

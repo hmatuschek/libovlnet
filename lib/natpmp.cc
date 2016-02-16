@@ -1,6 +1,6 @@
-#include "natpmp.h"
+#include "natpmp.hh"
 #include <netinet/in.h>
-#include "logger.h"
+#include "logger.hh"
 
 
 /** Possible result codes. */

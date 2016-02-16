@@ -3,7 +3,7 @@
 
 #include <QObject>
 #include <QList>
-#include "lib/dht.h"
+#include "lib/dht.hh"
 
 // forward declarations
 class Application;

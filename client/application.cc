@@ -7,8 +7,8 @@
 #include "filetransferdialog.hh"
 #include "settingsdialog.hh"
 
-#include "lib/socks.h"
-#include "lib/logger.h"
+#include "lib/socks.hh"
+#include "lib/logger.hh"
 
 #include <portaudio.h>
 

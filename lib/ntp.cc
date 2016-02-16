@@ -1,5 +1,5 @@
-#include "ntp.h"
-#include "logger.h"
+#include "ntp.hh"
+#include "logger.hh"
 #include <QtEndian>
 #include <QHostInfo>
 #include <QEventLoop>

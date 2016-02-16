@@ -7,8 +7,8 @@
 #include <QStringList>
 #include <QTimer>
 
-#include "lib/crypto.h"
-#include "lib/dht.h"
+#include "lib/crypto.hh"
+#include "lib/dht.hh"
 #include "dhtstatus.hh"
 #include "buddylist.hh"
 #include "bootstrapnodelist.hh"

@@ -1,5 +1,5 @@
 #include "httpstatus.hh"
-#include "lib/dht.h"
+#include "lib/dht.hh"
 
 HttpStatus::HttpStatus(DHT &dht, QObject *parent)
   : HttpRequestHandler(parent), _dht(dht)

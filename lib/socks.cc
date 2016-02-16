@@ -1,7 +1,7 @@
-#include "socks.h"
+#include "socks.hh"
 #include <netinet/in.h>
 #include <QHostInfo>
-#include "dht.h"
+#include "dht.hh"
 
 
 /* ******************************************************************************************** *

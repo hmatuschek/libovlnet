@@ -1,8 +1,8 @@
 #ifndef BUCKETS_H
 #define BUCKETS_H
 
-#include "dht_config.h"
-#include "logger.h"
+#include "dht_config.hh"
+#include "logger.hh"
 
 #include <QByteArray>
 #include <QList>

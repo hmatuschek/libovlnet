@@ -1,7 +1,7 @@
 #ifndef __OVLNET_HTTP_PROXY_H__
 #define __OVLNET_HTTP_PROXY_H__
 
-#include "httpservice.h"
+#include "httpservice.hh"
 
 /** A local HTTP proxy server into the OVL network.
  * @ingroup http */

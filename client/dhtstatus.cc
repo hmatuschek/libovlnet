@@ -1,5 +1,5 @@
 #include "dhtstatus.hh"
-#include "lib/dht_config.h"
+#include "lib/dht_config.hh"
 #include "application.hh"
 
 #include <cmath>

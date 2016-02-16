@@ -1,5 +1,5 @@
-#include "lib/dht.h"
-#include "lib/httpproxy.h"
+#include "lib/dht.hh"
+#include "lib/httpproxy.hh"
 #include <iostream>
 
 #include <QCoreApplication>

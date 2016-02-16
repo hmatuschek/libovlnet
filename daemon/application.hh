@@ -2,8 +2,8 @@
 #define APPLICATION_H
 
 #include <QCoreApplication>
-#include "lib/crypto.h"
-#include "lib/dht.h"
+#include "lib/crypto.hh"
+#include "lib/dht.hh"
 #include "qhal.hh"
 #include "settings.hh"
 

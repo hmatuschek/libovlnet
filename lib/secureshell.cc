@@ -1,4 +1,4 @@
-#include "secureshell.h"
+#include "secureshell.hh"
 
 SecureShell::SecureShell(DHT &dht, const QString &command, QObject *parent)
   : SecureStream(dht, parent), _command(command), _process()

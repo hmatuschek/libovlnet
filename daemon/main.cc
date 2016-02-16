@@ -1,7 +1,7 @@
-#include "lib/dht.h"
-#include "lib/ntp.h"
-#include "lib/crypto.h"
-#include "lib/logger.h"
+#include "lib/dht.hh"
+#include "lib/ntp.hh"
+#include "lib/crypto.hh"
+#include "lib/logger.hh"
 
 #include "application.hh"
 #include <time.h>

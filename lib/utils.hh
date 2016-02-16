@@ -1,7 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "logger.h"
+#include "logger.hh"
 
 #include <inttypes.h>
 

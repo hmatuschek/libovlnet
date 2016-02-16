@@ -1,7 +1,7 @@
 #ifndef SEARCHDIALOG_H
 #define SEARCHDIALOG_H
 
-#include "lib/dht.h"
+#include "lib/dht.hh"
 #include "buddylist.hh"
 
 #include <QWidget>

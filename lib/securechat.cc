@@ -1,5 +1,5 @@
-#include "securechat.h"
-#include "dht.h"
+#include "securechat.hh"
+#include "dht.hh"
 
 SecureChat::SecureChat(DHT &dht)
   : QObject(0), SecureSocket(dht),

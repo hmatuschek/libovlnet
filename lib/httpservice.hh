@@ -9,8 +9,8 @@
 #include <QHash>
 #include <QTcpServer>
 
-#include "crypto.h"
-#include "stream.h"
+#include "crypto.hh"
+#include "stream.hh"
 
 /** Enum of implemented HTTP methods.
  * @ingroup http */

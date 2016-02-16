@@ -1,6 +1,6 @@
 #ifndef __OVLNET_DAEMON_HTTP_STATUS_H__
 #define __OVLNET_DAEMON_HTTP_STATUS_H__
-#include "lib/httpservice.h"
+#include "lib/httpservice.hh"
 
 class HttpStatus: public HttpRequestHandler
 {

@@ -2,7 +2,7 @@
 #define FILETRANSFERDIALOG_H
 
 
-#include "lib/filetransfer.h"
+#include "lib/filetransfer.hh"
 
 #include <QWidget>
 #include <QLabel>

@@ -1,7 +1,7 @@
-#include "filetransfer.h"
+#include "filetransfer.hh"
 #include <QtEndian>
 #include <QFileInfo>
-#include "dht.h"
+#include "dht.hh"
 
 #define FILETRANSFER_MAX_FILENAME_LEN (DHT_SEC_MAX_DATA_SIZE-9UL)
 

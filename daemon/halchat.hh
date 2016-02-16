@@ -1,8 +1,8 @@
 #ifndef HALCHAT_H
 #define HALCHAT_H
 
-#include "lib/dht.h"
-#include "lib/crypto.h"
+#include "lib/dht.hh"
+#include "lib/crypto.hh"
 #include "qhal.hh"
 
 #include <QObject>

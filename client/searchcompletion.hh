@@ -2,7 +2,7 @@
 #define SEARCHCOMPLETION_H
 
 #include <QAbstractListModel>
-#include "lib/dht.h"
+#include "lib/dht.hh"
 
 
 class SearchCompletionModel : public QAbstractListModel

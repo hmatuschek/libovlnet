@@ -2,7 +2,7 @@
 #define CALLWINDOW_H
 
 #include <QWidget>
-#include "lib/securecall.h"
+#include "lib/securecall.hh"
 
 class Application;
 
