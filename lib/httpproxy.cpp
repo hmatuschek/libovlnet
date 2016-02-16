@@ -6,7 +6,7 @@
  * Implementation of LocalHttpProxyServer
  * ********************************************************************************************* */
 LocalHttpProxyServer::LocalHttpProxyServer(DHT &dht, uint16_t port)
-  : LocalHttpServer(new LocalHttpProxyServerHandler(dht, this), port)
+  : LocalHttpServer(new LocalHttpProxyServerHandler(dht), port)
 {
   // pass...
 }
@@ -35,6 +35,7 @@ LocalHttpProxyServerHandler::acceptReqest(HttpRequest *request) {
     logInfo() << "HttpProxyHandler: Request without a host!";
     return false;
   }
+  logDebug() << "HTTP Proxy: Accecpt request for '" << request->header("Host") << "'.";
   return true;
 }
 
@@ -43,7 +44,7 @@ LocalHttpProxyServerHandler::processRequest(HttpRequest *request) {
   // Dispatch by TLD
   if (request->header("Host").endsWith(".ovl")) {
     // if host domain is of form ID.ovl -> connect to ID's HTTP server
-    QString id = request->header("Host");
+    QString id = request->header("Host").simplified();
     id.chop(4);
     return new LocalHttpProxyResponse(_dht, Identifier::fromBase32(id), request);
   }
@@ -64,6 +65,7 @@ LocalHttpProxyResponse::LocalHttpProxyResponse(DHT &dht, const Identifier &id, H
   connect(&_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(_onNodeFound(NodeItem)));
   connect(&_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
           this, SLOT(_onNodeNotFound(Identifier,QList<NodeItem>)));
+  logDebug() << "HTTP Proxy: Try to resolve " << _destination;
   _dht.findNode(_destination);
 }
 
@@ -72,7 +74,7 @@ LocalHttpProxyResponse::_onNodeFound(NodeItem item) {
   // Skip if not searched for this node
   if (_destination != item.id()) { return; }
   // Connect to HTTP service at the node
-  logDebug() << "Found node " << item.id() << ". Connect to HTTP service.";
+  logDebug() << "HTTP Proxy: Found node " << item.id() << ". Connect to HTTP service.";
 
   _stream = new SecureStream(_dht, this);
   connect(_stream, SIGNAL(established()), this, SLOT(_onConnected()));
@@ -81,18 +83,22 @@ LocalHttpProxyResponse::_onNodeFound(NodeItem item) {
 
 void
 LocalHttpProxyResponse::_onNodeNotFound(Identifier id, QList<NodeItem> near) {
+  // Skip if not searched for this node
+  if (_destination != id) { return; }
+  logDebug() << "HTTP Proxy: Cannot resolve " << _destination;
   setResponseCode(HTTP_BAD_GATEWAY);
-  connect(this, SIGNAL(headersSend()), this, SLOT(_onCloseLocal()));
+  connect(this, SIGNAL(headersSend()), this, SIGNAL(completed()));
   this->sendHeaders();
 }
 
 void
 LocalHttpProxyResponse::_onCloseLocal() {
-  emit completed();
+  // pass...
 }
 
 void
 LocalHttpProxyResponse::_onConnected() {
+  logDebug() << "HTTP Proxy: Connected to " << _destination << ": Forward request.";
   // Forward request
   switch(_request->method()) {
     case HTTP_GET: _stream->write("GET "); break;
@@ -130,6 +136,7 @@ LocalHttpProxyResponse::_onConnected() {
 
 void
 LocalHttpProxyResponse::_onLocalReadyRead() {
+  logDebug() << "HTTP Proxy: Forward request body...";
   QByteArray buffer = _request->connection()->socket()->read(
         std::min(size_t(0xffff), _requestSize));
   _requestSize -= buffer.size();

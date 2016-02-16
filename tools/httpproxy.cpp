@@ -4,7 +4,10 @@
 
 #include <QCoreApplication>
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
+  Logger::addHandler(new IOLogHandler());
+
   QCoreApplication app(argc, argv);
 
   if (argc<2) {

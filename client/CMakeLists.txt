@@ -1,12 +1,13 @@
-set(VLF_CLIENT_SOURCES main.cpp application.cpp dhtstatus.cpp dhtstatusview.cpp dhtnetgraph.cpp
-    searchdialog.cpp buddylist.cpp buddylistview.cpp chatwindow.cpp
-    callwindow.cpp bootstrapnodelist.cpp filetransferdialog.cpp
-    sockswindow.cpp logwindow.cpp settings.cpp settingsdialog.cpp searchcompletion.cpp)
-set(VLF_CLIENT_MOC_HEADERS application.h dhtstatus.h dhtstatusview.h dhtnetgraph.h searchdialog.h
-    buddylist.h buddylistview.h chatwindow.h callwindow.h
-    filetransferdialog.h sockswindow.h logwindow.h settings.h settingsdialog.h searchcompletion.h)
+set(VLF_CLIENT_SOURCES main.cpp bootstrapnodelist.cc
+    application.cc dhtstatus.cc dhtstatusview.cc dhtnetgraph.cc searchdialog.cc buddylist.cc
+    buddylistview.cc chatwindow.cc callwindow.cc filetransferdialog.cc sockswindow.cc logwindow.cc
+    settings.cc settingsdialog.cc searchcompletion.cc)
+set(VLF_CLIENT_MOC_HEADERS
+    application.hh dhtstatus.hh dhtstatusview.hh dhtnetgraph.hh searchdialog.hh buddylist.hh
+    buddylistview.hh chatwindow.hh callwindow.hh filetransferdialog.hh sockswindow.hh logwindow.hh
+    settings.hh settingsdialog.hh searchcompletion.hh)
 set(VLF_CLIENT_HEADERS ${VLF_CLIENT_MOC_HEADERS}
-    bootstrapnodelist.h)
+    bootstrapnodelist.hh)
 
 qt5_wrap_cpp(VLF_CLIENT_MOC_SOURCES ${VLF_CLIENT_MOC_HEADERS})
 qt5_add_resources(VLF_CLIENT_RCC_SOURCES ../shared/resources.qrc)

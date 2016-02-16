@@ -65,16 +65,14 @@ public:
   StreamInBuffer();
 
   /** Returns the number of bytes available for reading. */
-  inline uint32_t available() const { return _available; }
+  uint16_t available() const;
 
   /** Returns the next expected sequence number. */
-  uint32_t nextSequence() const { return _nextSequence; }
+  uint32_t nextSequence() const;
 
   /** Returns the number of bytes starting at the next expected sequence number (@c nextSequence)
    * the buffer will accept. */
-  uint16_t window() const {
-    return _buffer.free()-_available;
-  }
+  uint16_t window() const;
 
   /** Reads some ACKed data . */
   uint16_t read(uint8_t *buffer, uint16_t len);
@@ -84,21 +82,13 @@ public:
 
 protected:
   /** Returns @c true if @c seq is within the interval [@c a, @c b) modulo 2^32. */
-  static inline bool _in_between(uint32_t seq, uint32_t a, uint32_t b) {
-    return ( (a<b) ? ((a<=seq) && (seq<b)) : ((a<=seq) || (seq<b)) );
-  }
+  static bool _in_between(uint32_t seq, uint32_t a, uint32_t b);
 
   /** Returns @c true if the sequence number is within the reception window. */
-  bool _in_window(uint32_t seq) {
-    uint32_t a = _nextSequence;
-    uint32_t b = (_nextSequence-_available+window());
-    return _in_between(seq, a, b);
-  }
+  bool _in_window(uint32_t seq) const;
 
   /** Returns @c true if the sequence number is within the given packet (sequence, len). */
-  static inline bool _in_packet(uint32_t seq, const QPair<uint32_t, uint32_t> &packet) {
-    return _in_between(seq, packet.first, packet.first+packet.second);
-  }
+  static inline bool _in_packet(uint32_t seq, const QPair<uint32_t, uint32_t> &packet);
 
 protected:
   /** The input buffer (64kb). */
@@ -131,10 +121,11 @@ public:
   uint16_t bytesToWrite() const;
 
   /** Sequence number of the first unACKed byte. */
-  uint32_t firstSequence() const { return _firstSequence; }
+  uint32_t firstSequence() const;
+
   /** Sequence number of the first byte of a segement that will be added to the buffer.
    * I.e. the sequence number of the last unACKed byte in buffer + 1. */
-  uint32_t nextSequence() const { return _nextSequence; }
+  uint32_t nextSequence() const;
 
   /** Writes some data to the buffer. */
   uint16_t write(const uint8_t *buffer, uint16_t len);
@@ -147,9 +138,7 @@ public:
   uint64_t age() const;
 
   /** Returns @c true if the oldest byte in the buffer is older than the timeout. */
-  inline bool timeout() const {
-    return (age() > _timeout);
-  }
+  bool timeout() const;
 
   /** Get the oldes bytes.
    * @param buffer The buffer, the data will be stored into.
@@ -160,9 +149,7 @@ public:
 
 protected:
   /** Returns @c true if @c x is in (@c a, @c b]. */
-  inline bool _in_between(uint32_t x, uint32_t a, uint32_t b) {
-    return ( (a<b) ? ((a<x) && (x<=b)) : ((a<x) || (x<=b)) );
-  }
+  bool _in_between(uint32_t x, uint32_t a, uint32_t b) const;
 
   /** Updates the round trip time statistics. Every 64 samples, the timeout is updated. */
   inline void _update_rt(size_t ms);
@@ -233,9 +220,11 @@ public:
   qint64 bytesToWrite() const;
 
 signals:
+  /** Gets emitted once the stream is established. */
   void established();
 
 protected:
+  /** Starts the stream. Opens the @c QIODevice and emit @c established on success. */
   bool start(const Identifier &streamId, const PeerItem &peer);
   /** Gets called for every received decrypted datagram. */
   void handleDatagram(const uint8_t *data, size_t len);

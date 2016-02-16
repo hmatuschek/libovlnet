@@ -136,6 +136,22 @@ StreamInBuffer::StreamInBuffer()
 }
 
 uint16_t
+StreamInBuffer::available() const {
+  return _available;
+}
+
+uint32_t
+StreamInBuffer::nextSequence() const {
+  return _nextSequence;
+}
+
+uint16_t
+StreamInBuffer::window() const {
+  return 0xffff-available();
+}
+
+
+uint16_t
 StreamInBuffer::read(uint8_t *buffer, uint16_t len) {
   len = std::min(len, _available);
   len = _buffer.read(buffer, len);
@@ -204,6 +220,23 @@ StreamInBuffer::putPacket(uint32_t seq, const uint8_t *data, uint16_t len) {
   return newbytes;*/
 }
 
+bool
+StreamInBuffer::_in_between(uint32_t seq, uint32_t a, uint32_t b) {
+  return ( (a<b) ? ((a<=seq) && (seq<b)) : ((a<=seq) || (seq<b)) );
+}
+
+bool
+StreamInBuffer::_in_window(uint32_t seq) const {
+  uint32_t a = _nextSequence;
+  uint32_t b = (_nextSequence-_available+window());
+  return _in_between(seq, a, b);
+}
+
+bool
+StreamInBuffer::_in_packet(uint32_t seq, const QPair<uint32_t, uint32_t> &packet) {
+  return _in_between(seq, packet.first, packet.first+packet.second);
+}
+
 
 /* ********************************************************************************************* *
  * Implementation of StreamOutBuffer
@@ -223,6 +256,16 @@ StreamOutBuffer::free() const {
 uint16_t
 StreamOutBuffer::bytesToWrite() const {
   return _nextSequence - _firstSequence;
+}
+
+uint32_t
+StreamOutBuffer::firstSequence() const {
+  return _firstSequence;
+}
+
+uint32_t
+StreamOutBuffer::nextSequence() const {
+  return _nextSequence;
 }
 
 uint16_t
@@ -277,6 +320,11 @@ StreamOutBuffer::resend(uint8_t *buffer, uint16_t len, uint32_t &sequence) {
   return len;
 }
 
+bool
+StreamOutBuffer::timeout() const {
+  return (age() > _timeout);
+}
+
 void
 StreamOutBuffer::_update_rt(size_t ms) {
   // Update sums
@@ -291,6 +339,11 @@ StreamOutBuffer::_update_rt(size_t ms) {
     // reset counts and sums
     _rt_sum = 0; _rt_sumsq = 0; _rt_count = 0;
   }
+}
+
+bool
+StreamOutBuffer::_in_between(uint32_t x, uint32_t a, uint32_t b) const {
+  return ( (a<b) ? ((a<x) && (x<=b)) : ((a<x) || (x<=b)) );
 }
 
 
@@ -486,8 +539,10 @@ bool
 SecureStream::start(const Identifier &streamId, const PeerItem &peer) {
   if (SecureSocket::start(streamId, peer)) {
     bool res = open(QIODevice::ReadWrite);
-    if (res) { emit established(); }
-    return res;
+    if (res) {
+      emit established();
+      return true;
+    }
   }
   return false;
 }
