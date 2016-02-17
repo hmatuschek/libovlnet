@@ -59,6 +59,7 @@ HttpRequest::parse() {
 
 void
 HttpRequest::_onReadyRead() {
+  logDebug() << "Try to process " << _connection->socket()->bytesAvailable() << "b.";
   // Check if a line can be read from the device:
   while (_connection->socket()->canReadLine()) {
     logDebug() << "Try to parse request header...";
