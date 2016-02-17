@@ -5,6 +5,7 @@
 #include "dht.hh"
 #include <QUrl>
 #include <QTcpSocket>
+#include <QJsonDocument>
 
 
 /* ********************************************************************************************* *
@@ -322,6 +323,117 @@ HttpStringResponse::_bytesWritten(qint64 bytes) {
 
 
 /* ********************************************************************************************* *
+ * Implementation of HttpJsonResponse
+ * ********************************************************************************************* */
+HttpJsonResponse::HttpJsonResponse(const QJsonDocument &document, HttpRequest *request)
+  : HttpStringResponse(
+      request->version(), HTTP_OK, document.toBinaryData(), request->connection(), "application/json")
+{
+  // pass
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of HttpFileResponse
+ * ********************************************************************************************* */
+HttpFileResponse::HttpFileResponse(const QString &filename, HttpRequest *request)
+  : HttpResponse(request->version(), HTTP_RESP_INCOMPLETE, request->connection()),
+    _file(filename), _offset(0)
+{
+  if (! _file.open(QIODevice::ReadOnly)) {
+    this->setResponseCode(HTTP_FORBIDDEN);
+    this->setHeader("Content-Length", "0");
+    return;
+  }
+
+  this->setResponseCode(HTTP_OK);
+  QFileInfo fi(_file.fileName());
+  this->setHeader("Content-Type", guessMimeType(fi.suffix()));
+  this->setHeader("Content-Length", QString::number(_file.size()));
+
+  connect(this, SIGNAL(headersSend()), this, SLOT(_onHeadersSend()));
+}
+
+void
+HttpFileResponse::_onHeadersSend() {
+  connect(_connection->socket(), SIGNAL(bytesWritten(qint64)), this, SLOT(_bytesWritten(qint64)));
+  _onBytesWritten(0);
+}
+
+void
+HttpFileResponse::_bytesWritten(qint64 bytes) {
+  if (_offset == _file.size()) {
+    emit completed();
+    return;
+  }
+
+  char buffer[0xffff];
+  _file.seek(_offset);
+  qint64 len = _file.read(buffer, 0xffff);
+  if (len>0) {
+    len = _connection->socket()->write(buffer, len);
+    if (len>0) {
+      _offset += len;
+    }
+  }
+}
+
+QString
+HttpFileResponse::guessMimeType(const QString &ext) {
+  // Try to determine content type by file extension
+  if (("html"==ext) | ("htm"==ext)) { return "text/html"; }
+  if ("xml" == ext) { return "application/xml"; }
+  if ("png" == ext) { return "image/png"; }
+  if ("jpeg" == ext) { return "image/jpeg"; }
+  if ("js" == ext) { return "text/javascript"; }
+  if ("jpeg" == ext) { return "image/jpeg"; }
+
+  return "application/octet-stream";
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of HttpDirectoryResponse
+ * ********************************************************************************************* */
+HttpDirectoryResponse::HttpDirectoryResponse(const QString &dirname, HttpRequest *request)
+  : HttpResponse(request->version(), HTTP_OK, request->connection()), _buffer(), _offset(0)
+{
+  QDir dir(dirname);
+  QStringList elements = dir.entryList();
+  _buffer.append("<html><head></head><body><table>");
+  foreach (QString element, elements) {
+    _buffer.append("<tr><td><a href=\"./");
+    _buffer.append(element.toUtf8());
+    _buffer.append("\">");
+    _buffer.append(element.toUtf8());
+    _buffer.append("</a></td></tr>");
+  }
+  _buffer.append("</table></body></html>");
+  this->setHeader("Content-Type", "text/html");
+  this->setHeader("Content-Length", QString::number(_buffer.size()));
+
+  connect(this, SIGNAL(headersSend()), this, SLOT(_onHeadersSend()));
+}
+
+void
+HttpDirectoryResponse::_onHeadersSend() {
+  connect(_connection->socket(), SIGNAL(bytesWritten(qint64)), this, SLOT(_bytesWritten(qint64)));
+  _bytesWritten(0);
+}
+
+void
+HttpDirectoryResponse::_bytesWritten(qint64 bytes) {
+  if (_offset == _buffer.size()) {
+    emit completed();
+    return;
+  }
+  qint64 len = _connection->socket()->write(_buffer.constData()+_offset,
+                                            _buffer.size()-_offset);
+  if (len>0) { _offset += len; }
+}
+
+
+/* ********************************************************************************************* *
  * Implementation of HttpConnection
  * ********************************************************************************************* */
 HttpConnection::HttpConnection(HttpRequestHandler *service, const NodeItem &remote, QIODevice *socket)
@@ -402,6 +514,44 @@ HttpConnection::_responseCompleted() {
     connect(_currentRequest, SIGNAL(headerRead()), this, SLOT(_requestHeadersRead()));
     // start parsing HTTP request
     _currentRequest->parse();
+  }
+}
+
+/* ********************************************************************************************* *
+ * Implementation of HttpDirectoryHandler
+ * ********************************************************************************************* */
+HttpDirectoryHandler::HttpDirectoryHandler(const QDir &directory, QObject *parent)
+  : HttpRequestHandler(parent), _directory(directory)
+{
+  // pass...
+}
+
+bool
+HttpDirectoryHandler::acceptReqest(HttpRequest *request) {
+  if (HTTP_GET==request->method()) {
+    return true;
+  }
+  return false;
+}
+
+HttpResponse *
+HttpDirectoryHandler::processRequest(HttpRequest *request) {
+  QString path = request->uri().path();
+  QFileInfo file(_directory, path);
+  if (! file.exists()) {
+    // 404
+    return new HttpStringResponse(request->version(), HTTP_NOT_FOUND,
+                                  "Not found", request->connection(), "text/plain");
+  }
+  if (! file.canonicalFilePath().startsWith(_directory.canonicalPath())) {
+    // 404
+    return new HttpStringResponse(request->version(), HTTP_NOT_FOUND,
+                                  "Not found", request->connection(), "text/plain");
+  }
+  if (file.isFile()) {
+    return new HttpFileResponse(file.canonicalFilePath(), request);
+  } else {
+    return new HttpDirectoryResponse(file.canonicalFilePath(), request);
   }
 }
 

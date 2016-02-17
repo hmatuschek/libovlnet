@@ -229,8 +229,6 @@ protected:
   QTimer _requestTimer;
   /** Timer to check nodes in buckets. */
   QTimer _nodeTimer;
-  /** Timer to keep announcements up-to-date. */
-  QTimer _announcementTimer;
   /** Timer to update i/o statistics every 5 seconds. */
   QTimer _statisticsTimer;
 

@@ -125,6 +125,7 @@
 #include "securecall.hh"
 #include "filetransfer.hh"
 #include "socks.hh"
+#include "httpservice.hh"
 
 #include "logger.hh"
 #include "ntp.hh"

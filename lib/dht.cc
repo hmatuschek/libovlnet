@@ -444,7 +444,7 @@ DHT::DHT(Identity &id,
   : QObject(parent), _self(id), _socket(), _started(false),
     _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
     _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),
-    _connections(), _requestTimer(), _nodeTimer(), _announcementTimer(), _statisticsTimer()
+    _connections(), _requestTimer(), _nodeTimer(), _statisticsTimer()
 {
   logInfo() << "Start node #" << id.id() << " @ " << addr << ":" << port;
 
@@ -470,9 +470,6 @@ DHT::DHT(Identity &id,
   _nodeTimer.setInterval(1000*60);
   _nodeTimer.setSingleShot(false);
 
-  // check announcements every 5 minutes
-  _announcementTimer.setInterval(1000*60*5);
-  _announcementTimer.setSingleShot(false);
 
   connect(&_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
   connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
@@ -482,7 +479,6 @@ DHT::DHT(Identity &id,
 
   _requestTimer.start();
   _nodeTimer.start();
-  _announcementTimer.start();
   _statisticsTimer.start();
 
   _started = true;

@@ -224,7 +224,7 @@ public:
   qint64 bytesAvailable() const;
   /** Returns the number of bytes in the output buffer. */
   qint64 bytesToWrite() const;
-  /** Returns @c true if the buffer contains <LF>. */
+  /** Returns @c true if the buffer contains "LF". */
   bool canReadLine() const;
 
 signals:
