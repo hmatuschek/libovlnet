@@ -49,6 +49,9 @@ protected slots:
   void _onNodeFound(NodeItem item);
   void _onNodeNotFound(Identifier id, QList<NodeItem> near);
   void _onTcpError(QAbstractSocket::SocketError error);
+  void _onConnectionError();
+  void _onRendezvousInitiated(const NodeItem &node);
+  void _onRendezvousFailed(const Identifier &id);
   void _onError();
   void _onConnected();
   void _onParseResponse();

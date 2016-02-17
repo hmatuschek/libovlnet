@@ -81,7 +81,7 @@ LocalHttpProxyResponse::_onNodeFound(NodeItem item) {
 
   SecureStream *socket = new SecureStream(_dht, this); _stream = socket;
   connect(socket, SIGNAL(established()), this, SLOT(_onConnected()));
-  connect(socket, SIGNAL(error()), this, SLOT(_onError()));
+  connect(socket, SIGNAL(error()), this, SLOT(_onConnectionError()));
   _dht.startConnection(_destination.port(), item, socket);
 }
 
@@ -96,6 +96,32 @@ LocalHttpProxyResponse::_onNodeNotFound(Identifier id, QList<NodeItem> near) {
 void
 LocalHttpProxyResponse::_onTcpError(QAbstractSocket::SocketError error) {
   logDebug() << "HTTP Proxy: TCP error: " << error;
+  _onError();
+}
+
+void
+LocalHttpProxyResponse::_onConnectionError() {
+  logDebug() << "Cannot connect to node. Try rendesvous";
+  delete _stream; _stream=0;
+  connect(&_dht, SIGNAL(rendezvousInitiated(NodeItem)), this, SLOT(_onRendezvousInitiated(NodeItem)));
+  connect(&_dht, SIGNAL(rendezvousFailed(Identifier)), this, SLOT(_onRendezvousFailed(Identifier)));
+  _dht.rendezvous(_destination.ovlId());
+}
+
+void
+LocalHttpProxyResponse::_onRendezvousInitiated(const NodeItem &node) {
+  if (node.id() != _destination.ovlId()) { return; }
+  logDebug() << "Rendezvous initiated. Retry connection.";
+  SecureStream *socket = new SecureStream(_dht, this); _stream = socket;
+  connect(socket, SIGNAL(established()), this, SLOT(_onConnected()));
+  connect(socket, SIGNAL(error()), this, SLOT(_onError()));
+  _dht.startConnection(_destination.port(), node, socket);
+}
+
+void
+LocalHttpProxyResponse::_onRendezvousFailed(const Identifier &id) {
+  if (id != _destination.ovlId()) { return; }
+  logDebug() << "Rendezvous failed.";
   _onError();
 }
 
