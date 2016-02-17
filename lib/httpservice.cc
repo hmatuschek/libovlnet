@@ -109,7 +109,6 @@ void
 HttpRequest::_onReadyRead() {  
   // Check if a line can be read from the device:
   while (_connection->socket()->canReadLine()) {
-    logDebug() << "Try to parse request header...";
     if (READ_REQUEST == _parserState) {
       QByteArray line = _connection->socket()->readLine();
       if (! line.endsWith("\r\n")) {
