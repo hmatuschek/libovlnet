@@ -278,6 +278,7 @@ HttpStringResponse::_onBytesWritten(qint64 bytes) {
 HttpConnection::HttpConnection(HttpRequestHandler *service, const NodeItem &remote, QIODevice *socket)
   : QObject(service), _service(service), _remote(remote), _socket(socket)
 {
+  logDebug() << "New HTTP connection...";
   // Create new request parser (request)
   _currentRequest = new HttpRequest(this);
   // no response yet
