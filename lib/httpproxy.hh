@@ -43,12 +43,13 @@ class LocalHttpProxyResponse: public HttpResponse
   Q_OBJECT
 
 public:
-  LocalHttpProxyResponse(DHT &dht, const Identifier &id, HttpRequest *request);
+  LocalHttpProxyResponse(DHT &dht, const HostName &id, HttpRequest *request);
 
 protected slots:
   void _onNodeFound(NodeItem item);
   void _onNodeNotFound(Identifier id, QList<NodeItem> near);
-  void _onCloseLocal();
+  void _onTcpError(QAbstractSocket::SocketError error);
+  void _onError();
   void _onConnected();
   void _onParseResponse();
   void _onLocalReadyRead();
@@ -62,9 +63,10 @@ protected:
 
 protected:
   DHT &_dht;
-  Identifier _destination;
+  HostName _destination;
+  QString _host;
   HttpRequest *_request;
-  SecureStream *_stream;
+  QIODevice *_stream;
   size_t _requestSize;
   ParserState _parserState;
   size_t _responseSize;

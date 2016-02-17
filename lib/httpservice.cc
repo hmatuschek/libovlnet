@@ -8,6 +8,41 @@
 
 
 /* ********************************************************************************************* *
+ * Implementation of HostName
+ * ********************************************************************************************* */
+HostName::HostName(const QString &name, uint16_t defaultPort)
+  : _name(name), _port(defaultPort)
+{
+  // Split at ':'
+  if (_name.contains(':')) {
+    int idx = _name.indexOf(':');
+    _port = _name.mid(idx+1).toUInt();
+    _name = _name.left(idx);
+  }
+}
+
+const QString &
+HostName::name() const {
+  return _name;
+}
+
+uint16_t
+HostName::port() const {
+  return _port;
+}
+
+bool
+HostName::isOvlNode() const {
+  return _name.endsWith(".ovl");
+}
+
+Identifier
+HostName::ovlId() const {
+  return Identifier::fromBase32(_name.left(_name.size()-4));
+}
+
+
+/* ********************************************************************************************* *
  * Implementation of HTTPRequest
  * ********************************************************************************************* */
 HttpRequest::HttpRequest(HttpConnection *connection)
@@ -75,7 +110,7 @@ HttpRequest::_onReadyRead() {
       _parserState = READ_HEADER;
     } else if (READ_HEADER == _parserState) {
       QByteArray line = _connection->socket()->readLine();
-      if (!line.endsWith("\r\n")) {
+      if (! line.endsWith("\r\n")) {
         // Invalid format
         emit badRequest();
         return;
@@ -99,7 +134,7 @@ HttpRequest::_onReadyRead() {
         return;
       }
       _headers.insert(QString::fromLatin1(line.constData(), idx),
-                      QString::fromLatin1(line.constData()+idx+1, line.length()-idx-1));
+                      QString::fromLatin1(line.constData()+idx+1, line.length()-idx-1).simplified());
     } else {
       return;
     }
@@ -130,15 +165,13 @@ HttpResponse::HttpResponse(HttpVersion version, HttpResponseCode resp, HttpConne
   : QObject(connection), _connection(connection), _version(version), _code(resp),
     _headersSend(false), _headerSendIdx(0), _headers()
 {
-  // Connect to bytesWritten signal
-  connect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
-          this, SLOT(_onBytesWritten(qint64)));
 }
 
 void
 HttpResponse::sendHeaders() {
   // Skip if headers are serialized already or even has been send
   if (_headersSend || (0 != _headerBuffer.size()) || (HTTP_RESP_INCOMPLETE == _code)) { return; }
+  logDebug() << "Serialize headers...";
   // Send version
   switch (_version) {
     case HTTP_1_0: _headerBuffer.append("HTTP/1.0 "); break;
@@ -165,6 +198,10 @@ HttpResponse::sendHeaders() {
   }
   _headerBuffer.append("\r\n");
 
+  // Connect to bytesWritten signal
+  connect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
+          this, SLOT(_onBytesWritten(qint64)));
+
   // Try to send some part of the serialized response
   qint64 len = _connection->socket()->write(_headerBuffer);
   if (len > 0) { _headerSendIdx = len; }
@@ -172,7 +209,7 @@ HttpResponse::sendHeaders() {
 
 void
 HttpResponse::_onBytesWritten(qint64 bytes) {
-  logDebug() << "Continue send headers.";
+  logDebug() << "HttpResponse: Continue send headers.";
   // If headers already send -> done
   if (_headersSend) { return; }
   // If headers are just send
@@ -215,6 +252,7 @@ HttpStringResponse::_onHeadersSend() {
   logDebug() << "HttpStringResponse: Headers send: Send content.";
   connect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
           this, SLOT(_onBytesWritten(qint64)));
+  // Start body transmission
   _onBytesWritten(0);
 }
 
@@ -279,9 +317,11 @@ HttpConnection::_requestHeadersRead() {
     // If not processed -> not found
     _currentResponse = new HttpStringResponse(_currentRequest->version(), HTTP_NOT_FOUND, "Not found", this);
   }
-  // Get notified if the response has been completed
+  // Take ownership
+  _currentResponse->setParent(this);
+  // get notified if the response has been completed
   connect(_currentResponse, SIGNAL(completed()), this, SLOT(_responseCompleted()));
-  // start response
+  // start response if ready
   _currentResponse->sendHeaders();
 }
 
@@ -347,6 +387,11 @@ LocalHttpServer::LocalHttpServer(HttpRequestHandler *dispatcher, uint16_t port)
 LocalHttpServer::~LocalHttpServer() {
   // close the socket
   _server.close();
+}
+
+bool
+LocalHttpServer::started() const {
+  return _server.isListening();
 }
 
 void

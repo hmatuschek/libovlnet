@@ -44,6 +44,22 @@ typedef enum {
 } HttpResponseCode;
 
 
+class HostName
+{
+public:
+  HostName(const QString &name, uint16_t defaultPort=80);
+
+  const QString &name() const;
+  uint16_t port() const;
+  bool isOvlNode() const;
+  Identifier ovlId() const;
+
+protected:
+  QString _name;
+  uint16_t _port;
+};
+
+
 // Forward declarations
 class HttpRequest;
 class HttpResponse;
@@ -85,6 +101,9 @@ public:
   LocalHttpServer(HttpRequestHandler *dispatcher, uint16_t port=8080);
   /** Destructor. */
   virtual ~LocalHttpServer();
+
+  /** Returns @c true if the server bound to the specified port. */
+  bool started() const;
 
 protected slots:
   /** Gets called on incomming connections. */
@@ -248,12 +267,10 @@ public:
     return _headers[name];
   }
 
-  /** Start response. */
+  /** Start the response if ready. */
   void sendHeaders();
 
 signals:
-  /** Gets emitted once the response has been started. That is, the headers are ready to be send. */
-  void started();
   /** Gets emitted once the response headers has been send. */
   void headersSend();
   /** Gets emitted once the response is completed. */
