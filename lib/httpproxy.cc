@@ -166,14 +166,17 @@ LocalHttpProxyResponse::_onLocalReadyRead() {
 void
 LocalHttpProxyResponse::_onParseResponse() {
   while (_stream->bytesAvailable()) {
+    logDebug() << "HttpProxy: Request headers send, parse response...";
     if (PARSE_RESPONSE_CODE == _parserState) {
       if (!_stream->canReadLine()) { return; }
       QByteArray line = _stream->readLine();
+      logDebug() << line;
       _request->connection()->socket()->write(line);
       _parserState = PARSE_RESPONSE_HEADER;
     } else if (PARSE_RESPONSE_HEADER == _parserState) {
       if (!_stream->canReadLine()) { return; }
       QByteArray line = _stream->readLine();
+      logDebug() << line;
       _request->connection()->socket()->write(line);
       if ("\r\n" == line) {
         _parserState = FORWARD_RESPONSE_BODY;
@@ -182,6 +185,7 @@ LocalHttpProxyResponse::_onParseResponse() {
       }
     } else if (FORWARD_RESPONSE_BODY == _parserState) {
       QByteArray buffer = _stream->read(std::min(size_t(0xffff), _responseSize));
+      logDebug() << "Body (" << buffer.size() << "b).";
       _request->connection()->socket()->write(buffer);
       _responseSize -= buffer.size();
       if (0 == _responseSize) {
