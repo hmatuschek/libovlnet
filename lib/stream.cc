@@ -568,6 +568,12 @@ SecureStream::start(const Identifier &streamId, const PeerItem &peer) {
 }
 
 void
+SecureStream::failed() {
+  if (isOpen()) { close(); }
+  emit error();
+}
+
+void
 SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   // Restart time-out timer
   _timeout.start();

@@ -230,10 +230,14 @@ public:
 signals:
   /** Gets emitted once the stream is established. */
   void established();
+  /** Gets emiited if the connection fails. */
+  void error();
 
 protected:
   /** Starts the stream. Opens the @c QIODevice and emit @c established on success. */
   bool start(const Identifier &streamId, const PeerItem &peer);
+  /** Gets called if the connection fails. */
+  void failed();
   /** Gets called for every received decrypted datagram. */
   void handleDatagram(const uint8_t *data, size_t len);
   /** Read some data from the input buffer. */
