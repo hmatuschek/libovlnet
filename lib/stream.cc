@@ -454,6 +454,7 @@ SecureStream::close() {
 
   // If state is open
   if (OPEN == _state) {
+    logDebug() << "Close connection. " << bytesToWrite() << "b left in output buffer.";
     // readcanel finished
     emit readChannelFinished();
     _state = FIN_RECEIVED;
@@ -482,7 +483,7 @@ SecureStream::abort() {
 
   // Send reset packet
   if (CLOSED != _state) {
-    logDebug() << "SecureStream: Close connection, send RST.";
+    logDebug() << "SecureStream: Reset connection, send RST.";
     _state = CLOSED;
     Message msg(Message::RESET);
     if(! sendDatagram((uint8_t *) &msg, 1)) {
@@ -663,7 +664,9 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   if (Message::RESET == msg->type) {
     // check message length
     if (1 != len) { return; }
-    close();
+    logDebug() << "Received RST packet. Terminate connection.";
+    _state = CLOSED;
+    abort();
     // done.
     return;
   }

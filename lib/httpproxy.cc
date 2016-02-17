@@ -182,6 +182,7 @@ LocalHttpProxyResponse::_onParseResponse() {
       _responseSize -= buffer.size();
       if (0 == _responseSize) {
         _parserState = PARSE_RESPONSE_CODE;
+        _stream->close();
         emit completed();
         return;
       }
