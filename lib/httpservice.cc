@@ -402,8 +402,10 @@ HttpDirectoryResponse::HttpDirectoryResponse(const QString &dirname, HttpRequest
   QStringList elements = dir.entryList();
   _buffer.append("<html><head></head><body><table>");
   foreach (QString element, elements) {
+    QFileInfo einfo(element);
     _buffer.append("<tr><td><a href=\"");
     _buffer.append(element.toUtf8());
+    if (einfo.isDir()) { _buffer.append("/"); }
     _buffer.append("\">");
     _buffer.append(element.toUtf8());
     _buffer.append("</a></td></tr>");
