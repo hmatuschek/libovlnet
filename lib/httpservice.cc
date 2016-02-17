@@ -539,18 +539,22 @@ HttpDirectoryHandler::processRequest(HttpRequest *request) {
   QString path = request->uri().path();
   QFileInfo file(_directory, path);
   if (! file.exists()) {
+    logDebug() << "Path " << file.path() << " does not exist.";
     // 404
     return new HttpStringResponse(request->version(), HTTP_NOT_FOUND,
                                   "Not found", request->connection(), "text/plain");
   }
   if (! file.canonicalFilePath().startsWith(_directory.canonicalPath())) {
+    logDebug() << "Path " << file.path() << " is not located below " << _directory.path();
     // 404
     return new HttpStringResponse(request->version(), HTTP_NOT_FOUND,
                                   "Not found", request->connection(), "text/plain");
   }
   if (file.isFile()) {
+    logDebug() << "Serve file " << file.canonicalPath();
     return new HttpFileResponse(file.canonicalFilePath(), request);
   } else {
+    logDebug() << "Serve directory " << file.canonicalPath();
     return new HttpDirectoryResponse(file.canonicalFilePath(), request);
   }
 }
