@@ -10,8 +10,10 @@ HttpStatus::HttpStatus(DHT &dht, QObject *parent)
 bool
 HttpStatus::acceptReqest(HttpRequest *request) {
   if ("/status" == request->path()) {
+    logDebug() << "Accept request for " << request->path();
     return true;
   }
+  logDebug() << "Deny request for " << request->path();
   return false;
 }
 
