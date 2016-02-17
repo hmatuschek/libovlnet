@@ -311,6 +311,7 @@ HttpStringResponse::_onBytesWritten(qint64 bytes) {
   if (_textIdx == _text.size()) {
     disconnect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
                this, SLOT(_onBytesWritten(qint64)));
+    logDebug() << "HttpStringResponse: Content send.";
     emit completed();
     return;
   }

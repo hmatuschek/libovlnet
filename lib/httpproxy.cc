@@ -185,7 +185,7 @@ LocalHttpProxyResponse::_onParseResponse() {
       }
     } else if (FORWARD_RESPONSE_BODY == _parserState) {
       QByteArray buffer = _stream->read(std::min(size_t(0xffff), _responseSize));
-      logDebug() << "Body (" << buffer.size() << "b).";
+      logDebug() << "Body (" << buffer.size() << "b): " << buffer;
       _request->connection()->socket()->write(buffer);
       _responseSize -= buffer.size();
       if (0 == _responseSize) {
