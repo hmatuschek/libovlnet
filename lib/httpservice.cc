@@ -537,7 +537,7 @@ HttpDirectoryHandler::acceptReqest(HttpRequest *request) {
 HttpResponse *
 HttpDirectoryHandler::processRequest(HttpRequest *request) {
   QString path = request->uri().path();
-  QFileInfo file(_directory, path);
+  QFileInfo file(_directory.absolutePath() + "/" + path);
   if (! file.exists()) {
     logDebug() << "Path " << file.path() << " does not exist.";
     // 404
