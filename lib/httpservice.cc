@@ -306,6 +306,7 @@ HttpConnection::~HttpConnection() {
 
 void
 HttpConnection::_requestHeadersRead() {
+  logDebug() << "Request headers read.";
   // this should not happen
   if (! _currentRequest) { return; }
   // disconnect from signel
