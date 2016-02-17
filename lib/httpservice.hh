@@ -341,7 +341,7 @@ protected slots:
   /** Gets called once the headers has been send. */
   void _onHeadersSend();
   /** Gets called once some data has been send. */
-  void _onBytesWritten(qint64 bytes);
+  void _bytesWritten(qint64 bytes);
 
 protected:
   /** Index of the text buffer. */

@@ -300,13 +300,13 @@ void
 HttpStringResponse::_onHeadersSend() {
   logDebug() << "HttpStringResponse: Headers send: Send content.";
   connect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
-          this, SLOT(_onBytesWritten(qint64)));
+          this, SLOT(_bytesWritten(qint64)));
   // Start body transmission
-  _onBytesWritten(0);
+  _bytesWritten(0);
 }
 
 void
-HttpStringResponse::_onBytesWritten(qint64 bytes) {
+HttpStringResponse::_bytesWritten(qint64 bytes) {
   if (! _headersSend) { return; }
   if (_textIdx == _text.size()) {
     disconnect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
