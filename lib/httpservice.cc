@@ -308,7 +308,7 @@ HttpStringResponse::_onHeadersSend() {
 void
 HttpStringResponse::_bytesWritten(qint64 bytes) {
   if (! _headersSend) { return; }
-  if (_textIdx == _text.size()) {
+  if (_textIdx == size_t(_text.size())) {
     disconnect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
                this, SLOT(_onBytesWritten(qint64)));
     logDebug() << "HttpStringResponse: Content send.";
