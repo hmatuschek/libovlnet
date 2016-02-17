@@ -70,6 +70,13 @@ FixedRingBuffer::peek(uint16_t offset, uint8_t *buffer, uint16_t len) const {
   return len;
 }
 
+char
+FixedRingBuffer::peek(uint16_t index) const {
+  if (index>=available()) { return 0; }
+  index += _outptr;
+  return _buffer[index];
+}
+
 uint16_t
 FixedRingBuffer::read(uint8_t *buffer, uint16_t len) {
   // Read some data from the buffer
@@ -148,6 +155,15 @@ StreamInBuffer::nextSequence() const {
 uint16_t
 StreamInBuffer::window() const {
   return 0xffff-available();
+}
+
+bool
+StreamInBuffer::contains(char c) const {
+  if (0 == _available) { return false; }
+  for (size_t i=0; i<_available; i++) {
+    if (c == _buffer.peek(i)) { return true; }
+  }
+  return false;
 }
 
 
@@ -485,6 +501,10 @@ qint64
 SecureStream::bytesToWrite() const {
   // IO device buffer + internal packet-buffer
   return _outBuffer.bytesToWrite() + QIODevice::bytesToWrite();
+}
+bool
+SecureStream::canReadLine() const {
+  return _inBuffer.contains('\n') || QIODevice::canReadLine();
 }
 
 qint64

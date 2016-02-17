@@ -28,6 +28,9 @@ public:
   /** Reads some segement without removing it from the buffer. */
   uint16_t peek(uint16_t offset, uint8_t *buffer, uint16_t len) const;
 
+  /** Reads a single char without removing it from the buffer. */
+  char peek(uint16_t offset) const;
+
   /** Reads from the ring buffer. */
   uint16_t read(uint8_t *buffer, uint16_t len);
 
@@ -73,6 +76,9 @@ public:
   /** Returns the number of bytes starting at the next expected sequence number (@c nextSequence)
    * the buffer will accept. */
   uint16_t window() const;
+
+  /** Searches for the given char in the available data. */
+  bool contains(char c) const;
 
   /** Reads some ACKed data . */
   uint16_t read(uint8_t *buffer, uint16_t len);
@@ -218,6 +224,8 @@ public:
   qint64 bytesAvailable() const;
   /** Returns the number of bytes in the output buffer. */
   qint64 bytesToWrite() const;
+  /** Returns @c true if the buffer contains <LF>. */
+  bool canReadLine() const;
 
 signals:
   /** Gets emitted once the stream is established. */
