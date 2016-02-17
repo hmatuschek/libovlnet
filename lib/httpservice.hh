@@ -48,6 +48,9 @@ class HostName
 {
 public:
   HostName(const QString &name, uint16_t defaultPort=80);
+  HostName(const HostName &other);
+
+  HostName &operator=(const HostName &other);
 
   const QString &name() const;
   uint16_t port() const;
@@ -57,6 +60,28 @@ public:
 protected:
   QString _name;
   uint16_t _port;
+};
+
+
+class URI
+{
+public:
+  URI();
+  URI(const QString &uri);
+  URI(const URI &other);
+
+  URI &operator= (const URI &other);
+
+  inline const QString &protocol() const { return _proto; }
+  inline const HostName &host() const { return _host; }
+  inline const QString &path() const { return _path; }
+  inline const QString &query() const { return _query; }
+
+protected:
+  QString _proto;
+  HostName _host;
+  QString _path;
+  QString _query;
 };
 
 
@@ -181,7 +206,7 @@ public:
   /** Returns the HTTP version. */
   inline HttpVersion version() const { return _version; }
   /** Returns the resource path. */
-  inline const QString &path() const { return _path; }
+  inline const URI &uri() const { return _uri; }
   /** Returns @c true if the specified header was set. */
   inline bool hasHeader(const QString &name) const {
     return _headers.contains(name);
@@ -231,7 +256,7 @@ protected:
   /** The HTTP method. */
   HttpMethod     _method;
   /** The requested resource. */
-  QString        _path;
+  URI _uri;
   /** The HTTP version. */
   HttpVersion    _version;
   /** Table of headers. */

@@ -122,7 +122,7 @@ LocalHttpProxyResponse::_onConnected() {
     case HTTP_POST: _stream->write("POST "); break;
     case HTTP_INVALID_METHOD: break; // <- Already handled
   }
-  _stream->write(_request->path().toUtf8());
+  _stream->write(_request->uri().path().toUtf8());
   _stream->write(" ");
   switch(_request->version()) {
     case HTTP_1_0: _stream->write("HTTP/1.0\r\n"); break;

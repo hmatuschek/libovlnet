@@ -3,7 +3,7 @@
 #include "stream.hh"
 #include "buckets.hh"
 #include "dht.hh"
-
+#include <QUrl>
 #include <QTcpSocket>
 
 
@@ -19,6 +19,19 @@ HostName::HostName(const QString &name, uint16_t defaultPort)
     _port = _name.mid(idx+1).toUInt();
     _name = _name.left(idx);
   }
+}
+
+HostName::HostName(const HostName &other)
+  : _name(other._name), _port(other._port)
+{
+  // pass...
+}
+
+HostName &
+HostName::operator =(const HostName &other) {
+  _name = other._name;
+  _port = other._port;
+  return *this;
 }
 
 const QString &
@@ -43,10 +56,45 @@ HostName::ovlId() const {
 
 
 /* ********************************************************************************************* *
+ * Implementation of URI
+ * ********************************************************************************************* */
+URI::URI()
+  : _proto(), _host(""), _path(), _query()
+{
+
+}
+
+URI::URI(const QString &uri)
+  : _proto(), _host(""), _path(), _query()
+{
+  QUrl url(uri);
+  _proto = url.scheme();
+  _host  = HostName(url.host(), url.port());
+  _path  = url.path();
+  _query = url.query();
+}
+
+URI::URI(const URI &other)
+  : _proto(other._proto), _host(other._host), _path(other._path), _query(other._query)
+{
+  // pass...
+}
+
+URI &
+URI::operator =(const URI &other) {
+  _proto = other._proto;
+  _host = other._host;
+  _path = other._path;
+  _query = other._query;
+  return *this;
+}
+
+
+/* ********************************************************************************************* *
  * Implementation of HTTPRequest
  * ********************************************************************************************* */
 HttpRequest::HttpRequest(HttpConnection *connection)
-  : QObject(connection), _connection(connection), _parserState(READ_REQUEST), _headers()
+  : QObject(connection), _connection(connection), _parserState(READ_REQUEST), _uri(), _headers()
 {
   // pass..
 }
@@ -96,7 +144,7 @@ HttpRequest::_onReadyRead() {
         emit badRequest();
         return;
       }
-      _path = QString::fromLatin1(line.constData()+offset, idx-offset);
+      _uri = QString::fromLatin1(line.constData()+offset, idx-offset);
       offset = idx+1;
 
       // Extract version

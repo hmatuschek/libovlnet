@@ -9,11 +9,11 @@ HttpStatus::HttpStatus(DHT &dht, QObject *parent)
 
 bool
 HttpStatus::acceptReqest(HttpRequest *request) {
-  if ("/status" == request->path()) {
-    logDebug() << "Accept request for " << request->path();
+  if ("/status" == request->uri().path()) {
+    logDebug() << "Accept request for " << request->uri().path();
     return true;
   }
-  logDebug() << "Deny request for " << request->path();
+  logDebug() << "Deny request for " << request->uri().path();
   return false;
 }
 
