@@ -387,7 +387,7 @@ SecureStream::SecureStream(DHT &dht, QObject *parent)
 }
 
 SecureStream::~SecureStream() {
-  // pass...
+  abort();
 }
 
 bool

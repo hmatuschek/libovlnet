@@ -55,24 +55,19 @@ LocalHttpProxyServerHandler::processRequest(HttpRequest *request) {
 LocalHttpProxyResponse::LocalHttpProxyResponse(DHT &dht, const HostName &id, HttpRequest *request)
   : HttpResponse(request->version(), HTTP_RESP_INCOMPLETE, request->connection()),
     _dht(dht), _destination(id), _request(request), _stream(0)
-{
+{  
   if (_destination.isOvlNode()) {
     // If destination is a OVL node "domain".
     connect(&_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(_onNodeFound(NodeItem)));
     connect(&_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
             this, SLOT(_onNodeNotFound(Identifier,QList<NodeItem>)));
-    logDebug() << "HTTP Proxy: Try to resolve " << _destination.ovlId();
     _dht.findNode(_destination.ovlId());
   } else {
     // Otherwise assume "normal" domain name.
-    logDebug() << "HTTP Proxy: Try to connect to " << _destination.name() << ":"
-               << _destination.port();
-    // Try to connect to host
     QTcpSocket *socket = new QTcpSocket(this); _stream = socket;
     connect(socket, SIGNAL(connected()), this, SLOT(_onConnected()));
     connect(socket, SIGNAL(error(QAbstractSocket::SocketError)),
             this, SLOT(_onTcpError(QAbstractSocket::SocketError)));
-
     socket->connectToHost(_destination.name(), _destination.port());
   }
 }
@@ -82,7 +77,7 @@ LocalHttpProxyResponse::_onNodeFound(NodeItem item) {
   // Skip if not searched for this node
   if (_destination.ovlId() != item.id()) { return; }
   // Connect to HTTP service at the node
-  logDebug() << "HTTP Proxy: Found node " << item.id() << ". Connect to HTTP service.";
+  logDebug() << "HTTP Proxy: Found node " << item.id() << ".";
 
   SecureStream *socket = new SecureStream(_dht, this); _stream = socket;
   connect(socket, SIGNAL(established()), this, SLOT(_onConnected()));
@@ -166,17 +161,14 @@ LocalHttpProxyResponse::_onLocalReadyRead() {
 void
 LocalHttpProxyResponse::_onParseResponse() {
   while (_stream->bytesAvailable()) {
-    logDebug() << "HttpProxy: Request headers send, parse response...";
     if (PARSE_RESPONSE_CODE == _parserState) {
       if (!_stream->canReadLine()) { return; }
       QByteArray line = _stream->readLine();
-      logDebug() << line;
       _request->connection()->socket()->write(line);
       _parserState = PARSE_RESPONSE_HEADER;
     } else if (PARSE_RESPONSE_HEADER == _parserState) {
       if (!_stream->canReadLine()) { return; }
       QByteArray line = _stream->readLine();
-      logDebug() << line;
       _request->connection()->socket()->write(line);
       if ("\r\n" == line) {
         _parserState = FORWARD_RESPONSE_BODY;
@@ -185,7 +177,6 @@ LocalHttpProxyResponse::_onParseResponse() {
       }
     } else if (FORWARD_RESPONSE_BODY == _parserState) {
       QByteArray buffer = _stream->read(std::min(size_t(0xffff), _responseSize));
-      logDebug() << "Body (" << buffer.size() << "b): " << buffer;
       _request->connection()->socket()->write(buffer);
       _responseSize -= buffer.size();
       if (0 == _responseSize) {
