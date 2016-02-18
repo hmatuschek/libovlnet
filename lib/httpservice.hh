@@ -176,6 +176,7 @@ class HttpConnection: public QObject
 public:
   /** Constructs a new HTTP connection.
    * @param service Specifies the request handler instance for the connection.
+   * @param remote Specifies the remote node (at least address and port).
    * @param socket Specifies the socket of the connection. */
   HttpConnection(HttpRequestHandler *service, const NodeItem &remote, QIODevice *socket);
   /** Destructor. */
@@ -215,6 +216,7 @@ class HttpRequest : public QObject
   Q_OBJECT
 
 public:
+  /** The iterator over the request headers. */
   typedef QHash<QString, QString>::const_iterator iterator;
 
 public:
@@ -245,8 +247,9 @@ public:
     return ((HTTP_1_1 == _version) ||
             (hasHeader("Connection") && ("keep-alive"==header("Connection"))));
   }
-
+  /** Returns the iterator pointing at the first header. */
   inline iterator begin() const { return _headers.begin(); }
+  /** Returns the iterator pointing right after the last header. */
   inline iterator end() const { return _headers.end(); }
 
 signals:
@@ -297,6 +300,7 @@ class HttpResponse: public QObject
 
 protected:
   /** Hidden constructor.
+   * @param version Specifies the HTTP version of the response.
    * @param resp Specifies the response code.
    * @param connection Specifies the HTTP connection for the response. */
   HttpResponse(HttpVersion version, HttpResponseCode resp, HttpConnection *connection);
@@ -333,6 +337,7 @@ protected slots:
 protected:
   /** The HTTP connection. */
   HttpConnection *_connection;
+  /** The HTTP version. */
   HttpVersion _version;
   /** The response code. */
   HttpResponseCode _code;
@@ -355,6 +360,7 @@ class HttpStringResponse: public HttpResponse
 
 public:
   /** Constructs a new HTTP string response.
+   * @param version Specifies the HTTP version of the response.
    * @param resp Specifies the response code.
    * @param text Specifies the response text.
    * @param connection Specifies the connection.
@@ -376,23 +382,34 @@ protected:
 };
 
 
+/** A simple class sending a JSON response.
+ * @ingroup http */
 class HttpJsonResponse: public HttpStringResponse
 {
   Q_OBJECT
 
 public:
+  /** Constructor.
+   * @param document Specifies the JSON document to send.
+   * @param request Specifies the request, this is a response to. */
   HttpJsonResponse(const QJsonDocument &document, HttpRequest *request);
 };
 
 
+/** Implements a response class transmitting a file.
+ * @ingroup http */
 class HttpFileResponse: public HttpResponse
 {
   Q_OBJECT
 
 public:
+  /** Constructor.
+   * @param filename Specifies the file to transmit.
+   * @param request The request, this is a response to. */
   HttpFileResponse(const QString &filename, HttpRequest *request);
 
 public:
+  /** Guess a MIME type for the given file extension. */
   static QString guessMimeType(const QString &ext);
 
 protected slots:
@@ -402,16 +419,23 @@ protected slots:
   void _bytesWritten(qint64 bytes);
 
 protected:
+  /** The file to transmit. */
   QFile   _file;
+  /** The current offset within the file. */
   quint64 _offset;
 };
 
 
+/** Returns a directory listing in HTML as a response.
+ * @ingroup http */
 class HttpDirectoryResponse: public HttpResponse
 {
   Q_OBJECT
 
 public:
+  /** Constructor.
+   * @param dirname Specifies the directory to list.
+   * @param request The request this is a response to. */
   HttpDirectoryResponse(const QString &dirname, HttpRequest *request);
 
 protected slots:
@@ -421,22 +445,31 @@ protected slots:
   void _bytesWritten(qint64 bytes);
 
 protected:
+  /** Buffer containing the HTML to send. */
   QByteArray _buffer;
+  /** The current offset in the buffer. */
   quint64 _offset;
 };
 
 
+/** Serves a directory.
+ * @ingroup http */
 class HttpDirectoryHandler: public HttpRequestHandler
 {
   Q_OBJECT
 
 public:
+  /** Constructor.
+   * @param directory Specifies the directory to serve.
+   * @param parent Specifies the optional QObject parent. */
   HttpDirectoryHandler(const QDir &directory, QObject *parent=0);
 
+  /** Accepts all GET requests. */
   bool acceptReqest(HttpRequest *request);
   HttpResponse *processRequest(HttpRequest *request);
 
 protected:
+  /** The directory to serve. */
   QDir _directory;
 };
 

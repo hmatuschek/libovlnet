@@ -10,7 +10,11 @@ class LocalHttpProxyServer: public LocalHttpServer
   Q_OBJECT
 
 public:
+  /** Constructor
+   * @param dht Specifies the OVL node instance.
+   * @param port Specifies the local TCP port to listen on (default 8080). */
   LocalHttpProxyServer(DHT &dht, uint16_t port=8080);
+  /** Destructor. */
   virtual ~LocalHttpProxyServer();
 };
 
@@ -22,8 +26,11 @@ class LocalHttpProxyServerHandler: public HttpRequestHandler
   Q_OBJECT
 
 public:
-  /** Constructor. */
+  /** Constructor.
+   * @param dht Specifies the OVL node instance.
+   * @param parent Specifies the optional QObject parent. */
   LocalHttpProxyServerHandler(DHT &dht, QObject *parent=0);
+  /** Destructor. */
   virtual ~LocalHttpProxyServerHandler();
 
   /** Accepts all requests. */
@@ -32,6 +39,7 @@ public:
   HttpResponse *processRequest(HttpRequest *request);
 
 protected:
+  /** A weak reference to the DHT node. */
   DHT &_dht;
 };
 
@@ -43,35 +51,59 @@ class LocalHttpProxyResponse: public HttpResponse
   Q_OBJECT
 
 public:
+  /** Constructor.
+   * @param dht Specifies the OVL node instance.
+   * @param id Specifeis the hostname to connect to.
+   * @param request Specifies the request this is a response to. */
   LocalHttpProxyResponse(DHT &dht, const HostName &id, HttpRequest *request);
 
 protected slots:
+  /** Gets called if the remote node has been found. */
   void _onNodeFound(NodeItem item);
+  /** Gets called if the remote node cannot be found. */
   void _onNodeNotFound(Identifier id, QList<NodeItem> near);
+  /** Gets called if the remote host cannot be connected. */
   void _onTcpError(QAbstractSocket::SocketError error);
+  /** Gets called if the remote node cannot be connected. */
   void _onConnectionError();
+  /** Gets called if the rendezvous was successful. */
   void _onRendezvousInitiated(const NodeItem &node);
+  /** Gets called if the rendezvous failed. */
   void _onRendezvousFailed(const Identifier &id);
+  /** Gets called on error. */
   void _onError();
+  /** Gets called on successful connection. */
   void _onConnected();
+  /** Parses the response from the remote node or host. */
   void _onParseResponse();
+  /** Receives data from the local client. */
   void _onLocalReadyRead();
 
 protected:
+  /** Possible states of the response parser. */
   typedef enum {
+    /** Parse the response code. */
     PARSE_RESPONSE_CODE,
+    /** Parse response headers. */
     PARSE_RESPONSE_HEADER,
+    /** Forward response body. */
     FORWARD_RESPONSE_BODY
   } ParserState;
 
 protected:
+  /** A weak reference to the OVL node. */
   DHT &_dht;
+  /** The remote node or host. */
   HostName _destination;
-  QString _host;
+  /** The current client request. */
   HttpRequest *_request;
+  /** The connection to the remote host or node. */
   QIODevice *_stream;
+  /** The size of the request body. */
   size_t _requestSize;
+  /** The response parser state. */
   ParserState _parserState;
+  /** The size of the response body. */
   size_t _responseSize;
 };
 

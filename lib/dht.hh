@@ -36,7 +36,6 @@ class DHT: public QObject
 public:
   /** Constructor.
    * @param id Weak reference to the identity of the node.
-   * @param streamHandler Specifies the socket-handler.
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
