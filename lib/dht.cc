@@ -444,7 +444,7 @@ DHT::DHT(Identity &id,
   : QObject(parent), _self(id), _socket(), _started(false),
     _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
     _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),
-    _connections(), _requestTimer(), _nodeTimer(), _statisticsTimer()
+    _connections(), _requestTimer(), _nodeTimer(), _rendezvousTimer(), _statisticsTimer()
 {
   logInfo() << "Start node #" << id.id() << " @ " << addr << ":" << port;
 
@@ -466,6 +466,10 @@ DHT::DHT(Identity &id,
   _statisticsTimer.setInterval(1000*5);
   _statisticsTimer.setSingleShot(false);
 
+  // Ping rendezvous nodes every 10s
+  _rendezvousTimer.setInterval(1000*10);
+  _rendezvousTimer.setSingleShot(false);
+
   // check for dead nodes every minute
   _nodeTimer.setInterval(1000*60);
   _nodeTimer.setSingleShot(false);
@@ -475,10 +479,12 @@ DHT::DHT(Identity &id,
   connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
   connect(&_requestTimer, SIGNAL(timeout()), this, SLOT(_onCheckRequestTimeout()));
   connect(&_nodeTimer, SIGNAL(timeout()), this, SLOT(_onCheckNodeTimeout()));
+  connect(&_rendezvousTimer, SIGNAL(timeout()), this, SLOT(_onPingRendezvousNodes()));
   connect(&_statisticsTimer, SIGNAL(timeout()), this, SLOT(_onUpdateStatistics()));
 
   _requestTimer.start();
   _nodeTimer.start();
+  _rendezvousTimer.start();
   _statisticsTimer.start();
 
   _started = true;
@@ -702,6 +708,19 @@ DHT::inRate() const {
 double
 DHT::outRate() const {
   return _outRate;
+}
+
+bool
+DHT::rendezvousPingEnabled() const {
+  return _rendezvousTimer.isActive();
+}
+
+void
+DHT::enableRendezvousPing(bool enable) {
+  if (enable)
+    _rendezvousTimer.start();
+  else
+    _rendezvousTimer.stop();
 }
 
 
@@ -1289,6 +1308,16 @@ DHT::_onCheckNodeTimeout() {
     // search for myself, this will certainly fail but results in a list
     // of the closest nodes, which will be added to the buckets as candidates
     findNeighbours(_self.id());
+  }
+}
+
+void
+DHT::_onPingRendezvousNodes() {
+  QList<NodeItem> nodes;
+  _buckets.getNearest(id(), nodes);
+  QList<NodeItem>::iterator node = nodes.begin();
+  for (; node != nodes.end(); node++) {
+    ping(*node);
   }
 }
 

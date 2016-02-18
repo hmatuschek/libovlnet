@@ -4,7 +4,7 @@
 
 int main(int argc, char *argv[]) {
   if (argc<3) {
-    std::cout << "USAGE: ovlhttpsrv DIRECTORY BOOTSTRAP [PORT]";
+    std::cout << "USAGE: ovlhttpsrv DIRECTORY BOOTSTRAP [PORT]"<<std::endl;
     return -1;
   }
 

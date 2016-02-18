@@ -88,6 +88,13 @@ public:
    * First the neighbours of the node are searched and a rendezvous request will be send to each of
    * the neighbours. */
   void rendezvous(const Identifier &id);
+  /** Returns @c true if a rendezvous ping is send periodically to the K nearest neighbours.
+   * This allows to receive out-of-band packages from them even if this node is behind a (coned)
+   * NAT. This feature is not required for nodes being directly reachable. Disable it in these
+   * cases using @c enableRendezvousPing. */
+  bool rendezvousPingEnabled() const;
+  /** Enables or disables the rendezvous ping to the nearest neighbours. */
+  void enableRendezvousPing(bool enable);
 
   /** Returns @c true if a handler is associated with the given service. */
   bool hasService(uint16_t service) const;
@@ -185,6 +192,10 @@ private slots:
   void _onCheckRequestTimeout();
   /** Gets called regularily to check the timeout of the node in the buckets. */
   void _onCheckNodeTimeout();
+  /** Gets called periodically to ping the K nearest neighbours. They act as rendezvous nodes.
+   * By pinging them regularily the "connection" to these nodes through a NAT will remain "open".
+   * This allows to receive rendezvous messages from these nodes. */
+  void _onPingRendezvousNodes();
   /** Gets called regularily to update the statistics. */
   void _onUpdateStatistics();
   /** Gets called when some data has been send. */
@@ -229,6 +240,8 @@ protected:
   QTimer _requestTimer;
   /** Timer to check nodes in buckets. */
   QTimer _nodeTimer;
+  /** Timer to ping rendezvous nodes. */
+  QTimer _rendezvousTimer;
   /** Timer to update i/o statistics every 5 seconds. */
   QTimer _statisticsTimer;
 
