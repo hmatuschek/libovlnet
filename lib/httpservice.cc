@@ -350,7 +350,7 @@ HttpFileResponse::HttpFileResponse(const QString &filename, HttpRequest *request
   QFileInfo fi(_file.fileName());
   this->setHeader("Content-Type", guessMimeType(fi.suffix()));
   this->setHeader("Content-Length", QString::number(_file.size()));
-
+  logDebug() << "Send file of size " << _file.size() << "b";
   connect(this, SIGNAL(headersSend()), this, SLOT(_onHeadersSend()));
 }
 
@@ -377,8 +377,10 @@ HttpFileResponse::_bytesWritten(qint64 bytes)
   char buffer[0xffff];
   _file.seek(_offset);
   qint64 len = _file.read(buffer, 0xffff);
+  logDebug() << "Read " << len << "b";
   if (len>0) {
     len = _socket->write(buffer, len);
+    logDebug() << "Send " << len << "b";
     if (len>0) {
       _offset += len;
     }

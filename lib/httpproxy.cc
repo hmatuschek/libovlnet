@@ -204,7 +204,12 @@ LocalHttpProxyResponse::_onParseResponse() {
       }
     } else if (FORWARD_RESPONSE_BODY == _parserState) {
       QByteArray buffer = _stream->read(std::min(size_t(0xffff), _responseSize));
-      _request->socket()->write(buffer);
+      qint64 len = _request->socket()->write(buffer);
+      if (len != buffer.size()) {
+        logError() << "Cannot send " << buffer.size() << "b to client.";
+      } else {
+        logError() << "Send " << buffer.size() << "b to client.";
+      }
       _responseSize -= buffer.size();
       if (0 == _responseSize) {
         _parserState = PARSE_RESPONSE_CODE;
