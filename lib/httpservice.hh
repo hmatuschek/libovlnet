@@ -221,13 +221,13 @@ public:
 
 public:
   /** Constructs a request parser for the given connection. */
-  HttpRequest(HttpConnection *connection);
+  HttpRequest(QIODevice *socket);
 
   /** Starts reading the HTTP request. */
   void parse();
 
-  /** Returns the connection instance of the request. */
-  inline HttpConnection *connection() const { return _connection; }
+  /** Returns the socket instance of the request. */
+  inline QIODevice *socket() const { return _socket; }
   /** Returns the request method. */
   inline HttpMethod method() const { return _method; }
   /** Returns the HTTP version. */
@@ -278,7 +278,7 @@ protected:
 
 protected:
   /** The connection of the request. */
-  HttpConnection *_connection;
+  QIODevice *_socket;
   /** The parser state. */
   ParserState    _parserState;
   /** The HTTP method. */
@@ -303,7 +303,7 @@ protected:
    * @param version Specifies the HTTP version of the response.
    * @param resp Specifies the response code.
    * @param connection Specifies the HTTP connection for the response. */
-  HttpResponse(HttpVersion version, HttpResponseCode resp, HttpConnection *connection);
+  HttpResponse(HttpVersion version, HttpResponseCode resp, QIODevice *socket);
 
 public:
   /** Returns the response code. */
@@ -336,7 +336,7 @@ protected slots:
 
 protected:
   /** The HTTP connection. */
-  HttpConnection *_connection;
+  QIODevice *_socket;
   /** The HTTP version. */
   HttpVersion _version;
   /** The response code. */
@@ -366,7 +366,7 @@ public:
    * @param connection Specifies the connection.
    * @param contentType Specifies the content type of the response. */
   HttpStringResponse(HttpVersion version, HttpResponseCode resp, const QString &text,
-                     HttpConnection *connection, const QString contentType="text/plain");
+                     QIODevice *socket, const QString contentType="text/plain");
 
 protected slots:
   /** Gets called once the headers has been send. */

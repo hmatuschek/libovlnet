@@ -262,8 +262,8 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
 /* ******************************************************************************************** *
  * Implementation of SecureSocket
  * ******************************************************************************************** */
-SecureSocket::SecureSocket(Node &dht)
-  : _dht(dht), _sessionKeyPair(0), _peerPubKey(0), _streamId(Identifier::create())
+SecureSocket::SecureSocket(Node &node)
+  : _node(node), _sessionKeyPair(0), _peerPubKey(0), _streamId(Identifier::create())
 {
   // pass...
 }
@@ -271,7 +271,7 @@ SecureSocket::SecureSocket(Node &dht)
 SecureSocket::~SecureSocket() {
   if (_sessionKeyPair) { EVP_PKEY_free(_sessionKeyPair); }
   if (_peerPubKey) { EVP_PKEY_free(_peerPubKey); }
-  _dht.socketClosed(_streamId);
+  _node.socketClosed(_streamId);
 }
 
 int
@@ -282,7 +282,7 @@ SecureSocket::prepare(uint8_t *msg, size_t len) {
   size_t stored=0;
 
   // Store public key and its length into output buffer
-  if (0 > (keyLen = _dht.identity().publicKey(msg+2, len-2)) )
+  if (0 > (keyLen = _node.identity().publicKey(msg+2, len-2)) )
     goto error;
   *((uint16_t *)msg) = qToBigEndian(qint16(keyLen));
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
@@ -314,7 +314,7 @@ SecureSocket::prepare(uint8_t *msg, size_t len) {
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
 
   // Sign session key
-  if (0 > (keyLen = _dht.identity().sign(keyPtr, keyLen, msg+2, len-2)))
+  if (0 > (keyLen = _node.identity().sign(keyPtr, keyLen, msg+2, len-2)))
     goto error;
   *((uint16_t *)msg) = qToBigEndian(qint16(keyLen));
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
@@ -608,7 +608,7 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   txlen += enclen;
 
   // Send datagram
-  if (! _dht.sendData(_streamId, msg, txlen, _peer)) {
+  if (! _node.sendData(_streamId, msg, txlen, _peer)) {
     return false;
   }
 
@@ -620,7 +620,7 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
 bool
 SecureSocket::sendNull() {
   // send only stream id
-  return _dht.sendData(_streamId, 0, 0, _peer);
+  return _node.sendData(_streamId, 0, 0, _peer);
 }
 
 

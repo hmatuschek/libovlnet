@@ -53,7 +53,7 @@ LocalHttpProxyServerHandler::processRequest(HttpRequest *request) {
  * Implementation of LocalHttpProxyResponse
  * ********************************************************************************************* */
 LocalHttpProxyResponse::LocalHttpProxyResponse(Node &dht, const HostName &id, HttpRequest *request)
-  : HttpResponse(request->version(), HTTP_RESP_INCOMPLETE, request->connection()),
+  : HttpResponse(request->version(), HTTP_RESP_INCOMPLETE, request->socket()),
     _dht(dht), _destination(id), _request(request), _stream(0)
 {  
   if (_destination.isOvlNode()) {
@@ -164,7 +164,7 @@ LocalHttpProxyResponse::_onConnected() {
   // If method == POST -> forward data
   if ((HTTP_POST == _request->method()) && _request->hasHeader("Content-Length")) {
     _requestSize = _request->header("Content-Length").toUInt();
-    connect(_request->connection()->socket(), SIGNAL(readyRead()),
+    connect(_request->socket(), SIGNAL(readyRead()),
             this, SLOT(_onLocalReadyRead()));
   }
   // Parse response
@@ -175,12 +175,12 @@ LocalHttpProxyResponse::_onConnected() {
 
 void
 LocalHttpProxyResponse::_onLocalReadyRead() {
-  QByteArray buffer = _request->connection()->socket()->read(
+  QByteArray buffer = _request->socket()->read(
         std::min(size_t(0xffff), _requestSize));
   _requestSize -= buffer.size();
   _stream->write(buffer);
   if (0 == _requestSize) {
-    disconnect(_request->connection()->socket(), SIGNAL(readyRead()),
+    disconnect(_request->socket(), SIGNAL(readyRead()),
                this, SLOT(_onLocalReadyRead()));
   }
 }
@@ -191,12 +191,12 @@ LocalHttpProxyResponse::_onParseResponse() {
     if (PARSE_RESPONSE_CODE == _parserState) {
       if (!_stream->canReadLine()) { return; }
       QByteArray line = _stream->readLine();
-      _request->connection()->socket()->write(line);
+      _request->socket()->write(line);
       _parserState = PARSE_RESPONSE_HEADER;
     } else if (PARSE_RESPONSE_HEADER == _parserState) {
       if (!_stream->canReadLine()) { return; }
       QByteArray line = _stream->readLine();
-      _request->connection()->socket()->write(line);
+      _request->socket()->write(line);
       if ("\r\n" == line) {
         _parserState = FORWARD_RESPONSE_BODY;
       } else if (line.startsWith("Content-Length: ")) {
@@ -204,7 +204,7 @@ LocalHttpProxyResponse::_onParseResponse() {
       }
     } else if (FORWARD_RESPONSE_BODY == _parserState) {
       QByteArray buffer = _stream->read(std::min(size_t(0xffff), _responseSize));
-      _request->connection()->socket()->write(buffer);
+      _request->socket()->write(buffer);
       _responseSize -= buffer.size();
       if (0 == _responseSize) {
         _parserState = PARSE_RESPONSE_CODE;

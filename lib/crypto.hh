@@ -87,7 +87,7 @@ class SecureSocket
 {
 public:
   /** Constructor. */
-  SecureSocket(Node &dht);
+  SecureSocket(Node &node);
   /** Destructor. */
   virtual ~SecureSocket();
 
@@ -160,7 +160,7 @@ protected:
   /** Signals that the connection failed. */
   virtual void failed();
   /** Encrypts the given data @c in using the sequential number @c seq and stores the
-   * result in the ouput buffer @c out. */
+   * result in the output buffer @c out. */
   int encrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *out, uint8_t *tag);
   /** Decrypts the given data @c in using the sequential number @c seq and stores the
    * result in the output buffer @c out. */
@@ -168,7 +168,7 @@ protected:
 
 protected:
   /** A weak reference to the DHT instance. */
-  Node &_dht;
+  Node &_node;
 
 private:
   /** The ECDH key pair of this node for the session. */

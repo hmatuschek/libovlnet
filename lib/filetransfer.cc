@@ -35,8 +35,8 @@ typedef enum {
 /* ********************************************************************************************* *
  * Implementation of FileUpload
  * ********************************************************************************************* */
-FileUpload::FileUpload(Node &dht, const QString &filename, size_t filesize, QObject *parent)
-  : QObject(parent), SecureSocket(dht), _state(INITIALIZED),
+FileUpload::FileUpload(Node &node, const QString &filename, size_t filesize, QObject *parent)
+  : QObject(parent), SecureSocket(node), _state(INITIALIZED),
     _packetBuffer(2000), _fileName(filename), _fileSize(filesize)
 {
   // pass...
@@ -63,7 +63,7 @@ FileUpload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _dht.socketClosed(id());
+      _node.socketClosed(id());
       emit closed();
     }
     return;
@@ -148,7 +148,7 @@ FileUpload::stop() {
     _state = TERMINATED;
     emit closed();
     // signal DHT to close stream
-    _dht.socketClosed(id());
+    _node.socketClosed(id());
   }
 }
 
@@ -223,7 +223,7 @@ FileDownload::handleDatagram(const uint8_t *data, size_t len) {
   if (RESET == msg->type) {
     if (TERMINATED != _state) {
       _state = TERMINATED;
-      _dht.socketClosed(id());
+      _node.socketClosed(id());
       emit closed();
     }
     return;
@@ -312,7 +312,7 @@ FileDownload::stop() {
   if (TERMINATED != _state) {
     _state = TERMINATED;
     // signal DHT to close stream
-    _dht.socketClosed(id());
+    _node.socketClosed(id());
     emit closed();
   }
 }

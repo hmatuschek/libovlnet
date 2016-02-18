@@ -94,24 +94,24 @@ URI::operator =(const URI &other) {
 /* ********************************************************************************************* *
  * Implementation of HTTPRequest
  * ********************************************************************************************* */
-HttpRequest::HttpRequest(HttpConnection *connection)
-  : QObject(connection), _connection(connection), _parserState(READ_REQUEST), _uri(), _headers()
+HttpRequest::HttpRequest(QIODevice *socket)
+  : QObject(socket), _socket(socket), _parserState(READ_REQUEST), _uri(), _headers()
 {
   // pass..
 }
 
 void
 HttpRequest::parse() {
-  connect(_connection->socket(), SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+  connect(_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
   _onReadyRead();
 }
 
 void
 HttpRequest::_onReadyRead() {  
   // Check if a line can be read from the device:
-  while (_connection->socket()->canReadLine()) {
+  while (_socket->canReadLine()) {
     if (READ_REQUEST == _parserState) {
-      QByteArray line = _connection->socket()->readLine();
+      QByteArray line = _socket->readLine();
       if (! line.endsWith("\r\n")) {
         // Invalid format
         emit badRequest();
@@ -158,7 +158,7 @@ HttpRequest::_onReadyRead() {
       // done
       _parserState = READ_HEADER;
     } else if (READ_HEADER == _parserState) {
-      QByteArray line = _connection->socket()->readLine();
+      QByteArray line = _socket->readLine();
       if (! line.endsWith("\r\n")) {
         // Invalid format
         emit badRequest();
@@ -171,7 +171,7 @@ HttpRequest::_onReadyRead() {
       if (0 == line.size()) {
         // done, disconnect from readyRead signal. Any additional data will be processed by the
         // request handler or by the next request
-        disconnect(_connection->socket(), SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+        disconnect(_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
         emit headerRead();
         return;
       }
@@ -210,8 +210,8 @@ HttpRequest::_getVersion(const char *str, int len) {
 /* ********************************************************************************************* *
  * Implementation of HttpResponse
  * ********************************************************************************************* */
-HttpResponse::HttpResponse(HttpVersion version, HttpResponseCode resp, HttpConnection *connection)
-  : QObject(connection), _connection(connection), _version(version), _code(resp),
+HttpResponse::HttpResponse(HttpVersion version, HttpResponseCode resp, QIODevice *socket)
+  : QObject(socket), _socket(socket), _version(version), _code(resp),
     _headersSend(false), _headerSendIdx(0), _headers()
 {
 }
@@ -248,11 +248,11 @@ HttpResponse::sendHeaders() {
   _headerBuffer.append("\r\n");
 
   // Connect to bytesWritten signal
-  connect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
+  connect(_socket, SIGNAL(bytesWritten(qint64)),
           this, SLOT(_onBytesWritten(qint64)));
 
   // Try to send some part of the serialized response
-  qint64 len = _connection->socket()->write(_headerBuffer);
+  qint64 len = _socket->write(_headerBuffer);
   if (len > 0) { _headerSendIdx = len; }
 }
 
@@ -266,7 +266,7 @@ HttpResponse::_onBytesWritten(qint64 bytes) {
     // mark headers send
     _headersSend = true;
     // disconnect from bytesWritten() signal
-    disconnect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
+    disconnect(_socket, SIGNAL(bytesWritten(qint64)),
                this, SLOT(_onBytesWritten(qint64)));
     logDebug() << "HTTPResponse: ... headers send.";
     // signal headers send
@@ -275,8 +275,8 @@ HttpResponse::_onBytesWritten(qint64 bytes) {
     return;
   }
   // Try to write some more data to the socket
-  qint64 len = _connection->socket()->write(_headerBuffer.constData()+_headerSendIdx,
-                                            _headerBuffer.size()-_headerSendIdx);
+  qint64 len = _socket->write(_headerBuffer.constData()+_headerSendIdx,
+                              _headerBuffer.size()-_headerSendIdx);
   if (0 < len) { _headerSendIdx += len; }
 }
 
@@ -285,8 +285,8 @@ HttpResponse::_onBytesWritten(qint64 bytes) {
  * Implementation of HttpResponse
  * ********************************************************************************************* */
 HttpStringResponse::HttpStringResponse(HttpVersion version, HttpResponseCode resp, const QString &text,
-                                       HttpConnection *connection, const QString contentType)
-  : HttpResponse(version, resp, connection), _textIdx(0), _text(text.toUtf8())
+                                       QIODevice *socket, const QString contentType)
+  : HttpResponse(version, resp, socket), _textIdx(0), _text(text.toUtf8())
 {
   // set content length
   setHeader("Content-Length", QString::number(_text.size()));
@@ -299,7 +299,7 @@ HttpStringResponse::HttpStringResponse(HttpVersion version, HttpResponseCode res
 void
 HttpStringResponse::_onHeadersSend() {
   logDebug() << "HttpStringResponse: Headers send: Send content.";
-  connect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
+  connect(_socket, SIGNAL(bytesWritten(qint64)),
           this, SLOT(_bytesWritten(qint64)));
   // Start body transmission
   _bytesWritten(0);
@@ -309,15 +309,15 @@ void
 HttpStringResponse::_bytesWritten(qint64 bytes) {
   if (! _headersSend) { return; }
   if (_textIdx == size_t(_text.size())) {
-    disconnect(_connection->socket(), SIGNAL(bytesWritten(qint64)),
+    disconnect(_socket, SIGNAL(bytesWritten(qint64)),
                this, SLOT(_onBytesWritten(qint64)));
     logDebug() << "HttpStringResponse: Content send.";
     emit completed();
     return;
   }
   // Try to write some data to the socket
-  qint64 len = _connection->socket()->write(_text.constData()+_textIdx,
-                                            _text.size()-_textIdx);
+  qint64 len = _socket->write(_text.constData()+_textIdx,
+                              _text.size()-_textIdx);
   if (0 < len) { _textIdx += len; }
 }
 
@@ -327,7 +327,7 @@ HttpStringResponse::_bytesWritten(qint64 bytes) {
  * ********************************************************************************************* */
 HttpJsonResponse::HttpJsonResponse(const QJsonDocument &document, HttpRequest *request)
   : HttpStringResponse(
-      request->version(), HTTP_OK, document.toBinaryData(), request->connection(), "application/json")
+      request->version(), HTTP_OK, document.toBinaryData(), request->socket(), "application/json")
 {
   // pass
 }
@@ -337,7 +337,7 @@ HttpJsonResponse::HttpJsonResponse(const QJsonDocument &document, HttpRequest *r
  * Implementation of HttpFileResponse
  * ********************************************************************************************* */
 HttpFileResponse::HttpFileResponse(const QString &filename, HttpRequest *request)
-  : HttpResponse(request->version(), HTTP_RESP_INCOMPLETE, request->connection()),
+  : HttpResponse(request->version(), HTTP_RESP_INCOMPLETE, request->socket()),
     _file(filename), _offset(0)
 {
   if (! _file.open(QIODevice::ReadOnly)) {
@@ -356,7 +356,7 @@ HttpFileResponse::HttpFileResponse(const QString &filename, HttpRequest *request
 
 void
 HttpFileResponse::_onHeadersSend() {
-  connect(_connection->socket(), SIGNAL(bytesWritten(qint64)), this, SLOT(_bytesWritten(qint64)));
+  connect(_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_bytesWritten(qint64)));
   _onBytesWritten(0);
 }
 
@@ -371,7 +371,7 @@ HttpFileResponse::_bytesWritten(qint64 bytes) {
   _file.seek(_offset);
   qint64 len = _file.read(buffer, 0xffff);
   if (len>0) {
-    len = _connection->socket()->write(buffer, len);
+    len = _socket->write(buffer, len);
     if (len>0) {
       _offset += len;
     }
@@ -396,7 +396,7 @@ HttpFileResponse::guessMimeType(const QString &ext) {
  * Implementation of HttpDirectoryResponse
  * ********************************************************************************************* */
 HttpDirectoryResponse::HttpDirectoryResponse(const QString &dirname, HttpRequest *request)
-  : HttpResponse(request->version(), HTTP_OK, request->connection()), _buffer(), _offset(0)
+  : HttpResponse(request->version(), HTTP_OK, request->socket()), _buffer(), _offset(0)
 {
   QDir dir(dirname);
   QStringList elements = dir.entryList();
@@ -419,7 +419,7 @@ HttpDirectoryResponse::HttpDirectoryResponse(const QString &dirname, HttpRequest
 
 void
 HttpDirectoryResponse::_onHeadersSend() {
-  connect(_connection->socket(), SIGNAL(bytesWritten(qint64)), this, SLOT(_bytesWritten(qint64)));
+  connect(_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_bytesWritten(qint64)));
   _bytesWritten(0);
 }
 
@@ -429,8 +429,8 @@ HttpDirectoryResponse::_bytesWritten(qint64 bytes) {
     emit completed();
     return;
   }
-  qint64 len = _connection->socket()->write(_buffer.constData()+_offset,
-                                            _buffer.size()-_offset);
+  qint64 len = _socket->write(_buffer.constData()+_offset,
+                              _buffer.size()-_offset);
   if (len>0) { _offset += len; }
 }
 
@@ -443,7 +443,7 @@ HttpConnection::HttpConnection(HttpRequestHandler *service, const NodeItem &remo
 {
   logDebug() << "New HTTP connection...";
   // Create new request parser (request)
-  _currentRequest = new HttpRequest(this);
+  _currentRequest = new HttpRequest(this->_socket);
   // no response yet
   _currentResponse = 0;
   // get notified on fishy requests
@@ -477,10 +477,12 @@ HttpConnection::_requestHeadersRead() {
   // If request is not accepted -> response with "Forbidden"
   if (! _service->acceptReqest(_currentRequest)) {
     // If not accepted send forbidden
-    _currentResponse = new HttpStringResponse(_currentRequest->version(), HTTP_FORBIDDEN, "Forbidden", this);
+    _currentResponse = new HttpStringResponse(_currentRequest->version(), HTTP_FORBIDDEN, "Forbidden",
+                                              this->_socket);
   } else if (0 == (_currentResponse = _service->processRequest(_currentRequest))) {
     // If not processed -> not found
-    _currentResponse = new HttpStringResponse(_currentRequest->version(), HTTP_NOT_FOUND, "Not found", this);
+    _currentResponse = new HttpStringResponse(_currentRequest->version(), HTTP_NOT_FOUND, "Not found",
+                                              this->_socket);
   }
   // Take ownership
   _currentResponse->setParent(this);
@@ -509,7 +511,7 @@ HttpConnection::_responseCompleted() {
     deleteLater();
   } else {
     // Get a new request
-    _currentRequest = new HttpRequest(this);
+    _currentRequest = new HttpRequest(this->_socket);
     // get notified on fishy requests
     connect(_currentRequest, SIGNAL(badRequest()), this, SLOT(_badRequest()));
     // get notified if the request headers has been read
@@ -544,13 +546,13 @@ HttpDirectoryHandler::processRequest(HttpRequest *request) {
     logDebug() << "Path " << file.path() << " does not exist.";
     // 404
     return new HttpStringResponse(request->version(), HTTP_NOT_FOUND,
-                                  "Not found", request->connection(), "text/plain");
+                                  "Not found", request->socket(), "text/plain");
   }
   if (! file.canonicalFilePath().startsWith(_directory.canonicalPath())) {
     logDebug() << "Path " << file.path() << " is not located below " << _directory.path();
     // 404
     return new HttpStringResponse(request->version(), HTTP_NOT_FOUND,
-                                  "Not found", request->connection(), "text/plain");
+                                  "Not found", request->socket(), "text/plain");
   }
   if (file.isFile()) {
     logDebug() << "Serve file " << file.canonicalPath();

@@ -476,7 +476,7 @@ SecureStream::abort() {
   _timeout.stop();
 
   // Make sure the stream does not get notified anymore.
-  _dht.socketClosed(id());
+  _node.socketClosed(id());
 
   // close QIODevice
   QIODevice::close();

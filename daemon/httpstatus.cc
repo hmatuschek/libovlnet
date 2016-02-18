@@ -30,7 +30,7 @@ HttpStatus::processRequest(HttpRequest *request) {
       "</body></html>";
   return new HttpStringResponse(request->version(),
         HTTP_OK, resp.arg(_dht.id().toBase32()).arg(_dht.numSockets()).arg(_dht.bytesReceived()).arg(_dht.bytesSend()),
-        request->connection(), "text/html");
+        request->socket(), "text/html");
 }
 
 
