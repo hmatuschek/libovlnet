@@ -13,7 +13,7 @@ public:
   /** Constructor
    * @param dht Specifies the OVL node instance.
    * @param port Specifies the local TCP port to listen on (default 8080). */
-  LocalHttpProxyServer(DHT &dht, uint16_t port=8080);
+  LocalHttpProxyServer(Node &dht, uint16_t port=8080);
   /** Destructor. */
   virtual ~LocalHttpProxyServer();
 };
@@ -29,7 +29,7 @@ public:
   /** Constructor.
    * @param dht Specifies the OVL node instance.
    * @param parent Specifies the optional QObject parent. */
-  LocalHttpProxyServerHandler(DHT &dht, QObject *parent=0);
+  LocalHttpProxyServerHandler(Node &dht, QObject *parent=0);
   /** Destructor. */
   virtual ~LocalHttpProxyServerHandler();
 
@@ -40,7 +40,7 @@ public:
 
 protected:
   /** A weak reference to the DHT node. */
-  DHT &_dht;
+  Node &_dht;
 };
 
 
@@ -55,7 +55,7 @@ public:
    * @param dht Specifies the OVL node instance.
    * @param id Specifeis the hostname to connect to.
    * @param request Specifies the request this is a response to. */
-  LocalHttpProxyResponse(DHT &dht, const HostName &id, HttpRequest *request);
+  LocalHttpProxyResponse(Node &dht, const HostName &id, HttpRequest *request);
 
 protected slots:
   /** Gets called if the remote node has been found. */
@@ -92,7 +92,7 @@ protected:
 
 protected:
   /** A weak reference to the OVL node. */
-  DHT &_dht;
+  Node &_dht;
   /** The remote node or host. */
   HostName _destination;
   /** The current client request. */

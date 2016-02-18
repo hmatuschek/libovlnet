@@ -1,6 +1,6 @@
 #include "searchcompletion.hh"
 
-SearchCompletionModel::SearchCompletionModel(DHT &dht, QObject *parent)
+SearchCompletionModel::SearchCompletionModel(Node &dht, QObject *parent)
   : QAbstractListModel(parent), _dht(dht), _results()
 {
   connect(&_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),

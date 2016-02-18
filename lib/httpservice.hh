@@ -167,7 +167,7 @@ protected:
 };
 
 
-/** Represents a connection to a HTTP client.
+/** Represents an incomming connection from a HTTP client.
  * @ingroup http */
 class HttpConnection: public QObject
 {
@@ -485,7 +485,7 @@ public:
    * @param dht Specifies the DHT node instance.
    * @param handler The request handler.
    * @param parent Optional QObject parent. */
-  HttpService(DHT &dht, HttpRequestHandler *handler, QObject *parent=0);
+  HttpService(Node &dht, HttpRequestHandler *handler, QObject *parent=0);
   /** Destructor. */
   virtual ~HttpService();
 
@@ -500,7 +500,7 @@ public:
 
 protected:
   /** DHT instance. */
-  DHT &_dht;
+  Node &_dht;
   /** The HTTP request handler. */
   HttpRequestHandler *_handler;
 };

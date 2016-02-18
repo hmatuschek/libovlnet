@@ -56,7 +56,7 @@ DHTStatus::neighbors(QList<QPair<double, bool> > &nodes) const {
     Distance d = _application.dht().id() - item->id();
     nodes.push_back(
           QPair<double, bool>(
-            double(d.leadingBit())/(8*DHT_HASH_SIZE),
+            double(d.leadingBit())/(8*OVL_HASH_SIZE),
             _application.buddies().hasNode(item->id())));
   }
 }

@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
   QCoreApplication app(argc, argv);
 
   Identity *id = Identity::newIdentity();
-  DHT node(*id, QHostAddress::Any, port);
+  Node node(*id, QHostAddress::Any, port);
   HttpDirectoryHandler *handler = new HttpDirectoryHandler(QDir(argv[1]));
   node.registerService(80, new HttpService(node, handler));
 

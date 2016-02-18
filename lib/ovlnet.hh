@@ -117,7 +117,7 @@
 #define __OVLNET_H__
 
 #include "dht_config.hh"
-#include "dht.hh"
+#include "node.hh"
 #include "crypto.hh"
 #include "stream.hh"
 

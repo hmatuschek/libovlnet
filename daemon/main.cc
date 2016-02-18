@@ -1,4 +1,4 @@
-#include "lib/dht.hh"
+#include "lib/node.hh"
 #include "lib/ntp.hh"
 #include "lib/crypto.hh"
 #include "lib/logger.hh"

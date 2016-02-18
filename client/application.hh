@@ -8,7 +8,7 @@
 #include <QTimer>
 
 #include "lib/crypto.hh"
-#include "lib/dht.hh"
+#include "lib/node.hh"
 #include "dhtstatus.hh"
 #include "buddylist.hh"
 #include "bootstrapnodelist.hh"
@@ -32,7 +32,7 @@ public:
   void sendFile(const QString &path, size_t size, const Identifier &id);
 
   /** Returns a weak reference to the DHT instance. */
-  DHT &dht();
+  Node &dht();
   /** Returns the settings instance. */
   Settings &settings();
   /** Returns a weak reference to the identity of this DHT node. */
@@ -95,7 +95,7 @@ protected:
   /** The identity of this DHT node. */
   Identity *_identity;
   /** This DHT node. */
-  DHT *_dht;
+  Node *_dht;
   /** Status of the DHT node. */
   DHTStatus *_status;
   /** The persistent settings instance. */

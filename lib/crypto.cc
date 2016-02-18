@@ -1,6 +1,6 @@
 #include "crypto.hh"
 
-#include "dht.hh"
+#include "node.hh"
 #include "dht_config.hh"
 #include "utils.hh"
 
@@ -262,7 +262,7 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
 /* ******************************************************************************************** *
  * Implementation of SecureSocket
  * ******************************************************************************************** */
-SecureSocket::SecureSocket(DHT &dht)
+SecureSocket::SecureSocket(Node &dht)
   : _dht(dht), _sessionKeyPair(0), _peerPubKey(0), _streamId(Identifier::create())
 {
   // pass...
@@ -515,7 +515,7 @@ SecureSocket::decrypt(uint64_t seq, const uint8_t *in, size_t inlen, uint8_t *ou
 {
   // Check arguments
   if ((!in) || (!out)) { return -1; }
-  int len1=DHT_MAX_DATA_SIZE, len2=0;
+  int len1=OVL_MAX_DATA_SIZE, len2=0;
   // "derive IV"
   uint8_t iv[16]; memcpy(iv, _sharedIV, 8);
   // Append seq to shared IV (first 8bytes)
@@ -568,7 +568,7 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
     // A valid encrypted message needs at least 24 bytes (64bit seq + 128bit tag).
     return;
   }
-  uint8_t inBuffer[DHT_MAX_DATA_SIZE];
+  uint8_t inBuffer[OVL_MAX_DATA_SIZE];
   // Get sequence number
   qint64 seq = qFromBigEndian(*((quint64 *)data)); data +=8;
   // Get MAC tag
@@ -582,9 +582,9 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
   /// @bug That is somewhat late! However, sizeof(_inBuffer)==DHT_MAX_MESSAGE_SIZE
   ///      and the decrypted message cannot be larger than that. Hence it is
   ///      ensured that there is no buffer overrun.
-  if (rxlen > DHT_SEC_MAX_DATA_SIZE) {
+  if (rxlen > OVL_SEC_MAX_DATA_SIZE) {
     logError() << "Fatal: Decrypted data larger than MAX_SEC_DATA_SIZE!"
-               << " LEN=" << rxlen << ">" << DHT_SEC_MAX_DATA_SIZE;
+               << " LEN=" << rxlen << ">" << OVL_SEC_MAX_DATA_SIZE;
   }
   // Forward decrypted data
   this->handleDatagram(inBuffer, rxlen);
@@ -592,7 +592,7 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
 
 bool
 SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
-  uint8_t msg[DHT_MAX_MESSAGE_SIZE];
+  uint8_t msg[OVL_MAX_MESSAGE_SIZE];
   uint8_t *ptr = msg;
   int txlen = 0, enclen=0;
 

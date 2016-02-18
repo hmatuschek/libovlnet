@@ -8,7 +8,7 @@
 #include "lib/stream.hh"
 
 /** Maximum amount of data transferred in a single message. */
-#define FILETRANSFER_MAX_DATA_LEN     (DHT_SEC_MAX_DATA_SIZE-5UL)
+#define FILETRANSFER_MAX_DATA_LEN     (OVL_SEC_MAX_DATA_SIZE-5UL)
 
 
 /** Implements the file transfer sender side.
@@ -32,7 +32,7 @@ public:
    * @param filename Filename of the file to be transferred (do not need to exists).
    * @param filesize Size of the file.
    * @param parent Specifies the optional QObject parent. */
-  explicit FileUpload(DHT &dht, const QString &filename, size_t filesize, QObject *parent = 0);
+  explicit FileUpload(Node &dht, const QString &filename, size_t filesize, QObject *parent = 0);
   /** Destructor. */
   virtual ~FileUpload();
 
@@ -100,7 +100,7 @@ public:
   /** Constructor.
    * @param dht Specifies the DHT instance.
    * @param parent Specifies the optional QObject parent. */
-  explicit FileDownload(DHT &dht, QObject *parent = 0);
+  explicit FileDownload(Node &dht, QObject *parent = 0);
   /** Destructor. */
   virtual ~FileDownload();
 

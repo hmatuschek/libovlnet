@@ -20,7 +20,7 @@ public:
    * @param dht Specifies the DHT instance.
    * @param command Specifies the command to execute.
    * @param parent Specifies the optional QObject parent. */
-  SecureShell(DHT &dht, const QString &command="login", QObject *parent=0);
+  SecureShell(Node &dht, const QString &command="login", QObject *parent=0);
 
   /** Startes the process. */
   bool open(OpenMode mode);

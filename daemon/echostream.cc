@@ -1,6 +1,6 @@
 #include "echostream.hh"
 
-EchoStream::EchoStream(DHT &dht)
+EchoStream::EchoStream(Node &dht)
   : SecureSocket(dht)
 {
   // pass...

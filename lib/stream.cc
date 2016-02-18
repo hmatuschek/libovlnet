@@ -1,6 +1,6 @@
 #include "stream.hh"
 
-#include "dht.hh"
+#include "node.hh"
 #include <netinet/in.h>
 
 /** The format of the stream messages. */
@@ -366,7 +366,7 @@ StreamOutBuffer::_in_between(uint32_t x, uint32_t a, uint32_t b) const {
 /* ******************************************************************************************** *
  * Implementation of SecureStream
  * ******************************************************************************************** */
-SecureStream::SecureStream(DHT &dht, QObject *parent)
+SecureStream::SecureStream(Node &dht, QObject *parent)
   : QIODevice(parent), SecureSocket(dht), _inBuffer(), _outBuffer(2000),
     _state(INITIALIZED), _keepalive(), _packetTimer(), _timeout()
 {

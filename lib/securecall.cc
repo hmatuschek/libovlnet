@@ -1,8 +1,8 @@
 #include "securecall.hh"
-#include "dht.hh"
+#include "node.hh"
 #include <netinet/in.h>
 
-SecureCall::SecureCall(bool incomming, DHT &dht)
+SecureCall::SecureCall(bool incomming, Node &dht)
   : QObject(0), SecureSocket(dht),
     _incomming(incomming), _encoder(0), _decoder(0), _paStream(0)
 {

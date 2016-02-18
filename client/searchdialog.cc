@@ -12,7 +12,7 @@
 #include <QCloseEvent>
 
 
-SearchDialog::SearchDialog(DHT *dht, BuddyList *buddies, QWidget *parent)
+SearchDialog::SearchDialog(Node *dht, BuddyList *buddies, QWidget *parent)
   : QWidget(parent), _dht(dht), _buddies(buddies)
 {
   setWindowTitle(tr("Overlay network node search"));

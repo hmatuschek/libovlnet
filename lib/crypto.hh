@@ -1,5 +1,5 @@
-#ifndef IDENTITY_H
-#define IDENTITY_H
+#ifndef __OVL_IDENTITY_HH__
+#define __OVL_IDENTITY_HH__
 
 #include <QObject>
 #include <QIODevice>
@@ -13,14 +13,14 @@
 #include <openssl/evp.h>
 
 // Forward decl.
-class DHT;
+class Node;
 
 
 /** Maximum unencrypted payload per message
- * (DHT_MAX_DATA_SIZE - 8 (sequence) - 16 (GCM-MAC) - 16 (AES 128 BLOCK MARGIN)). */
-#define DHT_SEC_MAX_DATA_SIZE (DHT_MAX_DATA_SIZE-40)
+ * (OVL_MAX_DATA_SIZE - 8 (sequence) - 16 (GCM-MAC) - 16 (AES 128 BLOCK MARGIN)). */
+#define OVL_SEC_MAX_DATA_SIZE (OVL_MAX_DATA_SIZE-40)
 /** The max. public key size for a START_STREAM message. */
-#define DHT_MAX_PUBKEY_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-3)
+#define OVL_MAX_PUBKEY_SIZE (OVL_MAX_MESSAGE_SIZE-OVL_HASH_SIZE-3)
 
 
 /** Represents the identity of a node. A node is unquely identified by its keypair. The private key
@@ -87,7 +87,7 @@ class SecureSocket
 {
 public:
   /** Constructor. */
-  SecureSocket(DHT &dht);
+  SecureSocket(Node &dht);
   /** Destructor. */
   virtual ~SecureSocket();
 
@@ -168,7 +168,7 @@ protected:
 
 protected:
   /** A weak reference to the DHT instance. */
-  DHT &_dht;
+  Node &_dht;
 
 private:
   /** The ECDH key pair of this node for the session. */
@@ -186,12 +186,12 @@ private:
   /** The current sequence number (bytes send). */
   uint64_t _outSeq;
   /** Buffer holding the decrypted message. */
-  uint8_t _inBuffer[DHT_MAX_DATA_SIZE];
+  uint8_t _inBuffer[OVL_MAX_DATA_SIZE];
   /** Identifier of the stream. */
   Identifier _streamId;
 
   // DHT may access some of the protected methods
-  friend class DHT;
+  friend class Node;
 };
 
 
@@ -271,4 +271,4 @@ public:
 };
 
 
-#endif // IDENTITY_H
+#endif // __OVL_IDENTITY_HH__

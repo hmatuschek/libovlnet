@@ -1,5 +1,5 @@
-#ifndef BUCKETS_H
-#define BUCKETS_H
+#ifndef __OVL_BUCKETS_HH__
+#define __OVL_BUCKETS_HH__
 
 #include "dht_config.hh"
 #include "logger.hh"
@@ -300,4 +300,4 @@ protected:
 };
 
 
-#endif // BUCKETS_H
+#endif // __OVL_BUCKETS_HH__

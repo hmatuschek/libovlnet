@@ -67,7 +67,7 @@ Application::Application(int &argc, char *argv[])
   Logger::addHandler(_logModel);
 
   // Create DHT instance
-  _dht = new DHT(*_identity, QHostAddress::Any, 7742);
+  _dht = new Node(*_identity, QHostAddress::Any, 7742);
   // register services
   _dht->registerService(2, new ChatService(*this));
 
@@ -262,7 +262,7 @@ Application::sendFile(const QString &path, size_t size, const Identifier &id) {
   _dht->findNode(id);
 }
 
-DHT &
+Node &
 Application::dht() {
   return *_dht;
 }

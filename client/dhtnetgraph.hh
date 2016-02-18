@@ -2,7 +2,7 @@
 #define DHTNETGRAPH_H
 
 #include <QWidget>
-#include "lib/dht.hh"
+#include "lib/node.hh"
 
 
 class DHTNetGraph : public QWidget

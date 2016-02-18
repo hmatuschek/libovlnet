@@ -11,7 +11,7 @@
 /** Specifies the number of frames per datagram. */
 #define DHT_CALL_NUM_FRAMES 960
 /** Specifies the maximum size of the datagram payload (encoded audio). */
-#define DHT_CALL_MAX_BUFFER_SIZE (DHT_MAX_MESSAGE_SIZE-DHT_HASH_SIZE-24)
+#define DHT_CALL_MAX_BUFFER_SIZE (OVL_MAX_MESSAGE_SIZE-OVL_HASH_SIZE-24)
 
 #include <QObject>
 
@@ -34,7 +34,7 @@ public:
   /** Constructor.
    * @param incomming Indicates whether the call was initiated by the peer or this node.
    * @param dht A weak reference to the @c DHT instance. */
-  explicit SecureCall(bool incomming, DHT &dht);
+  explicit SecureCall(bool incomming, Node &dht);
   /** Destructor. */
   virtual ~SecureCall();
 

@@ -1,7 +1,7 @@
 #include "securechat.hh"
-#include "dht.hh"
+#include "node.hh"
 
-SecureChat::SecureChat(DHT &dht)
+SecureChat::SecureChat(Node &dht)
   : QObject(0), SecureSocket(dht),
     _keepAlive(), _timeout()
 {

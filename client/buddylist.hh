@@ -1,7 +1,7 @@
 #ifndef BUDDYLIST_H
 #define BUDDYLIST_H
 
-#include "lib/dht.hh"
+#include "lib/node.hh"
 
 #include <QObject>
 #include <QFile>

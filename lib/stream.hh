@@ -7,7 +7,7 @@
 
 
 /** Specifies the maximum number of bytes that can be send with one packet. */
-#define DHT_STREAM_MAX_DATA_SIZE (DHT_SEC_MAX_DATA_SIZE-5)
+#define DHT_STREAM_MAX_DATA_SIZE (OVL_SEC_MAX_DATA_SIZE-5)
 
 
 /** A ring buffer of size 64k (65535 bytes). This ring buffer can be implemented efficiently
@@ -207,7 +207,7 @@ public:
   /** Constructor.
    * @param dht A weak reference to the DHT instance.
    * @param parent The optional QObject parent. */
-  SecureStream(DHT &dht, QObject *parent=0);
+  SecureStream(Node &dht, QObject *parent=0);
   /** Destructor. */
   virtual ~SecureStream();
 

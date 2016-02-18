@@ -29,7 +29,7 @@ class SecureSocket;
 
 
 /** Implements a node in the DHT. */
-class DHT: public QObject
+class Node: public QObject
 {
   Q_OBJECT
 
@@ -39,11 +39,11 @@ public:
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
-  explicit DHT(Identity &id, const QHostAddress &addr=QHostAddress::Any,
+  explicit Node(Identity &id, const QHostAddress &addr=QHostAddress::Any,
                quint16 port=7741, QObject *parent=0);
 
   /** Destructor. */
-  virtual ~DHT();
+  virtual ~Node();
 
   /** Returns a weak reference it the identity of the node. */
   Identity &identity();

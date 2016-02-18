@@ -1,7 +1,7 @@
 #ifndef SEARCHDIALOG_H
 #define SEARCHDIALOG_H
 
-#include "lib/dht.hh"
+#include "lib/node.hh"
 #include "buddylist.hh"
 
 #include <QWidget>
@@ -13,7 +13,7 @@ class SearchDialog : public QWidget
   Q_OBJECT
 
 public:
-  explicit SearchDialog(DHT *dht, BuddyList *buddies, QWidget *parent = 0);
+  explicit SearchDialog(Node *dht, BuddyList *buddies, QWidget *parent = 0);
 
 protected slots:
   void _onStartSearch();
@@ -26,7 +26,7 @@ protected:
   void closeEvent(QCloseEvent *evt);
 
 protected:
-  DHT *_dht;
+  Node *_dht;
   BuddyList *_buddies;
   Identifier _currentSearch;
   QLineEdit *_query;

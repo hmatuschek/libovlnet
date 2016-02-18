@@ -25,7 +25,7 @@ Identifier::Identifier()
 }
 
 Identifier::Identifier(const char *id)
-  : QByteArray(id, DHT_HASH_SIZE)
+  : QByteArray(id, OVL_HASH_SIZE)
 {
   // pass...
 }
@@ -50,7 +50,7 @@ Identifier::operator=(const Identifier &other) {
 
 bool
 Identifier::operator==(const Identifier &other) const {
-  for (size_t i=0; i<DHT_HASH_SIZE; i++) {
+  for (size_t i=0; i<OVL_HASH_SIZE; i++) {
     if (this->at(i) ^ other.at(i)) { return false; }
   }
   return true;
@@ -68,14 +68,14 @@ Identifier::isNull() const {
 
 bool
 Identifier::isValid() const {
-  return (DHT_HASH_SIZE == this->size());
+  return (OVL_HASH_SIZE == this->size());
 }
 
 Identifier
 Identifier::create() {
   Identifier id;
-  id.reserve(DHT_HASH_SIZE);
-  for (int i=0; i<DHT_HASH_SIZE; i++) {
+  id.reserve(OVL_HASH_SIZE);
+  for (int i=0; i<OVL_HASH_SIZE; i++) {
     id.append(qrand() % 0xff);
   }
   return id;
@@ -84,9 +84,9 @@ Identifier::create() {
 QString
 Identifier::toBase32() const {
   // Ensure we have the correct length
-  if (DHT_HASH_SIZE != size()) { return ""; }
+  if (OVL_HASH_SIZE != size()) { return ""; }
   // Get the number of chars to encode HASH as base32 (no padding, we know the length)
-  size_t sc = ((DHT_HASH_SIZE*8/5) + (((DHT_HASH_SIZE*8)%5) ? 1 : 0));
+  size_t sc = ((OVL_HASH_SIZE*8/5) + (((OVL_HASH_SIZE*8)%5) ? 1 : 0));
   QString code; code.reserve(sc);
   for (size_t i=0; i<sc; i++) {
     // Get byte and msb of the i-th 5-bit symbol in a byte.
@@ -114,8 +114,8 @@ Identifier
 Identifier::fromBase32(const QString &base32) {
   Identifier id;
   // Get the number of chars to decode from base32 (no padding, we know the expected length)
-  size_t sc = std::min(base32.size(), ((DHT_HASH_SIZE*8/5)+((DHT_HASH_SIZE*8)%5 ? 1 : 0)));
-  id.resize(DHT_HASH_SIZE); id.fill(0, DHT_HASH_SIZE);
+  size_t sc = std::min(base32.size(), ((OVL_HASH_SIZE*8/5)+((OVL_HASH_SIZE*8)%5 ? 1 : 0)));
+  id.resize(OVL_HASH_SIZE); id.fill(0, OVL_HASH_SIZE);
   for (size_t i=0; i<sc; i++) {
     // Get byte and msb of the i-th 5-bit symbol in a byte.
     size_t byte = (i*5)/8, msb = (7 - ((i*5)%8));
@@ -139,9 +139,9 @@ Identifier::fromBase32(const QString &base32) {
  * Implementation of Distance
  * ******************************************************************************************** */
 Distance::Distance(const Identifier &a, const Identifier &b)
-  : QByteArray(DHT_HASH_SIZE, 0xff)
+  : QByteArray(OVL_HASH_SIZE, 0xff)
 {
-  for (uint i=0; i<DHT_HASH_SIZE; i++) {
+  for (uint i=0; i<OVL_HASH_SIZE; i++) {
     (*this)[i] = (a[i] ^ b[i]);
   }
 }
@@ -160,10 +160,10 @@ Distance::bit(size_t idx) const {
 
 size_t
 Distance::leadingBit() const {
-  for (size_t i=0; i<(8*DHT_HASH_SIZE); i++) {
+  for (size_t i=0; i<(8*OVL_HASH_SIZE); i++) {
     if (bit(i)) { return i; }
   }
-  return 8*DHT_HASH_SIZE;
+  return 8*OVL_HASH_SIZE;
 }
 
 /* ******************************************************************************************** *
@@ -340,7 +340,7 @@ Bucket::Item::lastSeen() const {
  * Implementation of Bucket
  * ******************************************************************************************** */
 Bucket::Bucket(const Identifier &self)
-  : _self(self), _maxSize(DHT_K), _prefix(0), _triples()
+  : _self(self), _maxSize(OVL_K), _prefix(0), _triples()
 {
   // pass...
 }
@@ -440,7 +440,7 @@ Bucket::getNearest(const Identifier &id, QList<NodeItem> &best) const {
     QList<NodeItem>::iterator node = best.begin();
     while ((node != best.end()) && (d>=(id-node->id()))) { node++; }
     best.insert(node, NodeItem(item.key(), item->addr(), item->port()));
-    while (best.size() > DHT_K) { best.pop_back(); }
+    while (best.size() > OVL_K) { best.pop_back(); }
   }
 }
 
@@ -487,7 +487,7 @@ Bucket::removeNode(const Identifier &id) {
 Buckets::Buckets(const Identifier &self)
   : _self(self), _buckets()
 {
-  _buckets.reserve(8*DHT_HASH_SIZE);
+  _buckets.reserve(8*OVL_HASH_SIZE);
 }
 
 bool

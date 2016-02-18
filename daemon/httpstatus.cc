@@ -1,7 +1,7 @@
 #include "httpstatus.hh"
-#include "lib/dht.hh"
+#include "lib/node.hh"
 
-HttpStatus::HttpStatus(DHT &dht, QObject *parent)
+HttpStatus::HttpStatus(Node &dht, QObject *parent)
   : HttpRequestHandler(parent), _dht(dht)
 {
   // pass...

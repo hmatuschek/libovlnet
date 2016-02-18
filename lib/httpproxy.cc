@@ -1,5 +1,5 @@
 #include "httpproxy.hh"
-#include "dht.hh"
+#include "node.hh"
 #include <QHostInfo>
 #include <QTcpSocket>
 
@@ -7,7 +7,7 @@
 /* ********************************************************************************************* *
  * Implementation of LocalHttpProxyServer
  * ********************************************************************************************* */
-LocalHttpProxyServer::LocalHttpProxyServer(DHT &dht, uint16_t port)
+LocalHttpProxyServer::LocalHttpProxyServer(Node &dht, uint16_t port)
   : LocalHttpServer(new LocalHttpProxyServerHandler(dht), port)
 {
   // pass...
@@ -21,7 +21,7 @@ LocalHttpProxyServer::~LocalHttpProxyServer() {
 /* ********************************************************************************************* *
  * Implementation of LocalHttpProxyServerHandler
  * ********************************************************************************************* */
-LocalHttpProxyServerHandler::LocalHttpProxyServerHandler(DHT &dht, QObject *parent)
+LocalHttpProxyServerHandler::LocalHttpProxyServerHandler(Node &dht, QObject *parent)
   : HttpRequestHandler(parent), _dht(dht)
 {
   // pass...
@@ -52,7 +52,7 @@ LocalHttpProxyServerHandler::processRequest(HttpRequest *request) {
 /* ********************************************************************************************* *
  * Implementation of LocalHttpProxyResponse
  * ********************************************************************************************* */
-LocalHttpProxyResponse::LocalHttpProxyResponse(DHT &dht, const HostName &id, HttpRequest *request)
+LocalHttpProxyResponse::LocalHttpProxyResponse(Node &dht, const HostName &id, HttpRequest *request)
   : HttpResponse(request->version(), HTTP_RESP_INCOMPLETE, request->connection()),
     _dht(dht), _destination(id), _request(request), _stream(0)
 {  

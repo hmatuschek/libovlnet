@@ -1,7 +1,7 @@
 #ifndef HALCHAT_H
 #define HALCHAT_H
 
-#include "lib/dht.hh"
+#include "lib/node.hh"
 #include "lib/crypto.hh"
 #include "qhal.hh"
 
@@ -14,7 +14,7 @@ class HalChat : public QObject, public SecureSocket
   Q_OBJECT
 
 public:
-  explicit HalChat(DHT &dht, QHalModel &model,QObject *parent = 0);
+  explicit HalChat(Node &dht, QHalModel &model,QObject *parent = 0);
 
   void started();
 

@@ -7,13 +7,13 @@ class HttpStatus: public HttpRequestHandler
   Q_OBJECT
 
 public:
-  HttpStatus(DHT &dht, QObject *parent=0);
+  HttpStatus(Node &dht, QObject *parent=0);
 
   bool acceptReqest(HttpRequest *request);
   HttpResponse *processRequest(HttpRequest *request);
 
 protected:
-  DHT &_dht;
+  Node &_dht;
 };
 
 #endif // __OVLNET_DAEMON_HTTP_STATUS_H__

@@ -1,9 +1,9 @@
 #include "filetransfer.hh"
 #include <QtEndian>
 #include <QFileInfo>
-#include "dht.hh"
+#include "node.hh"
 
-#define FILETRANSFER_MAX_FILENAME_LEN (DHT_SEC_MAX_DATA_SIZE-9UL)
+#define FILETRANSFER_MAX_FILENAME_LEN (OVL_SEC_MAX_DATA_SIZE-9UL)
 
 struct __attribute__((packed)) FileTransferMessage {
   uint8_t type;
@@ -35,7 +35,7 @@ typedef enum {
 /* ********************************************************************************************* *
  * Implementation of FileUpload
  * ********************************************************************************************* */
-FileUpload::FileUpload(DHT &dht, const QString &filename, size_t filesize, QObject *parent)
+FileUpload::FileUpload(Node &dht, const QString &filename, size_t filesize, QObject *parent)
   : QObject(parent), SecureSocket(dht), _state(INITIALIZED),
     _packetBuffer(2000), _fileName(filename), _fileSize(filesize)
 {
@@ -181,7 +181,7 @@ FileUpload::write(const uint8_t *buffer, size_t size) {
 /* ********************************************************************************************* *
  * Implementation of FileDownload
  * ********************************************************************************************* */
-FileDownload::FileDownload(DHT &dht, QObject *parent)
+FileDownload::FileDownload(Node &dht, QObject *parent)
   : QObject(parent), SecureSocket(dht),
     _state(INITIALIZED), _fileSize(0), _packetBuffer()
 {

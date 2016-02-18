@@ -1,4 +1,4 @@
-#include "lib/dht.hh"
+#include "lib/node.hh"
 #include "lib/httpproxy.hh"
 #include <iostream>
 
@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
   }
 
   Identity *id = Identity::newIdentity();
-  DHT dht(*id);
+  Node dht(*id);
   LocalHttpProxyServer proxy(dht, port);
 
   // Bootstrap

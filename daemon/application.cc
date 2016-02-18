@@ -29,7 +29,7 @@ Application::Application(int argc, char *argv[])
   }
 
   if (_identity) {
-    _dht = new DHT(*_identity);
+    _dht = new Node(*_identity);
   } else {
     logError() << "Error while loading or creating my identity.";
   }
@@ -40,7 +40,7 @@ Application::Application(int argc, char *argv[])
   _dht->registerService(80, new HttpService(*this->_dht, new HttpStatus(*this->_dht)));
 }
 
-DHT &
+Node &
 Application::dht() {
   return *_dht;
 }

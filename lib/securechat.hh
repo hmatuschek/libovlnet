@@ -20,7 +20,7 @@ class SecureChat : public QObject, public SecureSocket
 public:
   /** Construtor.
    * @param dht Specifies the @c DHT instance. */
-  SecureChat(DHT &dht);
+  SecureChat(Node &dht);
   /** Destructor, closes the connection. */
   virtual ~SecureChat();
 

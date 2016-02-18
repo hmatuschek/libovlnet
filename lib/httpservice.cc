@@ -2,7 +2,7 @@
 #include "logger.hh"
 #include "stream.hh"
 #include "buckets.hh"
-#include "dht.hh"
+#include "node.hh"
 #include <QUrl>
 #include <QTcpSocket>
 #include <QJsonDocument>
@@ -615,7 +615,7 @@ LocalHttpServer::_onNewConnection() {
 /* ********************************************************************************************* *
  * Implementation of HttpService
  * ********************************************************************************************* */
-HttpService::HttpService(DHT &dht, HttpRequestHandler *handler, QObject *parent)
+HttpService::HttpService(Node &dht, HttpRequestHandler *handler, QObject *parent)
   : QObject(parent), _dht(dht), _handler(handler)
 {
   // pass...

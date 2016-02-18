@@ -1,8 +1,8 @@
 set(ovl_SOURCES crypto.cc utils.cc buckets.cc logger.cc
-    ntp.cc dht.cc pcp.cc natpmp.cc stream.cc socks.cc filetransfer.cc securechat.cc securecall.cc
+    ntp.cc node.cc pcp.cc natpmp.cc stream.cc socks.cc filetransfer.cc securechat.cc securecall.cc
     httpservice.cc secureshell.cc httpproxy.cc)
 set(ovl_MOC_HEADERS 
-    ntp.hh dht.hh pcp.hh natpmp.hh stream.hh socks.hh filetransfer.hh securechat.hh securecall.hh
+    ntp.hh node.hh pcp.hh natpmp.hh stream.hh socks.hh filetransfer.hh securechat.hh securecall.hh
     httpservice.hh secureshell.hh httpproxy.hh)
 set(ovl_HEADERS ${ovl_MOC_HEADERS}
     ovlnet.hh buckets.hh utils.hh crypto.hh logger.hh)

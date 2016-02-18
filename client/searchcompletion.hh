@@ -2,7 +2,7 @@
 #define SEARCHCOMPLETION_H
 
 #include <QAbstractListModel>
-#include "lib/dht.hh"
+#include "lib/node.hh"
 
 
 class SearchCompletionModel : public QAbstractListModel
@@ -10,7 +10,7 @@ class SearchCompletionModel : public QAbstractListModel
   Q_OBJECT
 
 public:
-  explicit SearchCompletionModel(DHT &dht, QObject *parent = 0);
+  explicit SearchCompletionModel(Node &dht, QObject *parent = 0);
 
   int rowCount(const QModelIndex &parent) const;
 
@@ -19,7 +19,7 @@ protected slots:
 
 protected:
   /** Weak reference to the DHT instance (for searching). */
-  DHT &_dht;
+  Node &_dht;
   /** Last search results. */
   QList<NodeItem> _results;
 };

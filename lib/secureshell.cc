@@ -1,6 +1,6 @@
 #include "secureshell.hh"
 
-SecureShell::SecureShell(DHT &dht, const QString &command, QObject *parent)
+SecureShell::SecureShell(Node &dht, const QString &command, QObject *parent)
   : SecureStream(dht, parent), _command(command), _process()
 {
   connect(&_process, SIGNAL(started()), this, SLOT(_shellStarted()));

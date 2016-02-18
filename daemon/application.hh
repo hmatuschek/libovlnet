@@ -3,7 +3,7 @@
 
 #include <QCoreApplication>
 #include "lib/crypto.hh"
-#include "lib/dht.hh"
+#include "lib/node.hh"
 #include "qhal.hh"
 #include "settings.hh"
 
@@ -14,7 +14,7 @@ class Application : public QCoreApplication
 public:
   explicit Application(int argc, char *argv[]);
 
-  DHT &dht();
+  Node &dht();
 
 protected:
   class HalChatService: public AbstractService
@@ -43,7 +43,7 @@ protected:
 
 protected:
   Identity *_identity;
-  DHT *_dht;
+  Node *_dht;
   QHalModel _model;
   Settings _settings;
 };
