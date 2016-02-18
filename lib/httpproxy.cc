@@ -101,7 +101,7 @@ LocalHttpProxyResponse::_onTcpError(QAbstractSocket::SocketError error) {
 
 void
 LocalHttpProxyResponse::_onConnectionError() {
-  logDebug() << "Cannot connect to node. Try rendesvous";
+  logDebug() << "Cannot connect to node. Try rendezvous";
   delete _stream; _stream=0;
   connect(&_dht, SIGNAL(rendezvousInitiated(NodeItem)), this, SLOT(_onRendezvousInitiated(NodeItem)));
   connect(&_dht, SIGNAL(rendezvousFailed(Identifier)), this, SLOT(_onRendezvousFailed(Identifier)));

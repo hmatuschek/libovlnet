@@ -364,8 +364,10 @@ void
 HttpFileResponse::_bytesWritten(qint64 bytes)
 {
   if (_offset == _file.size()) {
+    logDebug() << "File send... Wait for completion.";
     // If all has be read from file
     if (0 == _socket->bytesToWrite()) {
+      logDebug() << "Transfer completed.";
       // If all has been send to the device
       emit completed();
     }
