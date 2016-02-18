@@ -69,7 +69,7 @@ Application::Application(int &argc, char *argv[])
   // Create DHT instance
   _dht = new Node(*_identity, QHostAddress::Any, 7742);
   // register services
-  _dht->registerService(2, new ChatService(*this));
+  _dht->registerService("::simplechat", new ChatService(*this));
 
   // Load settings
   _settings = new Settings(nodeDir.canonicalPath()+"/settings.json");
@@ -311,13 +311,13 @@ Application::onNodeFound(const NodeItem &node) {
   if (0 != (chat = dynamic_cast<SecureChat *>(stream))) {
     logInfo() << "Node " << node.id() << " found: Start chat.";
     (new ChatWindow(*this, chat))->show();
-    _dht->startConnection(2, node, stream);
+    _dht->startConnection("::simplechat", node, stream);
   } else if (0 != (call = dynamic_cast<SecureCall *>(stream))) {
     logInfo() << "Node " << node.id() << " found: Start call.";
-    _dht->startConnection(1, node, stream);
+    _dht->startConnection("::call", node, stream);
   } else if (0 != (upload = dynamic_cast<FileUpload *>(stream))) {
     logInfo() << "Node " << node.id() << "found: Start upload of file " << upload->fileName();
-    _dht->startConnection(4, node, stream);
+    _dht->startConnection("::fileupload", node, stream);
   }
 }
 

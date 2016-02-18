@@ -20,7 +20,7 @@ class Node;
  * (OVL_MAX_DATA_SIZE - 8 (sequence) - 16 (GCM-MAC) - 16 (AES 128 BLOCK MARGIN)). */
 #define OVL_SEC_MAX_DATA_SIZE (OVL_MAX_DATA_SIZE-40)
 /** The max. public key size for a START_STREAM message. */
-#define OVL_MAX_PUBKEY_SIZE (OVL_MAX_MESSAGE_SIZE-OVL_HASH_SIZE-3)
+#define OVL_MAX_PUBKEY_SIZE (OVL_MAX_MESSAGE_SIZE-2*OVL_HASH_SIZE-1)
 
 
 /** Represents the identity of a node. A node is unquely identified by its keypair. The private key
@@ -270,5 +270,7 @@ public:
   virtual void connectionFailed(SecureSocket *stream) = 0;
 };
 
+
+void OVLHash(const unsigned char *data, size_t len, unsigned char *out);
 
 #endif // __OVL_IDENTITY_HH__

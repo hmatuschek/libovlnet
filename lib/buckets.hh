@@ -40,7 +40,7 @@ public:
   /** Creates an empty identifier. */
   Identifier();
   /** Constructor. */
-  Identifier(const char *id);
+  explicit Identifier(const char *id);
   /** Constructor. */
   Identifier(const QByteArray &id);
   /** Copy constructor. */

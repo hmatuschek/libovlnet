@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
   Identity *id = Identity::newIdentity();
   Node node(*id, QHostAddress::Any, port);
   HttpDirectoryHandler *handler = new HttpDirectoryHandler(QDir(argv[1]));
-  node.registerService(80, new HttpService(node, handler));
+  node.registerService("::http", new HttpService(node, handler));
 
   node.ping(argv[2], 7741);
   node.ping(argv[2], 7742);

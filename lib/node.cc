@@ -27,14 +27,10 @@ struct __attribute__((packed)) Message
   typedef enum {
     /** A ping request or response. */
     PING = 0,
-    /** An announce message. */
-    ANNOUNCE,
     /** A find node request message. */
     FIND_NODE,
-    /** A find value request message. */
-    FIND_VALUE,
     /** A "connect" request or response message. */
-    START_STREAM,
+    CONNECT,
     /** A rendezvous request or notification message. */
     RENDEZVOUS,
   } Type;
@@ -51,13 +47,6 @@ struct __attribute__((packed)) Message
       char    id[OVL_HASH_SIZE];  ///< Identifier of the sender
     } ping;
 
-    /** An announcement message. */
-    struct __attribute__((packed)) {
-      uint8_t type;                ///< Type flag == @c MSG_ANNOUNCE.
-      char    who[OVL_HASH_SIZE];  ///< Identifier of the sender.
-      char    what[OVL_HASH_SIZE]; ///< Identifier of the object.
-    } announce;
-
     /** A find node request. */
     struct __attribute__((packed)) {
       /** Type flag == @c MSG_FIND_NODE. */
@@ -69,17 +58,6 @@ struct __attribute__((packed)) Message
        * of this field implicitly defines the number of triples returned by the remote node. */
       char    dummy[OVL_MAX_TRIPLES*OVL_TRIPLE_SIZE-OVL_HASH_SIZE];
     } find_node;
-
-    struct __attribute__((packed)) {
-      /** Type flag == @c MSG_FIND_VALUE. */
-      uint8_t type;
-      /** The identifier of the value to find. */
-      char    id[OVL_HASH_SIZE];
-      /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
-       * attack. It ensures that the request has at least the same size as the response. The size
-       * of this field implicitly defines the max. number of triples returned by the remote node. */
-      char    dummy[OVL_MAX_TRIPLES*OVL_TRIPLE_SIZE-OVL_HASH_SIZE];
-    } find_value;
 
     /** A response to "find value" or "find node". */
     struct __attribute__((packed)) {
@@ -95,8 +73,8 @@ struct __attribute__((packed)) Message
     struct __attribute__((packed)) {
       /** Type flag == @c MSG_START_CONNECTION. */
       uint8_t  type;
-      /** A service id (not part of the DHT specification). */
-      uint16_t service;
+      /** A service id (not part of the OVL specification). */
+      uint8_t service[OVL_HASH_SIZE];
       /** Public (ECDH) key of the requesting or responding node. */
       uint8_t  pubkey[OVL_MAX_PUBKEY_SIZE];
     } start_connection;
@@ -129,15 +107,15 @@ Message::Message()
 }
 
 
-#define DHT_PING_REQU_SIZE             (OVL_COOKIE_SIZE+OVL_HASH_SIZE+1)
-#define DHT_PING_RESP_SIZE             DHT_PING_REQU_SIZE
-#define DHT_FIND_NODE_MIN_REQU_SIZE    (OVL_COOKIE_SIZE+OVL_HASH_SIZE+1)
-#define DHT_FIND_NODE_MIN_RESP_SIZE    (OVL_COOKIE_SIZE+1)
+#define DHT_PING_REQU_SIZE               (OVL_COOKIE_SIZE+OVL_HASH_SIZE+1)
+#define DHT_PING_RESP_SIZE               DHT_PING_REQU_SIZE
+#define DHT_FIND_NODE_MIN_REQU_SIZE      (OVL_COOKIE_SIZE+OVL_HASH_SIZE+1)
+#define DHT_FIND_NODE_MIN_RESP_SIZE      (OVL_COOKIE_SIZE+1)
 #define DHT_FIND_NEIGHBOR_MIN_REQU_SIZE  (OVL_COOKIE_SIZE+OVL_HASH_SIZE+1)
 #define DHT_FIND_NEIGHBOR_MIN_RESP_SIZE  (OVL_COOKIE_SIZE+1)
-#define DHT_START_STREAM_MIN_REQU_SIZE (OVL_COOKIE_SIZE+OVL_HASH_SIZE+3)
-#define DHT_START_STREAM_MIN_RESP_SIZE (OVL_COOKIE_SIZE+3)
-#define DHT_RENDEZVOUS_REQU_SIZE       (OVL_COOKIE_SIZE+OVL_HASH_SIZE+19)
+#define DHT_CONNECT_MIN_REQU_SIZE        (OVL_COOKIE_SIZE+2*OVL_HASH_SIZE+1)
+#define DHT_CONNECT_MIN_RESP_SIZE        DHT_CONNECT_MIN_REQU_SIZE
+#define DHT_RENDEZVOUS_REQU_SIZE         (OVL_COOKIE_SIZE+OVL_HASH_SIZE+19)
 
 
 /** Base class of all search queries.
@@ -301,21 +279,21 @@ class StartConnectionRequest: public Request
 {
 public:
   /** Constructor.
-   * @param service The service number.
+   * @param service The service identifier.
    * @param peer Identifier of the peer node.
    * @param socket The secure socket for the connection. */
-  StartConnectionRequest(uint16_t service, const Identifier &peer, SecureSocket *socket);
+  StartConnectionRequest(const char *service, const Identifier &peer, SecureSocket *socket);
 
   /** Returns the socket of the request. */
   inline SecureSocket *socket() const { return _socket; }
   /** Returns the service number of the request. */
-  inline uint16_t service() const { return _service; }
+  inline const char *service() const { return _service; }
   /** Returns the identifier of the remote node. */
   inline const Identifier &peedId() const { return _peer; }
 
 protected:
   /** The service number. */
-  uint16_t _service;
+  const char *_service;
   /** The id of the remote node. */
   Identifier _peer;
   /** The socket of the connection. */
@@ -429,7 +407,7 @@ RendezvousSearchRequest::RendezvousSearchRequest(SearchQuery *query)
   // pass...
 }
 
-StartConnectionRequest::StartConnectionRequest(uint16_t service, const Identifier &peer, SecureSocket *socket)
+StartConnectionRequest::StartConnectionRequest(const char *service, const Identifier &peer, SecureSocket *socket)
   : Request(START_CONNECTION), _service(service), _peer(peer), _socket(socket)
 {
   _cookie = socket->id();
@@ -601,19 +579,30 @@ Node::findNeighbours(const Identifier &id, const QList<NodeItem> &start) {
 }
 
 bool
-Node::hasService(uint16_t service) const {
+Node::hasService(const Identifier &service) const {
   return _services.contains(service);
 }
 
 bool
-Node::registerService(uint16_t no, AbstractService *handler) {
-  if (_services.contains(no)) { return false; }
-  _services.insert(no, handler);
+Node::hasService(const char *service) const {
+  unsigned char hash[OVL_HASH_SIZE];
+  OVLHash((const unsigned char *)service, strlen(service), hash);
+  return hasService(Identifier((const char *)hash));
+}
+
+bool
+Node::registerService(const char *service, AbstractService *handler) {
+  unsigned char hash[OVL_HASH_SIZE];
+  OVLHash((const unsigned char *)service, strlen(service), hash);
+  Identifier id((const char *) hash);
+  if (_services.contains(id)) { return false; }
+  _services.insert(id, handler);
   return true;
 }
 
 bool
-Node::startConnection(uint16_t service, const NodeItem &node, SecureSocket *stream) {
+Node::startConnection(const char *service, const NodeItem &node, SecureSocket *stream)
+{
   logDebug() << "Send start secure connection id=" << stream->id()
              << " to " << node.id()
              << " @" << node.addr() << ":" << node.port();
@@ -622,8 +611,8 @@ Node::startConnection(uint16_t service, const NodeItem &node, SecureSocket *stre
   // Assemble message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.start_connection.type = Message::START_STREAM;
-  msg.payload.start_connection.service = htons(service);
+  msg.payload.start_connection.type = Message::CONNECT;
+  OVLHash((const unsigned char *)service, strlen(service), msg.payload.start_connection.service);
   int keyLen = 0;
   if (0 > (keyLen = stream->prepare(msg.payload.start_connection.pubkey, OVL_MAX_PUBKEY_SIZE)) ) {
     stream->failed();
@@ -865,7 +854,7 @@ Node::_onReadyRead() {
           _processPingRequest(msg, size, addr, port);
         } else if ((size >= DHT_FIND_NODE_MIN_REQU_SIZE) && (Message::FIND_NODE == msg.payload.find_node.type)) {
           _processFindNodeRequest(msg, size, addr, port);
-        } else if ((size > DHT_START_STREAM_MIN_REQU_SIZE) && (Message::START_STREAM == msg.payload.start_connection.type)) {
+        } else if ((size > DHT_CONNECT_MIN_REQU_SIZE) && (Message::CONNECT == msg.payload.start_connection.type)) {
           _processStartConnectionRequest(msg, size, addr, port);
         } else if ((size == DHT_RENDEZVOUS_REQU_SIZE) && (Message::RENDEZVOUS == msg.payload.rendezvous.type)) {
           _processRendezvousRequest(msg, size, addr, port);
@@ -893,13 +882,13 @@ Node::_processPingResponse(
     const struct Message &msg, size_t size, PingRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // signal success
-  emit nodeReachable(NodeItem(msg.payload.ping.id, addr, port));
+  emit nodeReachable(NodeItem(Identifier(msg.payload.ping.id), addr, port));
   // If the buckets are empty -> we are likely bootstrapping
   bool bootstrapping = _buckets.empty();
   // Given that this is a ping response -> add the node to the corresponding
   // bucket if space is left
-  if (_buckets.add(msg.payload.ping.id, addr, port)) {
-    emit nodeAppeard(NodeItem(msg.payload.ping.id, addr, port));
+  if (_buckets.add(Identifier(msg.payload.ping.id), addr, port)) {
+    emit nodeAppeard(NodeItem(Identifier(msg.payload.ping.id), addr, port));
   }
   if (bootstrapping) {
     emit connected();
@@ -1085,8 +1074,8 @@ Node::_processPingRequest(
     logError() << "Failed to send Ping response to " << addr << ":" << port;
   }
   // Add node to candidate nodes for the bucket table if not known already
-  if (! _buckets.contains(msg.payload.ping.id)) {
-    _buckets.addCandidate(msg.payload.ping.id, addr, port);
+  if (! _buckets.contains(Identifier(msg.payload.ping.id))) {
+    _buckets.addCandidate(Identifier(msg.payload.ping.id), addr, port);
   }
 }
 
@@ -1095,7 +1084,7 @@ Node::_processFindNodeRequest(
     const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
   QList<NodeItem> best;
-  _buckets.getNearest(msg.payload.find_node.id, best);
+  _buckets.getNearest(Identifier(msg.payload.find_node.id), best);
 
   struct Message resp;
   // Assemble response
@@ -1123,7 +1112,7 @@ Node::_processFindNodeRequest(
 void
 Node::_processStartConnectionRequest(const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
-  uint16_t service = ntohs(msg.payload.start_connection.service);
+  Identifier service((const char *)msg.payload.start_connection.service);
   logDebug() << "Received StartConnection request, service: " << service;
   if (! _services.contains(service)) { return; }
   AbstractService *serviceHandler = _services[service];
@@ -1149,20 +1138,21 @@ Node::_processStartConnectionRequest(const Message &msg, size_t size, const QHos
   // assemble response
   Message resp; int keyLen=0;
   memcpy(resp.cookie, msg.cookie, OVL_COOKIE_SIZE);
-  resp.payload.start_connection.type = Message::START_STREAM;
-  resp.payload.start_connection.service = msg.payload.start_connection.service;
+  resp.payload.start_connection.type = Message::CONNECT;
+  memcpy(resp.payload.start_connection.service,
+         msg.payload.start_connection.service, OVL_HASH_SIZE);
   if (0 > (keyLen = connection->prepare(resp.payload.start_connection.pubkey, OVL_MAX_PUBKEY_SIZE))) {
     logError() << "Can not prepare connection.";
     delete connection; return;
   }
 
-  if (! connection->start(resp.cookie, PeerItem(addr, port))) {
+  if (! connection->start(Identifier(resp.cookie), PeerItem(addr, port))) {
     logError() << "Can not finish SecureSocket handshake.";
     delete connection; return;
   }
 
   // compute message size
-  keyLen += DHT_START_STREAM_MIN_RESP_SIZE;
+  keyLen += DHT_CONNECT_MIN_RESP_SIZE;
   // Send response
   if (keyLen != _socket.writeDatagram((char *)&resp, keyLen, addr, port)) {
     logError() << "Can not send StartConnection response";
@@ -1170,7 +1160,7 @@ Node::_processStartConnectionRequest(const Message &msg, size_t size, const QHos
   }
 
   // Connection started..
-  _connections[resp.cookie] = connection;
+  _connections[Identifier(resp.cookie)] = connection;
   serviceHandler->connectionStarted(connection);
 }
 
@@ -1179,9 +1169,9 @@ Node::_processRendezvousRequest(Message &msg, size_t size, const QHostAddress &a
   if (_self.id() == Identifier(msg.payload.rendezvous.id)) {
     // If the rendezvous request addressed me -> response with a ping
     ping(msg.payload.rendezvous.ip, ntohs(msg.payload.rendezvous.port));
-  } else if (_buckets.contains(msg.payload.rendezvous.id)) {
+  } else if (_buckets.contains(Identifier(msg.payload.rendezvous.id))) {
     // If the rendezvous request is not addressed to me but to a node I know -> forward
-    NodeItem node = _buckets.getNode(msg.payload.rendezvous.id);
+    NodeItem node = _buckets.getNode(Identifier(msg.payload.rendezvous.id));
     memcpy(msg.payload.rendezvous.ip, addr.toIPv6Address().c, 16);
     msg.payload.rendezvous.port = htons(port);
     if (DHT_RENDEZVOUS_REQU_SIZE != _socket.writeDatagram(

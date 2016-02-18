@@ -649,3 +649,11 @@ AbstractService::~AbstractService() {
   // pass...
 }
 
+
+/* ******************************************************************************************** *
+ * Implementation of helper functions
+ * ******************************************************************************************** */
+void
+OVLHash(const unsigned char *data, size_t len, unsigned char *out) {
+  RIPEMD160(data, len, out);
+}

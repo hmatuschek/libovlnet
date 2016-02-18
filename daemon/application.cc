@@ -35,9 +35,9 @@ Application::Application(int argc, char *argv[])
   }
 
   // Register services
-  _dht->registerService(2, new HalChatService(*this));
-  _dht->registerService(5, new SocksService(*this));
-  _dht->registerService(80, new HttpService(*this->_dht, new HttpStatus(*this->_dht)));
+  _dht->registerService("::simplechat", new HalChatService(*this));
+  _dht->registerService("::socks5", new SocksService(*this));
+  _dht->registerService("::http", new HttpService(*this->_dht, new HttpStatus(*this->_dht)));
 }
 
 Node &

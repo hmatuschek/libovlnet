@@ -82,7 +82,7 @@ LocalHttpProxyResponse::_onNodeFound(NodeItem item) {
   SecureStream *socket = new SecureStream(_dht, this); _stream = socket;
   connect(socket, SIGNAL(established()), this, SLOT(_onConnected()));
   connect(socket, SIGNAL(error()), this, SLOT(_onConnectionError()));
-  _dht.startConnection(_destination.port(), item, socket);
+  _dht.startConnection("::http", item, socket);
 }
 
 void
@@ -115,7 +115,7 @@ LocalHttpProxyResponse::_onRendezvousInitiated(const NodeItem &node) {
   SecureStream *socket = new SecureStream(_dht, this); _stream = socket;
   connect(socket, SIGNAL(established()), this, SLOT(_onConnected()));
   connect(socket, SIGNAL(error()), this, SLOT(_onError()));
-  _dht.startConnection(_destination.port(), node, socket);
+  _dht.startConnection("::http", node, socket);
 }
 
 void

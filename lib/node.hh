@@ -95,12 +95,14 @@ public:
   /** Enables or disables the rendezvous ping to the nearest neighbours. */
   void enableRendezvousPing(bool enable);
 
-  /** Returns @c true if a handler is associated with the given service. */
-  bool hasService(uint16_t service) const;
+  /** Returns @c true if a handler is associated with the given service identifier. */
+  bool hasService(const Identifier &service) const;
+  /** Returns @c true if a handler is associated with the given service name. */
+  bool hasService(const char *service) const;
   /** Registers a service.
    * Returns @c true on success and @c false if a handler is already associated with the given
    * service. The ownership of the handler is transferred to the DHT. */
-  bool registerService(uint16_t no, AbstractService *handler);
+  bool registerService(const char* service, AbstractService *handler);
   /** Retunrs the number of active connections. */
   size_t numSockets() const;
 
@@ -108,7 +110,7 @@ public:
    * The ownership of the @c SecureSocket instance is passed to the DHT and will be deleted if the
    * connection fails. If the connection is established, the ownership of the socket is passed to
    * the serivce handler instance. */
-  bool startConnection(uint16_t service, const NodeItem &node, SecureSocket *stream);
+  bool startConnection(const char *service, const NodeItem &node, SecureSocket *stream);
   /** Unregister the socket with the DHT instance. */
   void socketClosed(const Identifier &id);
   
@@ -231,7 +233,7 @@ protected:
   QHash<Identifier, Request *> _pendingRequests;
 
   /** Table of services. */
-  QHash<uint16_t, AbstractService *> _services;
+  QHash<Identifier, AbstractService *> _services;
   /** The list of open connection. */
   QHash<Identifier, SecureSocket *> _connections;
 
