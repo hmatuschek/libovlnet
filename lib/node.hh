@@ -63,8 +63,6 @@ public:
   /** Returns the upload rate. */
   double outRate() const;
 
-  /** Returns the number of nodes in the buckets. */
-  size_t numNodes() const;
   /** Sends a ping request to the given hostname and port. */
   void ping(const QString &addr, uint16_t port);
   /** Sends a ping request to the given peer. */
@@ -76,6 +74,8 @@ public:
   /** Sends a ping request to the given node. */
   void ping(const NodeItem &node);
 
+  /** Returns the number of nodes in the buckets. */
+  size_t numNodes() const;
   /** Returns the list of all nodes in the buckets. */
   void nodes(QList<NodeItem> &lst);
 
@@ -95,33 +95,33 @@ public:
   /** Enables or disables the rendezvous ping to the nearest neighbours. */
   void enableRendezvousPing(bool enable);
 
-  /** Returns @c true if a handler is associated with the given service identifier. */
-  bool hasService(const Identifier &service) const;
   /** Returns @c true if a handler is associated with the given service name. */
   bool hasService(const char *service) const;
+  /** Returns @c true if a handler is associated with the given service identifier. */
+  bool hasService(const Identifier &service) const;
   /** Registers a service.
    * Returns @c true on success and @c false if a handler is already associated with the given
    * service. The ownership of the handler is transferred to the DHT. */
   bool registerService(const char* service, AbstractService *handler);
+
   /** Retunrs the number of active connections. */
   size_t numSockets() const;
-
   /** Starts a secure connection.
-   * The ownership of the @c SecureSocket instance is passed to the DHT and will be deleted if the
+   * The ownership of the @c SecureSocket instance is passed to the @c Node and will be deleted if the
    * connection fails. If the connection is established, the ownership of the socket is passed to
    * the serivce handler instance. */
   bool startConnection(const char *service, const NodeItem &node, SecureSocket *stream);
-  /** Unregister the socket with the DHT instance. */
+  /** Unregister a socket with the Node instance. */
   void socketClosed(const Identifier &id);
   
 signals:
-  /** Gets emitted as the DHT node enters the network. */
+  /** Gets emitted as the Node enters the network. */
   void connected();
-  /** Gets emitted as the DHT node leaves the network. */
+  /** Gets emitted as the Node leaves the network. */
   void disconnected();
   /** Gets emitted if a node leaves the buckets. */
   void nodeLost(const Identifier &id);
-  /** Gets emitted if a node enters the bucketlist. */
+  /** Gets emitted if a node enters the buckets. */
   void nodeAppeard(const NodeItem &node);
 
   /** Gets emitted if a ping was replied. */
@@ -130,9 +130,9 @@ signals:
   void nodeFound(const NodeItem &node);
   /** Gets emitted if the given node was not found. */
   void nodeNotFound(const Identifier &id, const QList<NodeItem> &best);
-  /** Gets emitted if a search neighbours query finished. */
+  /** Gets emitted if a search for neighbours finished. */
   void neighboursFound(const Identifier &id, const QList<NodeItem> &neighbours);
-  /** Gets emitted if the node to date can be found. */
+  /** Gets emitted if the node to date has been notified. */
   void rendezvousInitiated(const NodeItem &node);
   /** Gets emitted if the node to date cannot be found. */
   void rendezvousFailed(const Identifier &id);

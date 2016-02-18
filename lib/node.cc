@@ -12,7 +12,7 @@
 struct __attribute__((packed)) DHTTriple {
   /** The ID of a node. */
   char      id[OVL_HASH_SIZE];
-  /** The IP of the node. */
+  /** The IP (IPv6) of the node. */
   uint8_t   ip[16];
   /** The port of the node. */
   uint16_t  port;
@@ -55,7 +55,7 @@ struct __attribute__((packed)) Message
       char    id[OVL_HASH_SIZE];
       /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
        * attack. It ensures that the request has at least the same size as the response. The size
-       * of this field implicitly defines the number of triples returned by the remote node. */
+       * of this field implicitly defines the maximal number of triples returned by the remote node. */
       char    dummy[OVL_MAX_TRIPLES*OVL_TRIPLE_SIZE-OVL_HASH_SIZE];
     } find_node;
 
@@ -75,11 +75,11 @@ struct __attribute__((packed)) Message
       uint8_t  type;
       /** A service id (not part of the OVL specification). */
       uint8_t service[OVL_HASH_SIZE];
-      /** Public (ECDH) key of the requesting or responding node. */
+      /** Public (ECDH) key of the requesting or responding node, session public keys and lengths. */
       uint8_t  pubkey[OVL_MAX_PUBKEY_SIZE];
     } start_connection;
 
-    /** A rendesvous request or notification message. */
+    /** A rendezvous request or notification message. */
     struct __attribute__((packed)) {
       /** Type flag == @c MSG_RENDEZVOUS. */
       uint8_t  type;
@@ -105,17 +105,6 @@ Message::Message()
 {
   memset(this, 0, sizeof(Message));
 }
-
-
-#define DHT_PING_REQU_SIZE               (OVL_COOKIE_SIZE+OVL_HASH_SIZE+1)
-#define DHT_PING_RESP_SIZE               DHT_PING_REQU_SIZE
-#define DHT_FIND_NODE_MIN_REQU_SIZE      (OVL_COOKIE_SIZE+OVL_HASH_SIZE+1)
-#define DHT_FIND_NODE_MIN_RESP_SIZE      (OVL_COOKIE_SIZE+1)
-#define DHT_FIND_NEIGHBOR_MIN_REQU_SIZE  (OVL_COOKIE_SIZE+OVL_HASH_SIZE+1)
-#define DHT_FIND_NEIGHBOR_MIN_RESP_SIZE  (OVL_COOKIE_SIZE+1)
-#define DHT_CONNECT_MIN_REQU_SIZE        (OVL_COOKIE_SIZE+2*OVL_HASH_SIZE+1)
-#define DHT_CONNECT_MIN_RESP_SIZE        DHT_CONNECT_MIN_REQU_SIZE
-#define DHT_RENDEZVOUS_REQU_SIZE         (OVL_COOKIE_SIZE+OVL_HASH_SIZE+19)
 
 
 /** Base class of all search queries.
@@ -235,17 +224,6 @@ public:
   /** Constructor.
    * @param query Specifies the query object associated with this request. */
   FindNodeRequest(SearchQuery *query);
-};
-
-
-/** A find value request item.
- * @ingroup internal */
-class FindValueRequest: public SearchRequest
-{
-public:
-  /** Constructor.
-   * @param query Specifies the query object associated with this request. */
-  FindValueRequest(SearchQuery *query);
 };
 
 
@@ -612,7 +590,9 @@ Node::startConnection(const char *service, const NodeItem &node, SecureSocket *s
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
   msg.payload.start_connection.type = Message::CONNECT;
+  // Compute connection hash and store in package
   OVLHash((const unsigned char *)service, strlen(service), msg.payload.start_connection.service);
+
   int keyLen = 0;
   if (0 > (keyLen = stream->prepare(msg.payload.start_connection.pubkey, OVL_MAX_PUBKEY_SIZE)) ) {
     stream->failed();
@@ -621,7 +601,7 @@ Node::startConnection(const char *service, const NodeItem &node, SecureSocket *s
   }
 
   // Compute total size
-  keyLen += OVL_COOKIE_SIZE + 1 + 2;
+  keyLen += OVL_COOKIE_SIZE + 1 + OVL_HASH_SIZE;
 
   // add to pending request list & send it
   _pendingRequests.insert(req->cookie(), req);
@@ -824,8 +804,9 @@ Node::_onReadyRead() {
       // Read message
       struct Message msg; QHostAddress addr; uint16_t port;
       int64_t size = _socket.readDatagram((char *) &msg, sizeof(Message), &addr, &port);
-
+      // Extract cookie
       Identifier cookie(msg.cookie);
+
       // First, check if message belongs to a open stream
       if (_connections.contains(cookie)) {
         // Process streams
@@ -833,6 +814,7 @@ Node::_onReadyRead() {
       } else if (_pendingRequests.contains(cookie)) {
         // Message is a response -> dispatch by type from table
         Request *item = _pendingRequests[cookie];
+        // remove from pending requests
         _pendingRequests.remove(cookie);
         if (Request::PING == item->type()) {
           _processPingResponse(msg, size, static_cast<PingRequest *>(item), addr, port);
@@ -1185,6 +1167,7 @@ Node::_processRendezvousRequest(Message &msg, size_t size, const QHostAddress &a
 
 void
 Node::_onCheckRequestTimeout() {
+  // Remove dead requests from pending request list
   QList<Request *> deadRequests;
   QHash<Identifier, Request *>::iterator item = _pendingRequests.begin();
   while (item != _pendingRequests.end()) {
@@ -1261,7 +1244,9 @@ Node::_onCheckRequestTimeout() {
       }
     } else if (Request::START_CONNECTION == (*req)->type()) {
       logDebug() << "StartConnection request timeout...";
+      // signal timeout
       static_cast<StartConnectionRequest *>(*req)->socket()->failed();
+      // delete request
       delete *req;
     }
   }

@@ -32,7 +32,7 @@ Identity::Identity(EVP_PKEY *key, QObject *parent)
     goto error;
 
   // Compute RIPEMD160
-  RIPEMD160(keydata, keylen, fingerprint);
+  OVLHash(keydata, keylen, fingerprint);
 
   // Done
   _fingerprint = Identifier((char *)fingerprint);
