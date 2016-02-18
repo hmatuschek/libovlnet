@@ -361,9 +361,14 @@ HttpFileResponse::_onHeadersSend() {
 }
 
 void
-HttpFileResponse::_bytesWritten(qint64 bytes) {
+HttpFileResponse::_bytesWritten(qint64 bytes)
+{
   if (_offset == _file.size()) {
-    emit completed();
+    // If all has be read from file
+    if (0 == _socket->bytesToWrite()) {
+      // If all has been send to the device
+      emit completed();
+    }
     return;
   }
 
@@ -426,7 +431,11 @@ HttpDirectoryResponse::_onHeadersSend() {
 void
 HttpDirectoryResponse::_bytesWritten(qint64 bytes) {
   if (_offset == _buffer.size()) {
-    emit completed();
+    // If all has be send to the buffer
+    if (0 == _socket->bytesToWrite()) {
+      // If all has been send to the device
+      emit completed();
+    }
     return;
   }
   qint64 len = _socket->write(_buffer.constData()+_offset,

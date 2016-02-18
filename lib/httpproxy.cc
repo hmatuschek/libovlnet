@@ -208,10 +208,19 @@ LocalHttpProxyResponse::_onParseResponse() {
       _responseSize -= buffer.size();
       if (0 == _responseSize) {
         _parserState = PARSE_RESPONSE_CODE;
-        _stream->close();
-        emit completed();
-        return;
+          logDebug() << "Response send. Close connection";
+          _socket->close();
+          emit completed();
       }
+      return;
     }
+  }
+}
+
+void
+LocalHttpProxyResponse::_onResponseFinishing(qint64 len) {
+  if (0 == _socket->bytesToWrite()) {
+    _socket->close();
+    emit completed();
   }
 }

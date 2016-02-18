@@ -78,6 +78,9 @@ protected slots:
   void _onParseResponse();
   /** Receives data from the local client. */
   void _onLocalReadyRead();
+  /** Gets called while final data is send. */
+  void _onResponseFinishing(qint64 len);
+
 
 protected:
   /** Possible states of the response parser. */
