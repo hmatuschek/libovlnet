@@ -18,3 +18,14 @@ target_link_libraries(ovlhttpsrv ovlnet ${LIBS})
 
 INSTALL(TARGETS ovlhttpsrv DESTINATION bin)
 
+
+SET(OVL_UPNP_SOURCES ovlupnp.cc)
+SET(OVL_UPNP_MOC_HEADERS )
+SET(OVL_UPNP_HEADERS ${OVL_UPNP_MOC_HEADERS} )
+
+qt5_wrap_cpp(OVL_UPNP_MOC_SOURCES ${OVL_UPNP_MOC_HEADERS})
+
+add_executable(ovlupnp ${OVL_UPNP_SOURCES} ${OVL_UPNP_MOC_SOURCES} ${OVL_UPNP_RCC_SOURCES})
+target_link_libraries(ovlupnp ovlnet ${LIBS})
+
+INSTALL(TARGETS ovlupnp DESTINATION bin)

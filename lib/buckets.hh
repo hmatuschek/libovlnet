@@ -276,7 +276,7 @@ public:
   /** Collects the nearest known nodes. */
   void getNearest(const Identifier &id, QList<NodeItem> &best) const;
 
-  /** Adds or updates an node. */
+  /** Adds or updates a node. */
   bool add(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** Adds a candidate node. */
   void addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port);

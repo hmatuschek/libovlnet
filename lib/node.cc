@@ -260,7 +260,7 @@ public:
    * @param service The service identifier.
    * @param peer Identifier of the peer node.
    * @param socket The secure socket for the connection. */
-  StartConnectionRequest(const char *service, const Identifier &peer, SecureSocket *socket);
+  StartConnectionRequest(const Identifier &service, const Identifier &peer, SecureSocket *socket);
 
   /** Returns the socket of the request. */
   inline SecureSocket *socket() const { return _socket; }
@@ -271,7 +271,7 @@ public:
 
 protected:
   /** The service number. */
-  const char *_service;
+  Identifier _service;
   /** The id of the remote node. */
   Identifier _peer;
   /** The socket of the connection. */
@@ -385,7 +385,7 @@ RendezvousSearchRequest::RendezvousSearchRequest(SearchQuery *query)
   // pass...
 }
 
-StartConnectionRequest::StartConnectionRequest(const char *service, const Identifier &peer, SecureSocket *socket)
+StartConnectionRequest::StartConnectionRequest(const Identifier &service, const Identifier &peer, SecureSocket *socket)
   : Request(START_CONNECTION), _service(service), _peer(peer), _socket(socket)
 {
   _cookie = socket->id();
@@ -569,9 +569,10 @@ Node::hasService(const char *service) const {
 }
 
 bool
-Node::registerService(const char *service, AbstractService *handler) {
+Node::registerService(const QString &service, AbstractService *handler) {
   unsigned char hash[OVL_HASH_SIZE];
-  OVLHash((const unsigned char *)service, strlen(service), hash);
+  QByteArray sName = service.toUtf8();
+  OVLHash((const uint8_t *)sName.constData(), sName.size(), hash);
   Identifier id((const char *) hash);
   if (_services.contains(id)) { return false; }
   _services.insert(id, handler);
@@ -579,19 +580,24 @@ Node::registerService(const char *service, AbstractService *handler) {
 }
 
 bool
-Node::startConnection(const char *service, const NodeItem &node, SecureSocket *stream)
+Node::startConnection(const QString &service, const NodeItem &node, SecureSocket *stream)
 {
   logDebug() << "Send start secure connection id=" << stream->id()
              << " to " << node.id()
              << " @" << node.addr() << ":" << node.port();
-  StartConnectionRequest *req = new StartConnectionRequest(service, node.id(), stream);
+
+  uint8_t serviceId[OVL_HASH_SIZE];
+  QByteArray sName = service.toUtf8();
+  OVLHash((const uint8_t *)sName.constData(), sName.size(), serviceId);
+
+  StartConnectionRequest *req = new StartConnectionRequest(Identifier((const char *)serviceId), node.id(), stream);
 
   // Assemble message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
   msg.payload.start_connection.type = Message::CONNECT;
-  // Compute connection hash and store in package
-  OVLHash((const unsigned char *)service, strlen(service), msg.payload.start_connection.service);
+  // Store service ID in package
+  memcpy(msg.payload.start_connection.service, serviceId, OVL_HASH_SIZE);
 
   int keyLen = 0;
   if (0 > (keyLen = stream->prepare(msg.payload.start_connection.pubkey, OVL_MAX_PUBKEY_SIZE)) ) {

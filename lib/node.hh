@@ -102,7 +102,7 @@ public:
   /** Registers a service.
    * Returns @c true on success and @c false if a handler is already associated with the given
    * service. The ownership of the handler is transferred to the DHT. */
-  bool registerService(const char* service, AbstractService *handler);
+  bool registerService(const QString& service, AbstractService *handler);
 
   /** Retunrs the number of active connections. */
   size_t numSockets() const;
@@ -110,7 +110,7 @@ public:
    * The ownership of the @c SecureSocket instance is passed to the @c Node and will be deleted if the
    * connection fails. If the connection is established, the ownership of the socket is passed to
    * the serivce handler instance. */
-  bool startConnection(const char *service, const NodeItem &node, SecureSocket *stream);
+  bool startConnection(const QString &service, const NodeItem &node, SecureSocket *stream);
   /** Unregister a socket with the Node instance. */
   void socketClosed(const Identifier &id);
   
