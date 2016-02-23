@@ -274,7 +274,7 @@ AnnouncementItem::operator =(const AnnouncementItem &other) {
 }
 
 bool
-AnnouncementItem::olderThan(size_t seconds) {
+AnnouncementItem::olderThan(size_t seconds) const {
   return (_timestamp.addSecs(seconds)<QDateTime::currentDateTime());
 }
 

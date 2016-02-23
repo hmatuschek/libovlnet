@@ -10,8 +10,8 @@
 /* ******************************************************************************************** *
  * Implementation of UPNP
  * ******************************************************************************************** */
-UPNP::UPNP(QObject *parent)
-  : QObject(parent), _state(IDLE), _timeout(), _socket(), _network()
+UPNP::UPNP(uint16_t iport, uint16_t eport, QObject *parent)
+  : QObject(parent), _state(IDLE), _timeout(), _socket(), _network(), _iport(iport), _eport(eport)
 {
   _localAddress = getLocalAddress();
   _timeout.setInterval(1000);
@@ -94,9 +94,9 @@ UPNP::addPortMapping(UPNPDeviceDescription *device, uint16_t iport, uint16_t epo
 }
 
 bool
-UPNP::getPortMapping(UPNPDeviceDescription *device, size_t idx) {
+UPNP::getPortMapping(UPNPDeviceDescription *device, uint16_t eport) {
   if (IDLE != _state) { return false; }
-  logDebug() << "Request port mapping entry " << idx;
+  logDebug() << "Request port mapping entry for port " << eport;
 
   UPNPServiceDescription *service = device->findServiceByType(
         "urn:schemas-upnp-org:service:WANIPConnection:1");
@@ -106,35 +106,16 @@ UPNP::getPortMapping(UPNPDeviceDescription *device, size_t idx) {
   }
 
   QList< QPair<QString, QString> >args;
-  args.push_back(QPair<QString,QString>("NewPortMappingIndex", QString::number(idx)));
+  args.push_back(QPair<QString,QString>("NewRemoteHost", ""));
+  args.push_back(QPair<QString,QString>("NewExternalPort", QString::number(eport)));
+  args.push_back(QPair<QString,QString>("NewProtocol", "UDP"));
 
   _state = GET_PORTMAPPING;
   connect(&_network, SIGNAL(finished(QNetworkReply*)),
           this, SLOT(processGetPortMapping(QNetworkReply*)));
 
   return sendCommand(service->controlURL(), "urn:schemas-upnp-org:service:WANIPConnection:1",
-                     "GetGenericPortMappingEntry", args);
-}
-
-bool
-UPNP::getNumPortMapping(UPNPDeviceDescription *device) {
-  if (IDLE != _state) { return false; }
-  logDebug() << "Request port mapping number.";
-
-  UPNPServiceDescription *service = device->findServiceByType(
-        "urn:schemas-upnp-org:service:WANIPConnection:1");
-  if (! service) {
-    logError() << "No service with type 'urn:schemas-upnp-org:service:WANIPConnection:1' found.";
-    return false;
-  }
-
-  QList< QPair<QString, QString> >args;
-  _state = GET_NUMPORTMAPPING;
-  connect(&_network, SIGNAL(finished(QNetworkReply*)),
-          this, SLOT(processGetNumPortMapping(QNetworkReply*)));
-
-  return sendCommand(service->controlURL(), "urn:schemas-upnp-org:service:WANIPConnection:1",
-                     "GetPortMappingNumberOfEntries", args);
+                     "GetSpecificPortMappingEntry", args);
 }
 
 QHostAddress
@@ -190,6 +171,8 @@ UPNP::processDiscover() {
         line = line.mid(10); line.chop(2);
         logDebug() << "Found UPNP device at " << line << " @ " << _socket.localAddress();
         emit foundUPnPDevice(QUrl(line));
+        // continue with requesting the device description
+        getDescription(QUrl(line));
       }
     }
   }
@@ -229,35 +212,68 @@ UPNP::processDescription(QNetworkReply *reply) {
 
   UPNPDeviceDescription *desc = new UPNPDeviceDescription(baseURL, device);
   emit gotDescription(desc);
+
+  // Try to establish port mapping
+  addPortMapping(desc, _iport, _eport);
 }
 
 void
 UPNP::processAddPortMapping(QNetworkReply *reply) {
   _timeout.stop(); _state = IDLE;
 
-  logDebug() << "got: " << reply->readAll();
+  QDomDocument doc;
+  if (! doc.setContent(reply, true)) {
+    logError() << "Cannot parse AddPortMapping response.";
+    reply->close(); reply->deleteLater();
+    emit error(); return;
+  }
   reply->close(); reply->deleteLater();
+
+  QDomElement root = doc.documentElement();
+  QDomElement body = root.firstChildElement("Body");
+  if (! body.firstChildElement("AddPortMappingResponse").isNull()) {
+    // success
+    logDebug() << "Established port mapping.";
+    emit establishedPortMapping();
+  } else {
+    // fail
+    logError() << "Failed to establish port mapping.";
+    emit error();
+  }
 }
 
 void
 UPNP::processGetPortMapping(QNetworkReply *reply) {
   _timeout.stop(); _state = IDLE;
 
-  logDebug() << "got: " << reply->readAll();
+  QDomDocument doc;
+  if (! doc.setContent(reply, true)) {
+    logError() << "Cannot parse GetSpecificPortMapping response.";
+    reply->close(); reply->deleteLater();
+    emit error(); return;
+  }
   reply->close(); reply->deleteLater();
-}
 
-void
-UPNP::processGetNumPortMapping(QNetworkReply *reply) {
-  _timeout.stop(); _state = IDLE;
-
-  logDebug() << "got: " << reply->readAll();
-  reply->close(); reply->deleteLater();
+  QDomElement root = doc.documentElement();
+  QDomElement body = root.firstChildElement("Body");
+  QDomElement resp = body.firstChildElement("GetSpecificPortMappingEntryResponse");
+  if (! resp.isNull()) {
+    // success
+    uint16_t iport = resp.firstChildElement("NewInternalPort").text().toUInt();
+    QHostAddress ihost = QHostAddress(resp.firstChildElement("NewInternalClient").text());
+    QString descr = resp.firstChildElement("NewPortMappingDescription").text();
+    emit gotPortMapping(ihost, iport, descr);
+  } else {
+    // fail
+    logError() << "Failed to request port mapping.";
+    emit error();
+  }
 }
 
 void
 UPNP::onTimeout() {
   _state = IDLE;
+  logError() << "Timeout.";
   emit error();
 }
 

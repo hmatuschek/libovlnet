@@ -18,19 +18,20 @@ class UPNP : public QObject
   Q_OBJECT
 
 public:
-  explicit UPNP(QObject *parent = 0);
+  explicit UPNP(uint16_t iport, uint16_t eport, QObject *parent = 0);
 
 public slots:
   bool discover();
   bool getDescription(const QUrl &url);
-  bool getNumPortMapping(UPNPDeviceDescription *device);
-  bool getPortMapping(UPNPDeviceDescription *device, size_t idx);
+  bool getPortMapping(UPNPDeviceDescription *device, uint16_t eport);
   bool addPortMapping(UPNPDeviceDescription *device, uint16_t iport, uint16_t eport=0);
   QHostAddress getLocalAddress();
 
 signals:
   void foundUPnPDevice(const QUrl &descrURL);
   void gotDescription(UPNPDeviceDescription *desc);
+  void establishedPortMapping();
+  void gotPortMapping(const QHostAddress &addr, uint16_t port, const QString &description);
   void error();
 
 protected:
@@ -46,14 +47,16 @@ protected slots:
   void processDescription(QNetworkReply *reply);
   void processAddPortMapping(QNetworkReply *reply);
   void processGetPortMapping(QNetworkReply *reply);
-  void processGetNumPortMapping(QNetworkReply *reply);
 
 protected:
   State _state;
   QTimer _timeout;
   QUdpSocket _socket;
   QNetworkAccessManager _network;
+
   QHostAddress _localAddress;
+  uint16_t _iport;
+  uint16_t _eport;
 };
 
 

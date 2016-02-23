@@ -89,6 +89,12 @@ public:
   /** Assignment operator. */
   PeerItem &operator=(const PeerItem &other);
 
+  /** Compares two @c PeerItem. */
+  inline bool operator==(const PeerItem &other) const {
+    if (_addr != other._addr) { return false; }
+    return _port == other._port;
+  }
+
   /** Returns the address of the peer. */
   const QHostAddress &addr() const;
   /** Returns the port of the peer. */
@@ -101,6 +107,10 @@ protected:
   uint16_t     _port;
 };
 
+// Hash function for the PeerItem class
+inline uint qHash(const PeerItem &key, uint seed) {
+  return qHash(key.addr(), seed) ^ qHash(key.port());
+}
 
 /** Represents a node (ID + IP address + port, or ID + Peer) in the network.
  * @ingroup core */
@@ -141,12 +151,17 @@ public:
   /** Assignment operator. */
   AnnouncementItem &operator =(const AnnouncementItem &other);
   /** Returns true if the announcement is older than the given amount of seconds. */
-  bool olderThan(size_t seconds);
+  bool olderThan(size_t seconds) const;
 
 protected:
   /** The timestamp of the announcement. */
   QDateTime _timestamp;
 };
+
+// Hash function for the AnnoucementItem class
+inline uint qHash(const AnnouncementItem &key, uint seed) {
+  return qHash(key.addr(), seed) ^ qHash(key.port());
+}
 
 
 /** Represents a single k-bucket.

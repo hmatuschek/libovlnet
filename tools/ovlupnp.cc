@@ -8,8 +8,7 @@ int main(int argc, char *argv[]) {
 
   QCoreApplication app(argc, argv);
 
-  UPNP upnp;
-  upnp.connect(&upnp, SIGNAL(foundUPnPDevice(QUrl)), &upnp, SLOT(getDescription(QUrl)));
+  UPNP upnp(7741, 7741);
   upnp.discover();
 
   app.exec();
