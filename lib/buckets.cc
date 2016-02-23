@@ -1,4 +1,5 @@
 #include "buckets.hh"
+#include "crypto.hh"
 #include <inttypes.h>
 #include <QChar>
 
@@ -63,7 +64,7 @@ Identifier::operator-(const Identifier &other) const {
 
 bool
 Identifier::isNull() const {
-  return 0 == this->size();
+  return isValid() && (Identifier::null() == *this);
 }
 
 bool
@@ -78,6 +79,13 @@ Identifier::create() {
   for (int i=0; i<OVL_HASH_SIZE; i++) {
     id.append(qrand() % 0xff);
   }
+  return id;
+}
+
+Identifier
+Identifier::null() {
+  Identifier id; id.reserve(OVL_HASH_SIZE);
+  OVLHash((const uint8_t *)"", 0, (uint8_t *)id.data());
   return id;
 }
 

@@ -66,6 +66,8 @@ public:
   static Identifier create();
   /** Constructs an identifier from its base-32 (RFC4648) representation. */
   static Identifier fromBase32(const QString &base32);
+  /** Constructs an identifier as the hash of an empty string. */
+  static Identifier null();
 };
 
 /** Logger output operation for identifier. */

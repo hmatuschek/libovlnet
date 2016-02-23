@@ -53,39 +53,17 @@ struct __attribute__((packed)) Message
 
     /** A find node request. */
     struct __attribute__((packed)) {
-      /** Type flag == @c MSG_FIND_NODE. */
+      /** Type flag == @c MSG_FIND_NODE | @c MSG_FIND_VALUE | @c MSG_ANNOUNCE. */
       uint8_t type;
       /** The identifier of the node to find. */
       char    id[OVL_HASH_SIZE];
+      /** The identifier of the network to search in. */
+      char    net[OVL_HASH_SIZE];
       /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
        * attack. It ensures that the request has at least the same size as the response. The size
        * of this field implicitly defines the maximal number of triples returned by the remote node. */
-      char    dummy[OVL_MAX_TRIPLES*OVL_TRIPLE_SIZE-OVL_HASH_SIZE];
-    } find_node;
-
-    /** A find value search request. */
-    struct __attribute__((packed)) {
-      /** Type flag == @c MSG_FIND_VALUE. */
-      uint8_t type;
-      /** The identifier of the value to find. */
-      char    id[OVL_HASH_SIZE];
-      /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
-       * attack. It ensures that the request has at least the same size as the response. The size
-       * of this field implicitly defines the maximal number of triples returned by the remote node. */
-      char    dummy[OVL_MAX_TRIPLES*OVL_TRIPLE_SIZE-OVL_HASH_SIZE];
-    } find_value;
-
-    /** An announce search request. */
-    struct __attribute__((packed)) {
-      /** Type flag == @c MSG_ANNOUNCE. */
-      uint8_t type;
-      /** The identifier of the value to announce. */
-      char    id[OVL_HASH_SIZE];
-      /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
-       * attack. It ensures that the request has at least the same size as the response. The size
-       * of this field implicitly defines the maximal number of triples returned by the remote node. */
-      char    dummy[OVL_MAX_TRIPLES*OVL_TRIPLE_SIZE-OVL_HASH_SIZE];
-    } announce;
+      char    dummy[OVL_MAX_TRIPLES*OVL_TRIPLE_SIZE-2*OVL_HASH_SIZE];
+    } search;
 
     /** A response to "find value", "find node" or "announce". */
     struct __attribute__((packed)) {
@@ -301,7 +279,13 @@ protected:
  * Implementation of SearchQuery etc.
  * ******************************************************************************************** */
 SearchQuery::SearchQuery(const Identifier &id)
-  : _id(id), _best(), _queried()
+  : _id(id), _net(Identifier::null()), _best(), _queried()
+{
+  // Pass...
+}
+
+SearchQuery::SearchQuery(const Identifier &net, const Identifier &id)
+  : _id(id), _net(net), _best(), _queried()
 {
   // Pass...
 }
@@ -318,6 +302,11 @@ SearchQuery::ignore(const Identifier &id) {
 const Identifier &
 SearchQuery::id() const {
   return _id;
+}
+
+const Identifier &
+SearchQuery::net() const {
+  return _net;
 }
 
 void
@@ -852,9 +841,10 @@ Node::sendFindNode(const NodeItem &to, SearchQuery *query) {
   // Assemble & send message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.find_node.type = Message::FIND_NODE;
-  memcpy(msg.payload.find_node.id, query->id().data(), OVL_HASH_SIZE);
-  int size = OVL_COOKIE_SIZE+1+OVL_K*OVL_TRIPLE_SIZE;
+  msg.payload.search.type = Message::FIND_NODE;
+  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
+  memcpy(msg.payload.search.net, query->net().data(), OVL_HASH_SIZE);
+  int size = OVL_COOKIE_SIZE+1+2*OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindNode request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
@@ -863,8 +853,6 @@ Node::sendFindNode(const NodeItem &to, SearchQuery *query) {
 
 void
 Node::sendFindNeighbours(const NodeItem &to, SearchQuery *query) {
-  /*logDebug() << "Send FindNode request to " << to.id()
-             << " @" << to.addr() << ":" << to.port(); */
   // Construct request item
   FindNeighboursRequest *req = new FindNeighboursRequest(query);
   // Queue request
@@ -872,9 +860,10 @@ Node::sendFindNeighbours(const NodeItem &to, SearchQuery *query) {
   // Assemble & send message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.find_node.type = Message::FIND_NODE;
-  memcpy(msg.payload.find_node.id, query->id().data(), OVL_HASH_SIZE);
-  int size = OVL_COOKIE_SIZE+1+OVL_K*OVL_TRIPLE_SIZE;
+  msg.payload.search.type = Message::FIND_NODE;
+  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
+  memcpy(msg.payload.search.net, query->net().data(), OVL_HASH_SIZE);
+  int size = OVL_COOKIE_SIZE+1+2*OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindNode request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
@@ -890,9 +879,10 @@ Node::sendAnnouncement(const NodeItem &to, SearchQuery *query) {
   // Assemble & send message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.find_node.type = Message::ANNOUNCE;
-  memcpy(msg.payload.announce.id, query->id().data(), OVL_HASH_SIZE);
-  int size = OVL_COOKIE_SIZE+1+OVL_K*OVL_TRIPLE_SIZE;
+  msg.payload.search.type = Message::ANNOUNCE;
+  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
+  memcpy(msg.payload.search.net, query->net().data(), OVL_HASH_SIZE);
+  int size = OVL_COOKIE_SIZE+1+2*OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send Announce request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
@@ -908,9 +898,10 @@ Node::sendFindValue(const NodeItem &to, ValueSearchQuery *query) {
   // Assemble & send message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.find_node.type = Message::FIND_VALUE;
-  memcpy(msg.payload.find_value.id, query->id().data(), OVL_HASH_SIZE);
-  int size = OVL_COOKIE_SIZE+1+OVL_K*OVL_TRIPLE_SIZE;
+  msg.payload.search.type = Message::FIND_VALUE;
+  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
+  memcpy(msg.payload.search.net, query->net().data(), OVL_HASH_SIZE);
+  int size = OVL_COOKIE_SIZE+1+2*OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send FindValue request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
@@ -926,9 +917,10 @@ Node::sendRendezvousSearch(const NodeItem &to, SearchQuery *query) {
   // Assemble & send message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.find_node.type = Message::FIND_NODE;
-  memcpy(msg.payload.find_node.id, query->id().data(), OVL_HASH_SIZE);
-  int size = OVL_COOKIE_SIZE+1+OVL_K*OVL_TRIPLE_SIZE;
+  msg.payload.search.type = Message::FIND_NODE;
+  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
+  memcpy(msg.payload.search.net, query->net().data(), OVL_HASH_SIZE);
+  int size = OVL_COOKIE_SIZE+1+2*OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
     logError() << "Failed to send Rendezvous request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
@@ -940,8 +932,8 @@ Node::sendRendezvous(const Identifier &with, const PeerItem &to) {
   Message msg;
   memcpy(msg.cookie, Identifier::create().data(), OVL_COOKIE_SIZE);
   memcpy(msg.payload.rendezvous.id, with.data(), OVL_HASH_SIZE);
-  if (DHT_RENDEZVOUS_REQU_SIZE != _socket.writeDatagram(
-        (char *)&msg, DHT_RENDEZVOUS_REQU_SIZE, to.addr(), to.port())) {
+  if (OVL_RENDEZVOUS_REQU_SIZE != _socket.writeDatagram(
+        (char *)&msg, OVL_RENDEZVOUS_REQU_SIZE, to.addr(), to.port())) {
     logError() << "DHT: Failed to send Rendezvous request to " << to.addr() << ":" << to.port();
   }
 }
@@ -1011,13 +1003,13 @@ Node::_onReadyRead() {
         delete item;
       } else {
         // Message is likely a request
-        if ((size == DHT_PING_REQU_SIZE) && (Message::PING == msg.payload.ping.type)){
+        if ((size == OVL_PING_REQU_SIZE) && (Message::PING == msg.payload.ping.type)){
           _processPingRequest(msg, size, addr, port);
-        } else if ((size >= DHT_FIND_NODE_MIN_REQU_SIZE) && (Message::FIND_NODE == msg.payload.find_node.type)) {
+        } else if ((size >= OVL_FIND_NODE_MIN_REQU_SIZE) && (Message::FIND_NODE == msg.payload.search.type)) {
           _processFindNodeRequest(msg, size, addr, port);
-        } else if ((size > DHT_CONNECT_MIN_REQU_SIZE) && (Message::CONNECT == msg.payload.start_connection.type)) {
+        } else if ((size > OVL_CONNECT_MIN_REQU_SIZE) && (Message::CONNECT == msg.payload.start_connection.type)) {
           _processStartConnectionRequest(msg, size, addr, port);
-        } else if ((size == DHT_RENDEZVOUS_REQU_SIZE) && (Message::RENDEZVOUS == msg.payload.rendezvous.type)) {
+        } else if ((size == OVL_RENDEZVOUS_REQU_SIZE) && (Message::RENDEZVOUS == msg.payload.rendezvous.type)) {
           _processRendezvousRequest(msg, size, addr, port);
         } else {
           logInfo() << "Unknown request from " << addr << ":" << port
@@ -1063,9 +1055,9 @@ Node::_processFindNodeResponse(
     const struct Message &msg, size_t size, FindNodeRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // payload length must be a multiple of triple length
-  if ( 0 == ((size-DHT_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
+  if ( 0 == ((size-OVL_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
     // unpack and update query
-    size_t Ntriple = (size-DHT_FIND_NODE_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
+    size_t Ntriple = (size-OVL_FIND_NODE_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
       NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip)),
@@ -1112,9 +1104,9 @@ Node::_processFindValueResponse(
     const struct Message &msg, size_t size, FindValueRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // payload length must be a multiple of triple length
-  if ( 0 == ((size-DHT_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
+  if ( 0 == ((size-OVL_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
     // unpack and update query
-    size_t Ntriple = (size-DHT_FIND_NODE_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
+    size_t Ntriple = (size-OVL_FIND_NODE_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
     if (msg.payload.result.success) {
       QList<NodeItem> nodes;
       // On value found -> unpack result and signal success
@@ -1170,9 +1162,9 @@ Node::_processAnnounceResponse(
     const struct Message &msg, size_t size, AnnounceRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // payload length must be a multiple of triple length
-  if ( 0 == ((size-DHT_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
+  if ( 0 == ((size-OVL_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
     // unpack and update query
-    size_t Ntriple = (size-DHT_FIND_NODE_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
+    size_t Ntriple = (size-OVL_FIND_NODE_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
       NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip)),
@@ -1207,12 +1199,12 @@ Node::_processFindNeighboursResponse(const Message &msg, size_t size, FindNeighb
                                     const QHostAddress &addr, uint16_t port)
 {
   // payload length must be a multiple of triple length
-  if ( 0 != ((size-DHT_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
+  if ( 0 != ((size-OVL_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
     logInfo() << "Received a malformed FIND_NODE response from "
               << addr << ":" << port;
   } else {
     // unpack and update query
-    size_t Ntriple = (size-DHT_FIND_NEIGHBOR_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
+    size_t Ntriple = (size-OVL_FIND_NEIGHBOR_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
     // proceed with returned nodes
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
@@ -1244,12 +1236,12 @@ Node::_processRendezvousSearchResponse(const Message &msg, size_t size, Rendezvo
                                       const QHostAddress &addr, uint16_t port)
 {
   // payload length must be a multiple of triple length
-  if ( 0 != ((size-DHT_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
+  if ( 0 != ((size-OVL_FIND_NODE_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
     logInfo() << "Received a malformed FIND_NODE response from "
               << addr << ":" << port;
   } else {
     // unpack and update query
-    size_t Ntriple = (size-DHT_FIND_NEIGHBOR_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
+    size_t Ntriple = (size-OVL_FIND_NEIGHBOR_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
     // proceed with returned nodes
     for (size_t i=0; i<Ntriple; i++) {
       Identifier id(msg.payload.result.triples[i].id);
@@ -1326,7 +1318,7 @@ Node::_processPingRequest(
   resp.payload.ping.type = Message::PING;
   // send
   //logDebug() << "Send Ping response to " << addr << ":" << port;
-  if(0 > _socket.writeDatagram((char *) &resp, DHT_PING_RESP_SIZE, addr, port)) {
+  if(0 > _socket.writeDatagram((char *) &resp, OVL_PING_RESP_SIZE, addr, port)) {
     logError() << "Failed to send Ping response to " << addr << ":" << port;
   }
   // Add node to candidate nodes for the bucket table if not known already
@@ -1339,15 +1331,17 @@ void
 Node::_processFindNodeRequest(
     const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
+  Identifier netId(msg.payload.search.net);
+
   QList<NodeItem> best;
-  _buckets.getNearest(Identifier(msg.payload.find_node.id), best);
+  _buckets.getNearest(Identifier(msg.payload.search.id), best);
 
   struct Message resp;
   // Assemble response
   memcpy(resp.cookie, msg.cookie, OVL_COOKIE_SIZE);
   resp.payload.result.success = 0;
   // Determine the number of nodes to reply
-  int maxN = int(size-DHT_FIND_NODE_MIN_REQU_SIZE)/OVL_TRIPLE_SIZE;
+  int maxN = int(size-OVL_FIND_NODE_MIN_REQU_SIZE)/OVL_TRIPLE_SIZE;
   int N = std::min(best.size(), maxN);
 
   // Add items
@@ -1359,7 +1353,7 @@ Node::_processFindNodeRequest(
   }
 
   // Compute size and send reponse
-  size_t resp_size = (DHT_FIND_NODE_MIN_RESP_SIZE + N*OVL_TRIPLE_SIZE);
+  size_t resp_size = (OVL_FIND_NODE_MIN_RESP_SIZE + N*OVL_TRIPLE_SIZE);
   _socket.writeDatagram((char *) &resp, resp_size, addr, port);
 }
 
@@ -1370,8 +1364,9 @@ Node::_processFindValueRequest(
   struct Message resp;
   // Assemble response
   memcpy(resp.cookie, msg.cookie, OVL_COOKIE_SIZE);
-  Identifier queryId(msg.payload.find_value.id);
-  int maxN = int(size-DHT_FIND_NODE_MIN_REQU_SIZE)/OVL_TRIPLE_SIZE;
+  Identifier queryId(msg.payload.search.id);
+  Identifier netId(msg.payload.search.net);
+  int maxN = int(size-OVL_FIND_NODE_MIN_REQU_SIZE)/OVL_TRIPLE_SIZE;
   QList<NodeItem> res;
 
   if (_hashTable.contains(queryId)) {
@@ -1386,7 +1381,7 @@ Node::_processFindValueRequest(
   } else {
     resp.payload.result.success = 0;
     QList<NodeItem> best;
-    _buckets.getNearest(Identifier(msg.payload.find_node.id), best);
+    _buckets.getNearest(Identifier(msg.payload.search.id), best);
     // Determine the number of nodes to reply
     int N = std::min(std::min(OVL_K, best.size()), maxN);
     QList<NodeItem>::iterator item = best.begin();
@@ -1404,7 +1399,7 @@ Node::_processFindValueRequest(
   }
 
   // Compute size and send reponse
-  size_t resp_size = (DHT_FIND_NODE_MIN_RESP_SIZE + res.size()*OVL_TRIPLE_SIZE);
+  size_t resp_size = (OVL_FIND_NODE_MIN_RESP_SIZE + res.size()*OVL_TRIPLE_SIZE);
   _socket.writeDatagram((char *) &resp, resp_size, addr, port);
 }
 
@@ -1417,8 +1412,9 @@ Node::_processAnnounceRequest(
   memcpy(resp.cookie, msg.cookie, OVL_COOKIE_SIZE);
   resp.payload.result.success = 0;
 
-  Identifier queryId(msg.payload.announce.id);
-  int maxN = int(size-DHT_FIND_NODE_MIN_REQU_SIZE)/OVL_TRIPLE_SIZE;
+  Identifier queryId(msg.payload.search.id);
+  Identifier netId(msg.payload.search.net);
+  int maxN = int(size-OVL_FIND_NODE_MIN_REQU_SIZE)/OVL_TRIPLE_SIZE;
 
   // Determine the number of nodes to reply
   QList<NodeItem> best;
@@ -1433,7 +1429,7 @@ Node::_processAnnounceRequest(
   }
 
   // Compute size and send reponse
-  size_t resp_size = (DHT_FIND_NODE_MIN_RESP_SIZE + N*OVL_TRIPLE_SIZE);
+  size_t resp_size = (OVL_FIND_NODE_MIN_RESP_SIZE + N*OVL_TRIPLE_SIZE);
   _socket.writeDatagram((char *) &resp, resp_size, addr, port);
 
   // If I am responsible for that value -> add to
@@ -1495,7 +1491,7 @@ Node::_processStartConnectionRequest(const Message &msg, size_t size, const QHos
   }
 
   // compute message size
-  keyLen += DHT_CONNECT_MIN_RESP_SIZE;
+  keyLen += OVL_CONNECT_MIN_RESP_SIZE;
   // Send response
   if (keyLen != _socket.writeDatagram((char *)&resp, keyLen, addr, port)) {
     logError() << "Can not send StartConnection response";
@@ -1517,8 +1513,8 @@ Node::_processRendezvousRequest(Message &msg, size_t size, const QHostAddress &a
     NodeItem node = _buckets.getNode(Identifier(msg.payload.rendezvous.id));
     memcpy(msg.payload.rendezvous.ip, addr.toIPv6Address().c, 16);
     msg.payload.rendezvous.port = htons(port);
-    if (DHT_RENDEZVOUS_REQU_SIZE != _socket.writeDatagram(
-          (char *)&msg, DHT_RENDEZVOUS_REQU_SIZE, node.addr(), node.port())) {
+    if (OVL_RENDEZVOUS_REQU_SIZE != _socket.writeDatagram(
+          (char *)&msg, OVL_RENDEZVOUS_REQU_SIZE, node.addr(), node.port())) {
       logError() << "DHT: Cannot forward rendezvous request to " << node.id()
                  << " @" << node.addr() << ":" << node.port();
     }  
@@ -1547,7 +1543,7 @@ Node::_onCheckRequestTimeout() {
       logDebug() << "Ping request timeout...";
       PingRequest *ping = static_cast<PingRequest *>(*req);
       // If the ping was send to a known node (known ID, and not to a peer)
-      if (! ping->id().isNull()) {
+      if (ping->id().isValid()) {
         _buckets.pingLost(ping->id());
       }
       delete ping;

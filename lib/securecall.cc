@@ -24,7 +24,7 @@ SecureCall::SecureCall(bool incomming, Node &dht)
   }
 
   // Init port audio device
-  PaError paerr = Pa_OpenDefaultStream(&_paStream, 1, 1, paInt16, 48000, DHT_CALL_NUM_FRAMES,
+  PaError paerr = Pa_OpenDefaultStream(&_paStream, 1, 1, paInt16, 48000, OVL_CALL_NUM_FRAMES,
                                        SecureCall::_handleFrames, this);
   if (paNoError != paerr) {
     logError() << "Can not configure PortAudio source:"
@@ -81,7 +81,7 @@ SecureCall::hangUp() {
 void
 SecureCall::handleDatagram(const uint8_t *data, size_t len) {
   if (len>=4) {
-    // If the first data arives and the outgoing stream has not started yet
+    // If the first data arives and the outgoing stream has not been started yet
     //  -> start audio device
     if ((INITIALIZED == _state) && (! _incomming)) {
       _state = RUNNING;
@@ -117,16 +117,16 @@ SecureCall::_handleFrames(const void *input, void *output, unsigned long frameCo
   if (self->_inBufferSize) {
     outFrames = opus_decode(self->_decoder,
                             (const unsigned char *)self->_inBuffer, self->_inBufferSize,
-                            (int16_t *)output, DHT_CALL_NUM_FRAMES, 0);
+                            (int16_t *)output, OVL_CALL_NUM_FRAMES, 0);
     self->_inBufferSize = 0;
   }
   // assemble datagram
-  uint8_t outBuffer[DHT_CALL_MAX_BUFFER_SIZE+4];
+  uint8_t outBuffer[OVL_CALL_MAX_BUFFER_SIZE+4];
   // store frame number
   *(uint32_t *)outBuffer = htonl(self->_outFrameNumber);
   // encode frame
   int32_t outlen = opus_encode(self->_encoder, (int16_t *) input, frameCount,
-                               outBuffer+4, DHT_CALL_MAX_BUFFER_SIZE);
+                               outBuffer+4, OVL_CALL_MAX_BUFFER_SIZE);
   // update frame number
   self->_outFrameNumber += frameCount;
   // send encoded frame

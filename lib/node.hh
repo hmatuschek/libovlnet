@@ -35,6 +35,8 @@ class SearchQuery
 public:
   /** Constructor. */
   SearchQuery(const Identifier &id);
+  SearchQuery(const Identifier &net, const Identifier &id);
+
   /** Destructor. */
   virtual ~SearchQuery();
 
@@ -43,6 +45,8 @@ public:
 
   /** Returns the identifier of the element being searched for. */
   const Identifier &id() const;
+  /** Returns the identifier of the network being searched. */
+  const Identifier &net() const;
 
   /** Update the search queue (ordered list of nodes to query). */
   void update(const NodeItem &nodes);
@@ -71,6 +75,8 @@ public:
 protected:
   /** The identifier of the element being searched for. */
   Identifier _id;
+  /** The identifier of the network being searched. */
+  Identifier _net;
   /** The current search queue. */
   QList<NodeItem> _best;
   /** The set of nodes already asked. */
@@ -241,7 +247,7 @@ signals:
   void rendezvousFailed(const Identifier &id);
 
 protected:
-  /** Sends a FindNode message to the node @c to to search for the node specified by @c id.
+  /** Sends a FindNode message to the node @c to to search for the node specified by the @c query.
    * Any response to that request will be forwarded to the specified @c query. */
   void sendFindNode(const NodeItem &to, SearchQuery *query);
   /** Sends a FindNode message to the node @c to to search for neighbours. */

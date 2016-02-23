@@ -39,7 +39,7 @@ protected:
     IDLE, DISCOVERY, GET_DESCRIPION, ADD_PORTMAPPING, GET_PORTMAPPING, GET_NUMPORTMAPPING
   } State;
 
-protected slots:
+private slots:
   bool sendCommand(const QUrl &url, const QString &service, const QString &action,
                    const QList< QPair<QString, QString> > &args);
   void onTimeout();

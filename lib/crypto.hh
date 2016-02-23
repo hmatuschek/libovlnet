@@ -16,13 +16,6 @@
 class Node;
 
 
-/** Maximum unencrypted payload per message
- * (OVL_MAX_DATA_SIZE - 8 (sequence) - 16 (GCM-MAC) - 16 (AES 128 BLOCK MARGIN)). */
-#define OVL_SEC_MAX_DATA_SIZE (OVL_MAX_DATA_SIZE-40)
-/** The max. public key size for a START_STREAM message. */
-#define OVL_MAX_PUBKEY_SIZE (OVL_MAX_MESSAGE_SIZE-OVL_COOKIE_SIZE-OVL_HASH_SIZE-1)
-
-
 /** Represents the identity of a node. A node is unquely identified by its keypair. The private key
  * of that key is only known to the node. Its public key is used to verify its identity. The hash
  * of the public key is the identifier of the node.
