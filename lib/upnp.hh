@@ -1,6 +1,7 @@
 #ifndef __OVL_UPNP_HH__
 #define __OVL_UPNP_HH__
 
+#include <inttypes.h>
 #include <QObject>
 #include <QTimer>
 #include <QUdpSocket>
