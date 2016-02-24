@@ -35,7 +35,6 @@ class SearchQuery
 public:
   /** Constructor. */
   SearchQuery(const Identifier &id);
-  SearchQuery(const Identifier &net, const Identifier &id);
 
   /** Destructor. */
   virtual ~SearchQuery();
@@ -45,8 +44,6 @@ public:
 
   /** Returns the identifier of the element being searched for. */
   const Identifier &id() const;
-  /** Returns the identifier of the network being searched. */
-  const Identifier &net() const;
 
   /** Update the search queue (ordered list of nodes to query). */
   void update(const NodeItem &nodes);
@@ -75,8 +72,6 @@ public:
 protected:
   /** The identifier of the element being searched for. */
   Identifier _id;
-  /** The identifier of the network being searched. */
-  Identifier _net;
   /** The current search queue. */
   QList<NodeItem> _best;
   /** The set of nodes already asked. */
@@ -352,12 +347,14 @@ protected:
   /** The output rate. */
   double _outRate;
 
-  /** The routing table. */
+  /** The routing table of the OVL network. */
   Buckets _buckets;
+
   /** Hash table of announced items. */
   QHash<Identifier, QSet<AnnouncementItem> > _hashTable;
   /** Table of items to announce. */
   QHash<Identifier, QDateTime> _annouceItems;
+
   /** The list of pending requests. */
   QHash<Identifier, Request *> _pendingRequests;
 
