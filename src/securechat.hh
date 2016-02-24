@@ -4,7 +4,7 @@
 #ifndef SECURECHAT_H
 #define SECURECHAT_H
 
-#include "lib/crypto.hh"
+#include "crypto.hh"
 
 #include <QObject>
 #include <QTimer>

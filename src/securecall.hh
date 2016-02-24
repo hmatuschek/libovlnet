@@ -4,7 +4,7 @@
 #ifndef SECURECALL_H
 #define SECURECALL_H
 
-#include "lib/crypto.hh"
+#include "crypto.hh"
 #include <opus.h>
 #include <portaudio.h>
 

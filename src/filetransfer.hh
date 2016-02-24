@@ -4,8 +4,8 @@
 #define FILETRANSFER_H
 
 #include <QObject>
-#include "lib/crypto.hh"
-#include "lib/stream.hh"
+#include "crypto.hh"
+#include "stream.hh"
 
 /** Maximum amount of data transferred in a single message. */
 #define FILETRANSFER_MAX_DATA_LEN     (OVL_SEC_MAX_DATA_SIZE-5UL)
