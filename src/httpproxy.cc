@@ -21,8 +21,8 @@ LocalHttpProxyServer::~LocalHttpProxyServer() {
 /* ********************************************************************************************* *
  * Implementation of LocalHttpProxyServerHandler
  * ********************************************************************************************* */
-LocalHttpProxyServerHandler::LocalHttpProxyServerHandler(Node &dht, QObject *parent)
-  : HttpRequestHandler(parent), _dht(dht)
+LocalHttpProxyServerHandler::LocalHttpProxyServerHandler(Node &dht)
+  : HttpRequestHandler(), _dht(dht)
 {
   // pass...
 }

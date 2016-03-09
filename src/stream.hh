@@ -244,6 +244,10 @@ protected:
   qint64 readData(char *data, qint64 maxlen);
   /** Write some data into the output buffer. */
   qint64 writeData(const char *data, qint64 len);
+  /** Emits the @c bytesWritten event. */
+  virtual void bytesWrittenEvent(qint64 bytes);
+  /** Emits the @c readyRead event. */
+  virtual void readyReadEvent();
 
 private slots:
   /** Gets called periodically to keep the connection alive. */

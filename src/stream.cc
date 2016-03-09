@@ -611,7 +611,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       }
       // Signal new data got available if stream is open
       if (OPEN == _state) {
-        emit readyRead();
+        this->readyReadEvent();
       }
     }
     // done
@@ -631,7 +631,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       // If some data in the output buffer has been ACKed
       // -> Signal data send if stream is open
       if (OPEN == _state) {
-        emit bytesWritten(send);
+        this->bytesWrittenEvent(send);
       }
       // If the last byte in the output buffer was ACKed and the _packettimer is
       // runnning -> stop it.
@@ -673,4 +673,14 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
 
   // Unknown packet type
   logError() << "Unknown datagram received: type=" << msg->type << ".";
+}
+
+void
+SecureStream::bytesWrittenEvent(qint64 bytes) {
+  emit bytesWritten(bytes);
+}
+
+void
+SecureStream::readyReadEvent() {
+  emit readyRead();
 }

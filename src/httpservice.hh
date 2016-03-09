@@ -116,13 +116,11 @@ class HttpResponse;
 
 /** Abstract interface for a Http request handler.
  * @ingroup http */
-class HttpRequestHandler: public QObject
+class HttpRequestHandler
 {
-  Q_OBJECT
-
 protected:
   /** Hidden constructor. */
-  HttpRequestHandler(QObject *parent=0);
+  HttpRequestHandler();
 
 public:
   /** Destructor. */
@@ -456,13 +454,11 @@ protected:
  * @ingroup http */
 class HttpDirectoryHandler: public HttpRequestHandler
 {
-  Q_OBJECT
-
 public:
   /** Constructor.
    * @param directory Specifies the directory to serve.
    * @param parent Specifies the optional QObject parent. */
-  HttpDirectoryHandler(const QDir &directory, QObject *parent=0);
+  HttpDirectoryHandler(const QDir &directory);
 
   /** Accepts all GET requests. */
   bool acceptReqest(HttpRequest *request);

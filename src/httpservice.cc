@@ -452,7 +452,7 @@ HttpDirectoryResponse::_bytesWritten(qint64 bytes) {
  * Implementation of HttpConnection
  * ********************************************************************************************* */
 HttpConnection::HttpConnection(HttpRequestHandler *service, const NodeItem &remote, QIODevice *socket)
-  : QObject(service), _service(service), _remote(remote), _socket(socket)
+  : QObject(), _service(service), _remote(remote), _socket(socket)
 {
   logDebug() << "New HTTP connection...";
   // Create new request parser (request)
@@ -537,8 +537,8 @@ HttpConnection::_responseCompleted() {
 /* ********************************************************************************************* *
  * Implementation of HttpDirectoryHandler
  * ********************************************************************************************* */
-HttpDirectoryHandler::HttpDirectoryHandler(const QDir &directory, QObject *parent)
-  : HttpRequestHandler(parent), _directory(directory)
+HttpDirectoryHandler::HttpDirectoryHandler(const QDir &directory)
+  : HttpRequestHandler(), _directory(directory)
 {
   // pass...
 }
@@ -580,8 +580,7 @@ HttpDirectoryHandler::processRequest(HttpRequest *request) {
 /* ********************************************************************************************* *
  * Implementation of HttpService
  * ********************************************************************************************* */
-HttpRequestHandler::HttpRequestHandler(QObject *parent)
-  : QObject(parent)
+HttpRequestHandler::HttpRequestHandler()
 {
   // pass...
 }
@@ -595,7 +594,7 @@ HttpRequestHandler::~HttpRequestHandler() {
  * Implementation of LocalHttpServer
  * ********************************************************************************************* */
 LocalHttpServer::LocalHttpServer(HttpRequestHandler *dispatcher, uint16_t port)
-  : QObject(dispatcher), _dispatcher(dispatcher), _server()
+  : QObject(), _dispatcher(dispatcher), _server()
 {
   if (_server.listen(QHostAddress::LocalHost, port)) {
     logDebug() << "Started LocalHttpService @localhost:" << port;
@@ -642,7 +641,7 @@ HttpService::~HttpService() {
 
 SecureSocket *
 HttpService::newSocket() {
-  return new SecureStream(_dht, _handler);
+  return new SecureStream(_dht, this);
 }
 
 void

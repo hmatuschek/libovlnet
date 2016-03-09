@@ -23,13 +23,11 @@ public:
  * @ingroup http */
 class LocalHttpProxyServerHandler: public HttpRequestHandler
 {
-  Q_OBJECT
-
 public:
   /** Constructor.
    * @param dht Specifies the OVL node instance.
    * @param parent Specifies the optional QObject parent. */
-  LocalHttpProxyServerHandler(Node &dht, QObject *parent=0);
+  LocalHttpProxyServerHandler(Node &dht);
   /** Destructor. */
   virtual ~LocalHttpProxyServerHandler();
 

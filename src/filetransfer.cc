@@ -121,7 +121,7 @@ FileUpload::sendRequest() {
   QByteArray fname = fileinfo.baseName().toUtf8();
   // truncate filename at maximum length
   size_t fnameLen = std::min(
-        size_t(fname.size()), FILETRANSFER_MAX_FILENAME_LEN);
+        fname.size(), int(FILETRANSFER_MAX_FILENAME_LEN));
 
   // Assemble "upload file request"
   FileTransferMessage msg;
@@ -159,7 +159,7 @@ FileUpload::write(const QByteArray &data) {
 
 size_t
 FileUpload::write(const uint8_t *buffer, size_t size) {
-  if (0 == (size = std::min(size, FILETRANSFER_MAX_DATA_LEN))) {
+  if (0 == (size = std::min(size, size_t(FILETRANSFER_MAX_DATA_LEN)))) {
     logDebug() << "Skip empty data package, size" << size
                << "max size" << FILETRANSFER_MAX_DATA_LEN;
     return 0;
