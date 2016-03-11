@@ -5,6 +5,7 @@
 #include "utils.hh"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QByteArray>
 #include <QtEndian>
 
@@ -20,10 +21,9 @@
 /* ******************************************************************************************** *
  * Implementation of Identity
  * ******************************************************************************************** */
-Identity::Identity(EVP_PKEY *key, QObject *parent)
+Identity::Identity(EVP_PKEY *key)
   : _keyPair(key)
 {
-  EVP_MD_CTX mdctx;
   unsigned char *keydata = 0; int keylen = 0;
   unsigned char fingerprint[20];
 
@@ -44,11 +44,143 @@ error:
   while ( 0 != (e = ERR_get_error()) ) {
     logError() << "OpenSSL: " << ERR_error_string(e, 0);
   }
-  EVP_MD_CTX_cleanup(&mdctx);
+}
+
+Identity::Identity()
+  : _keyPair(0)
+{
+  // Create new identity
+  unsigned char *keydata = 0; int keylen = 0;
+  unsigned char fingerprint[20];
+  EC_KEY *key = 0;
+
+  // Allocage and generate key
+  if (0 == (key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1)))
+    goto error;
+  EC_KEY_set_asn1_flag(key, OPENSSL_EC_NAMED_CURVE);
+  if (1 != EC_KEY_generate_key(key))
+    goto error;
+
+  // Store in EVP
+  if (0 == (_keyPair = EVP_PKEY_new()))
+    goto error;
+  if (! EVP_PKEY_assign_EC_KEY(_keyPair, key))
+    goto error;
+  // Ownership of key has been taken by pkey
+  key = 0;
+
+  // Get get public key in DER format (binary)
+  if ( 0 >= (keylen = i2d_PUBKEY(_keyPair, &keydata)) )
+    goto error;
+
+  // Compute RIPEMD160
+  OVLHash(keydata, keylen, fingerprint);
+
+  // Done
+  _fingerprint = Identifier((char *)fingerprint);
+  return;
+
+error:
+  ERR_load_crypto_strings();
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
+  if (key)
+    EC_KEY_free(key);
+  if (_keyPair)
+    EVP_PKEY_free(_keyPair);
+  _keyPair=0;
+}
+
+Identity::Identity(const Identity &other)
+  : _keyPair(0), _fingerprint(other._fingerprint)
+{
+  // Store in EVP
+  if (0 == (_keyPair = EVP_PKEY_new()))
+    goto error;
+
+  if (other._keyPair) {
+    if (0 >= EVP_PKEY_copy_parameters(_keyPair, other._keyPair))
+      goto error;
+  }
+
+error:
+  ERR_load_crypto_strings();
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
+  if (_keyPair)
+    EVP_PKEY_free(_keyPair);
+  _keyPair=0;
+}
+
+Identity::Identity(const QString &path)
+  : _keyPair(0), _fingerprint()
+{
+  BIO *bio = 0;
+  unsigned char *keydata = 0; int keylen = 0;
+  unsigned char fingerprint[20];
+  EC_KEY *key = 0;
+
+  // check if file exists
+  if (QFileInfo::exists(path)) {
+    // Read key from file
+    if (0 == (bio = BIO_new_file(path.toLocal8Bit(), "r")))
+      goto error;
+    if (! (_keyPair = PEM_read_bio_PUBKEY(bio, 0, 0,0)))
+      goto error;
+    if ( (_keyPair = PEM_read_bio_PrivateKey(bio, &_keyPair, 0,0)) ) {
+      logDebug() << "Read private key from" << path;
+    }
+    BIO_free_all(bio);
+  } else {
+    // Crate a new one
+    if (0 == (key = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1)))
+      goto error;
+    EC_KEY_set_asn1_flag(key, OPENSSL_EC_NAMED_CURVE);
+    if (1 != EC_KEY_generate_key(key))
+      goto error;
+
+    // Store in EVP
+    if (0 == (_keyPair = EVP_PKEY_new()))
+      goto error;
+    if (! EVP_PKEY_assign_EC_KEY(_keyPair, key))
+      goto error;
+    // Ownership of key has been taken by pkey
+    key = 0;
+  }
+
+  // Get get public key in DER format (binary)
+  if ( 0 >= (keylen = i2d_PUBKEY(_keyPair, &keydata)) )
+    goto error;
+
+  // Compute RIPEMD160
+  OVLHash(keydata, keylen, fingerprint);
+
+  // Done
+  _fingerprint = Identifier((char *)fingerprint);
+  return;
+
+error:
+  ERR_load_crypto_strings();
+  unsigned long e = 0;
+  while ( 0 != (e = ERR_get_error()) ) {
+    logError() << "OpenSSL: " << ERR_error_string(e, 0);
+  }
+  if (key)
+    EC_KEY_free(key);
+  if (_keyPair)
+    EVP_PKEY_free(_keyPair);
+  _keyPair=0;
+  if (bio)
+    BIO_free_all(bio);
 }
 
 Identity::~Identity() {
-  EVP_PKEY_free(_keyPair);
+  if (_keyPair)
+    EVP_PKEY_free(_keyPair);
   EVP_cleanup();
 }
 
@@ -657,3 +789,20 @@ void
 OVLHash(const unsigned char *data, size_t len, unsigned char *out) {
   RIPEMD160(data, len, out);
 }
+
+int
+OVLHashInit(EVP_MD_CTX *ctx) {
+  return EVP_DigestInit(ctx, EVP_ripemd160());
+}
+
+int
+OVLHashUpdate(const unsigned char *data, size_t len, EVP_MD_CTX *ctx) {
+  return EVP_DigestUpdate(ctx, data, len);
+}
+
+int
+OVLHashFinal(EVP_MD_CTX *ctx, unsigned char hash[]) {
+  unsigned int size = OVL_HASH_SIZE;
+  return EVP_DigestFinal(ctx, hash, &size);
+}
+

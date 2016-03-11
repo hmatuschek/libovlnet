@@ -448,8 +448,65 @@ StartConnectionRequest::StartConnectionRequest(const Identifier &service, const 
 /* ******************************************************************************************** *
  * Implementation of DHT
  * ******************************************************************************************** */
-Node::Node(Identity &id,
-         const QHostAddress &addr, quint16 port, QObject *parent)
+Node::Node(const QString &idFile,
+           const QHostAddress &addr, quint16 port, QObject *parent)
+  : QObject(parent), _self(idFile), _socket(), _started(false),
+    _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
+    _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),
+    _connections(), _requestTimer(), _nodeTimer(), _rendezvousTimer(), _announceTimer(),
+    _statisticsTimer()
+{
+  logInfo() << "Start node #" << _self.id() << " @ " << addr << ":" << port;
+
+  // try to bind socket to address and port
+  if (! _socket.bind(addr, port)) {
+    logError() << "Cannot bind to " << addr << ":" << port;
+    return;
+  }
+
+  // Connect to error slot
+  connect(&_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)),
+          this,SLOT(_onSocketError(QAbstractSocket::SocketState)));
+
+  // check request timeouts every 500ms
+  _requestTimer.setInterval(500);
+  _requestTimer.setSingleShot(false);
+
+  // Update statistics every 5 seconds
+  _statisticsTimer.setInterval(1000*5);
+  _statisticsTimer.setSingleShot(false);
+
+  // Ping rendezvous nodes every 10s
+  _rendezvousTimer.setInterval(1000*10);
+  _rendezvousTimer.setSingleShot(false);
+
+  // check for dead nodes every minute
+  _nodeTimer.setInterval(1000*60);
+  _nodeTimer.setSingleShot(false);
+
+  // Check for dead announcements and check for update my announcement items every 3min
+  _announceTimer.setInterval(1000*3);
+  _announceTimer.setSingleShot(false);
+
+  connect(&_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+  connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
+  connect(&_requestTimer, SIGNAL(timeout()), this, SLOT(_onCheckRequestTimeout()));
+  connect(&_nodeTimer, SIGNAL(timeout()), this, SLOT(_onCheckNodeTimeout()));
+  connect(&_rendezvousTimer, SIGNAL(timeout()), this, SLOT(_onPingRendezvousNodes()));
+  connect(&_announceTimer, SIGNAL(timeout()), this, SLOT(_onCheckAnnouncements()));
+  connect(&_statisticsTimer, SIGNAL(timeout()), this, SLOT(_onUpdateStatistics()));
+
+  _requestTimer.start();
+  _nodeTimer.start();
+  _rendezvousTimer.start();
+  _announceTimer.start();
+  _statisticsTimer.start();
+
+  _started = true;
+}
+
+Node::Node(const Identity &id,
+           const QHostAddress &addr, quint16 port, QObject *parent)
   : QObject(parent), _self(id), _socket(), _started(false),
     _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
     _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),

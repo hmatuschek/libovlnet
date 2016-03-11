@@ -26,9 +26,13 @@ protected:
   /** "Hidden" constructor.
    * @param key Key pair or only the public key of a node.
    * @param parent The optional parent of the QObject. */
-  explicit Identity(EVP_PKEY *key, QObject *parent = 0);
+  explicit Identity(EVP_PKEY *key);
 
 public:
+  Identity();
+  Identity(const QString &path);
+  Identity(const Identity &other);
+
   /** Destructor. */
   virtual ~Identity();
 
@@ -265,5 +269,7 @@ public:
 
 
 void OVLHash(const unsigned char *data, size_t len, unsigned char *out);
-
+int OVLHashInit(EVP_MD_CTX *ctx);
+int OVLHashUpdate(const unsigned char *data, size_t len, EVP_MD_CTX *ctx);
+int OVLHashFinal(EVP_MD_CTX *ctx, unsigned char hash[OVL_HASH_SIZE]);
 #endif // __OVL_IDENTITY_HH__

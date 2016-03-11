@@ -2,6 +2,7 @@
 #define __OVL_DHT_H__
 
 #include "buckets.hh"
+#include "crypto.hh"
 
 #include <inttypes.h>
 
@@ -22,7 +23,6 @@ class AnnounceRequest;
 class FindNeighboursRequest;
 class RendezvousSearchRequest;
 class StartConnectionRequest;
-class Identity;
 class AbstractService;
 class ServiceHandler;
 class SecureSocket;
@@ -110,12 +110,21 @@ class Node: public QObject
 
 public:
   /** Constructor.
+   * @param idFile Filename to read the identity of the node from.
+   * @param addr Specifies the network address the node will bind to.
+   * @param port Specifies the network port the node will listen on.
+   * @param parent Optional pararent object. */
+  explicit Node(const QString &idFile, const QHostAddress &addr=QHostAddress::Any,
+               quint16 port=7741, QObject *parent=0);
+
+  /** Constructor.
    * @param id Weak reference to the identity of the node.
    * @param addr Specifies the network address the node will bind to.
    * @param port Specifies the network port the node will listen on.
    * @param parent Optional pararent object. */
-  explicit Node(Identity &id, const QHostAddress &addr=QHostAddress::Any,
+  explicit Node(const Identity &id, const QHostAddress &addr=QHostAddress::Any,
                quint16 port=7741, QObject *parent=0);
+
 
   /** Destructor. */
   virtual ~Node();
@@ -327,7 +336,7 @@ private slots:
 
 protected:
   /** The identifier of the node. */
-  Identity &_self;
+  Identity _self;
   /** The network socket. */
   QUdpSocket _socket;
   /** If @c true, the socket was bound to the address and port given to the constructor. */
