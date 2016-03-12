@@ -150,6 +150,8 @@ Identity::Identity(const QString &path)
       goto error;
     // Ownership of key has been taken by pkey
     key = 0;
+    // Save identity in file
+    save(path);
   }
 
   // Get get public key in DER format (binary)
