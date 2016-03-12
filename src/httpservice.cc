@@ -94,8 +94,8 @@ URI::operator =(const URI &other) {
 /* ********************************************************************************************* *
  * Implementation of HTTPRequest
  * ********************************************************************************************* */
-HttpRequest::HttpRequest(QIODevice *socket)
-  : QObject(socket), _socket(socket), _parserState(READ_REQUEST), _uri(), _headers()
+HttpRequest::HttpRequest(QIODevice *socket, const NodeItem &remote)
+  : QObject(socket), _remote(remote), _socket(socket), _parserState(READ_REQUEST), _uri(), _headers()
 {
   // pass..
 }
@@ -104,6 +104,11 @@ void
 HttpRequest::parse() {
   connect(_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
   _onReadyRead();
+}
+
+const NodeItem &
+HttpRequest::remote() const {
+  return _remote;
 }
 
 void
@@ -456,7 +461,7 @@ HttpConnection::HttpConnection(HttpRequestHandler *service, const NodeItem &remo
 {
   logDebug() << "New HTTP connection...";
   // Create new request parser (request)
-  _currentRequest = new HttpRequest(this->_socket);
+  _currentRequest = new HttpRequest(this->_socket, _remote);
   // no response yet
   _currentResponse = 0;
   // get notified on fishy requests

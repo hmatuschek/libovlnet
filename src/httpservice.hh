@@ -219,10 +219,13 @@ public:
 
 public:
   /** Constructs a request parser for the given connection. */
-  HttpRequest(QIODevice *socket);
+  HttpRequest(QIODevice *socket, const NodeItem &remote=NodeItem());
 
   /** Starts reading the HTTP request. */
   void parse();
+
+  /** Returns the remote node. */
+  const NodeItem &remote() const;
 
   /** Returns the socket instance of the request. */
   inline QIODevice *socket() const { return _socket; }
@@ -275,6 +278,8 @@ protected:
   HttpVersion _getVersion(const char *str, int len);
 
 protected:
+  /** Nodeitem representing the remote node or peer. */
+  NodeItem _remote;
   /** The connection of the request. */
   QIODevice *_socket;
   /** The parser state. */
