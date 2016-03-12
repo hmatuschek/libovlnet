@@ -49,6 +49,8 @@ public:
 
   bool isSequential() const;
   void close();
+  qint64 bytesAvailable() const;
+  qint64 bytesToWrite() const;
 
   HttpResponseCode responseCode() const;
   bool hasResponseHeader(const QByteArray &header) const;

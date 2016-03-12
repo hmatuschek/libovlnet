@@ -12,12 +12,12 @@ HttpClientConnection::HttpClientConnection(Node &node, const NodeItem &remote, c
 
 bool
 HttpClientConnection::start(const Identifier &streamId, const PeerItem &peer) {
+  _state = IDLE;
   if (! SecureStream::start(streamId, peer)) {
     // connection failed
     _state = ERROR;
     return false;
   }
-  _state = IDLE;
   return true;
 }
 
@@ -29,13 +29,17 @@ HttpClientConnection::failed() {
 
 HttpClientResponse *
 HttpClientConnection::get(const QString &path) {
-  if (IDLE != _state) { return 0; }
+  if (IDLE != _state) {
+    logInfo() << "Cannot send GET " << path << " request. Connection state (" << _state
+              << ") is not idle.";
+    return 0;
+  }
 
   _state = PROCESS_REQUEST;
   // Construct request
   HttpClientResponse *resp = new HttpClientResponse(this, HTTP_GET, path);
   connect(resp, SIGNAL(destroyed(QObject*)), this, SLOT(_onRequestFinished(QObject *)));
-  // No body close instream immediately
+  // No body : close instream immediately
   resp->close();
   return resp;
 }
@@ -80,15 +84,17 @@ void
 HttpClientResponse::_onDataAvailable() {
   while (_connection->canReadLine()) {
     QByteArray line = _connection->readLine();
-
+    logDebug() << "HttpClientResponse parser: Parse line " << line;
     if (RECV_RESPONSE_CODE == _state) {
       if (line.size() < 12) { // HTTP/1.1 XXX
+        logError() << "Invalid response line " << line;
         disconnect(_connection, SIGNAL(readyRead()), this, SLOT(_onDataAvailable()));
         _state = ERROR;
         return;
       }
       bool ok; uint code = line.mid(9,3).toUInt(&ok);
       if (! ok) {
+        logError() << "Invalid response code " << line;
         disconnect(_connection, SIGNAL(readyRead()), this, SLOT(_onDataAvailable()));
         _state = ERROR;
         return;
@@ -101,6 +107,7 @@ HttpClientResponse::_onDataAvailable() {
         case HTTP_SERVER_ERROR: _resCode = HTTP_SERVER_ERROR; break;
         case HTTP_BAD_GATEWAY: _resCode = HTTP_BAD_GATEWAY; break;
         default:
+          logError() << "Invalid response code " << code;
           disconnect(_connection, SIGNAL(readyRead()), this, SLOT(_onDataAvailable()));
           _state = ERROR;
           return;
@@ -113,10 +120,12 @@ HttpClientResponse::_onDataAvailable() {
         connect(_connection, SIGNAL(readyRead()), this, SIGNAL(readyRead()));
         _state = RECV_BODY;
         if (! open(QIODevice::ReadOnly)) {
+          logError() << "Cannot reopen response for reading response body.";
           _state = ERROR;
           return;
         }
         emit finished();
+        return;
       }
       int idx = line.indexOf(':');
       if (0 > idx) {
@@ -134,6 +143,16 @@ HttpClientResponse::_onDataAvailable() {
 bool
 HttpClientResponse::isSequential() const {
   return true;
+}
+
+qint64
+HttpClientResponse::bytesAvailable() const {
+  return _connection->bytesAvailable();
+}
+
+qint64
+HttpClientResponse::bytesToWrite() const {
+  return _connection->bytesToWrite();
 }
 
 void

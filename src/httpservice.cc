@@ -332,7 +332,7 @@ HttpStringResponse::_bytesWritten(qint64 bytes) {
  * ********************************************************************************************* */
 HttpJsonResponse::HttpJsonResponse(const QJsonDocument &document, HttpRequest *request)
   : HttpStringResponse(
-      request->version(), HTTP_OK, document.toBinaryData(), request->socket(), "application/json")
+      request->version(), HTTP_OK, document.toJson(), request->socket(), "application/json")
 {
   // pass
 }
