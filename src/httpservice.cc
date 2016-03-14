@@ -7,6 +7,15 @@
 #include <QTcpSocket>
 #include <QJsonDocument>
 
+inline QString httpMethodName(HttpMethod m) {
+  switch (m) {
+    case HTTP_GET: return "GET";
+    case HTTP_POST: return "POST";
+    case HTTP_HEAD: return "HEAD";
+    case HTTP_INVALID_METHOD: return "INVALID";
+  }
+  return "INVALID";
+}
 
 /* ********************************************************************************************* *
  * Implementation of HostName
@@ -225,7 +234,7 @@ void
 HttpResponse::sendHeaders() {
   // Skip if headers are serialized already or even has been send
   if (_headersSend || (0 != _headerBuffer.size()) || (HTTP_RESP_INCOMPLETE == _code)) { return; }
-  logDebug() << "Serialize headers...";
+  //logDebug() << "Serialize headers...";
   // Send version
   switch (_version) {
     case HTTP_1_0: _headerBuffer.append("HTTP/1.0 "); break;
@@ -263,7 +272,7 @@ HttpResponse::sendHeaders() {
 
 void
 HttpResponse::_onBytesWritten(qint64 bytes) {
-  logDebug() << "HttpResponse: Continue send headers.";
+  // logDebug() << "HttpResponse: Continue send headers.";
   // If headers already send -> done
   if (_headersSend) { return; }
   // If headers are just send
@@ -273,7 +282,7 @@ HttpResponse::_onBytesWritten(qint64 bytes) {
     // disconnect from bytesWritten() signal
     disconnect(_socket, SIGNAL(bytesWritten(qint64)),
                this, SLOT(_onBytesWritten(qint64)));
-    logDebug() << "HTTPResponse: ... headers send.";
+    //logDebug() << "HTTPResponse: ... headers send.";
     // signal headers send
     emit headersSend();
     // done
@@ -303,7 +312,7 @@ HttpStringResponse::HttpStringResponse(HttpVersion version, HttpResponseCode res
 
 void
 HttpStringResponse::_onHeadersSend() {
-  logDebug() << "HttpStringResponse: Headers send: Send content.";
+  //logDebug() << "HttpStringResponse: Headers send: Send content.";
   connect(_socket, SIGNAL(bytesWritten(qint64)),
           this, SLOT(_bytesWritten(qint64)));
   // Start body transmission
@@ -316,7 +325,7 @@ HttpStringResponse::_bytesWritten(qint64 bytes) {
   if (_textIdx == size_t(_text.size())) {
     disconnect(_socket, SIGNAL(bytesWritten(qint64)),
                this, SLOT(_onBytesWritten(qint64)));
-    logDebug() << "HttpStringResponse: Content send.";
+    //logDebug() << "HttpStringResponse: Content send.";
     emit completed();
     return;
   }
@@ -459,7 +468,7 @@ HttpDirectoryResponse::_bytesWritten(qint64 bytes) {
 HttpConnection::HttpConnection(HttpRequestHandler *service, const NodeItem &remote, QIODevice *socket)
   : QObject(), _service(service), _remote(remote), _socket(socket)
 {
-  logDebug() << "New HTTP connection...";
+  //logDebug() << "New HTTP connection...";
   // Create new request parser (request)
   _currentRequest = new HttpRequest(this->_socket, _remote);
   // no response yet
@@ -487,11 +496,14 @@ HttpConnection::~HttpConnection() {
 
 void
 HttpConnection::_requestHeadersRead() {
-  logDebug() << "Request headers read.";
+  //logDebug() << "Request headers read.";
   // this should not happen
   if (! _currentRequest) { return; }
   // disconnect from signel
   disconnect(_currentRequest, SIGNAL(headerRead()), this, SLOT(_requestHeadersRead()));
+  logDebug() << "HTTP service: " << httpMethodName(_currentRequest->method())
+             << " '" << _currentRequest->uri().path()
+             << "' from " << _remote.id() << ".";
   // If request is not accepted -> response with "Forbidden"
   if (! _service->acceptReqest(_currentRequest)) {
     // If not accepted send forbidden
