@@ -701,6 +701,10 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
   } else if (len<24) {
     // A valid encrypted message needs at least 24 bytes (64bit seq + 128bit tag).
     return;
+  } else if (len > OVL_MAX_DATA_SIZE) {
+    logError() << "Encrypted message larger than OVL_MAX_DATA_SIZE!"
+               << " LEN=" << len << ">" << OVL_MAX_DATA_SIZE << ".";
+    return;
   }
   uint8_t inBuffer[OVL_MAX_DATA_SIZE];
   // Get sequence number
@@ -713,12 +717,10 @@ SecureSocket::handleData(const uint8_t *data, size_t len) {
     logDebug() << "Failed to decrypt message " << seq;
     return;
   }
-  /// @bug That is somewhat late! However, sizeof(_inBuffer)==DHT_MAX_MESSAGE_SIZE
-  ///      and the decrypted message cannot be larger than that. Hence it is
-  ///      ensured that there is no buffer overrun.
   if (rxlen > OVL_SEC_MAX_DATA_SIZE) {
-    logError() << "Fatal: Decrypted data larger than MAX_SEC_DATA_SIZE!"
+    logError() << "Decrypted data larger than MAX_SEC_DATA_SIZE!"
                << " LEN=" << rxlen << ">" << OVL_SEC_MAX_DATA_SIZE;
+    return;
   }
   // Forward decrypted data
   this->handleDatagram(inBuffer, rxlen);

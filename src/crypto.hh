@@ -29,8 +29,11 @@ protected:
   explicit Identity(EVP_PKEY *key);
 
 public:
+  /** Creates a new identity. */
   Identity();
+  /** Loads the identity from the given file. */
   Identity(const QString &path);
+  /** Copies the given identity. */
   Identity(const Identity &other);
 
   /** Destructor. */

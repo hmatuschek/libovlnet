@@ -387,7 +387,8 @@ SecureStream::SecureStream(Node &dht, QObject *parent)
 }
 
 SecureStream::~SecureStream() {
-  abort();
+  if (CLOSED != _state)
+    abort();
 }
 
 bool
@@ -439,9 +440,11 @@ SecureStream::_onCheckPacketTimeout() {
 
 void
 SecureStream::_onTimeOut() {
-  logInfo() << "SecureStream: Connection timeout -> reset connection.";
-  // abort connection
-  abort();
+  if (CLOSED != _state) {
+    logInfo() << "SecureStream: Connection timeout -> reset connection.";
+    // reset connection
+    abort();
+  }
 }
 
 void
@@ -457,7 +460,7 @@ SecureStream::close() {
     logDebug() << "Close connection. " << bytesToWrite() << "b left in output buffer.";
     // readcanel finished
     emit readChannelFinished();
-    _state = FIN_RECEIVED;
+    _state = CLOSING;
     // If all data has been send -> closed
     if (0 == bytesToWrite()) {
       // sends RST & closes the connection
@@ -558,9 +561,12 @@ SecureStream::readData(char *data, qint64 maxlen) {
 
 bool
 SecureStream::start(const Identifier &streamId, const PeerItem &peer) {
+  // Start connection (init crypto)
   if (SecureSocket::start(streamId, peer)) {
+    // Open IODevice
     bool res = open(QIODevice::ReadWrite);
     if (res) {
+      // signal success
       emit established();
       return true;
     }
@@ -638,7 +644,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       if ((0 == _outBuffer.bytesToWrite()) && _packetTimer.isActive()) {
         _packetTimer.stop();
       }
-      if ((FIN_RECEIVED == _state) && (0 == bytesToWrite())) {
+      if ((CLOSING == _state) && (0 == bytesToWrite())) {
         // reset the connection
         abort();
       }

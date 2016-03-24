@@ -377,7 +377,7 @@ HttpFileResponse::_onHeadersSend() {
 void
 HttpFileResponse::_bytesWritten(qint64 bytes)
 {
-  if (_offset == _file.size()) {
+  if (qint64(_offset) == _file.size()) {
     logDebug() << "File send... Wait for completion.";
     // If all has be read from file
     if (0 == _socket->bytesToWrite()) {
@@ -448,7 +448,7 @@ HttpDirectoryResponse::_onHeadersSend() {
 
 void
 HttpDirectoryResponse::_bytesWritten(qint64 bytes) {
-  if (_offset == _buffer.size()) {
+  if (int(_offset) == _buffer.size()) {
     // If all has be send to the buffer
     if (0 == _socket->bytesToWrite()) {
       // If all has been send to the device
@@ -503,7 +503,8 @@ HttpConnection::_requestHeadersRead() {
   disconnect(_currentRequest, SIGNAL(headerRead()), this, SLOT(_requestHeadersRead()));
   logDebug() << "HTTP service: " << httpMethodName(_currentRequest->method())
              << " '" << _currentRequest->uri().path()
-             << "' from " << _remote.id() << ".";
+             << "' from " << _remote.id() << " @"
+             << _remote.addr().toString() << ":" << _remote.port() << ".";
   // If request is not accepted -> response with "Forbidden"
   if (! _service->acceptReqest(_currentRequest)) {
     // If not accepted send forbidden

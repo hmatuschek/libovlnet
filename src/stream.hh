@@ -57,7 +57,7 @@ protected:
 
 
 /** Implements the input buffer of a TCP like stream.
- * This buffer re-assembles the data stream by reordereing the received segments according to
+ * This buffer reassembles the data stream by reordereing the received segments according to
  * their sequence number (call @c putPacket). Whenever a part of the sequence was received,
  * @c available increases and the received data can be @c read.
  * @ingroup internal */
@@ -182,9 +182,9 @@ protected:
 };
 
 
-/** Implements a encrypted stream. While the @c SecureSocket implements encrypted datagrams
- * (UDP like), the secure stream implements an encrypted data stream (TCP like), handling packet
- * loss and maintaining the data order.
+/** This class implements a encrypted stream. While the @c SecureSocket implements encrypted
+ * datagrams (UDP like), the secure stream implements an encrypted data stream (TCP like), handling
+ * packet loss, providing flow-controll and maintaining the data order.
  * @ingroup core */
 class SecureStream: public QIODevice, public SecureSocket
 {
@@ -196,7 +196,7 @@ public:
     INITIALIZED,  ///< Stream is initialized, data may be received but and stored in the buffer,
                   ///  but no event is emitted.
     OPEN,         ///< Stream is open and data can be send or received. IO events are emitted.
-    FIN_RECEIVED, ///< No data is received anymore but remaining data will be send. The state will
+    CLOSING,      ///< No data is received anymore but remaining data will be send. The state will
                   ///  change to CLOSED once all data has been send. This state can be reached if
                   ///  either a FIN packet is received or if @c close is called.
     CLOSED        ///< Stream closed, either by receiving a RST message or by having send all data
