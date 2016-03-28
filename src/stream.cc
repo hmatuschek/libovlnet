@@ -371,13 +371,13 @@ SecureStream::SecureStream(Node &dht, QObject *parent)
     _state(INITIALIZED), _keepalive(), _packetTimer(), _timeout()
 {
   // Setup keep-alive timer, gets started by open();
-  _keepalive.setInterval(1000);
+  _keepalive.setInterval(5000);
   _keepalive.setSingleShot(false);
   // Setup packet timeout timer
   _packetTimer.setInterval(100);
   _packetTimer.setSingleShot(false);
   // Setup connection timeout timer.
-  _timeout.setInterval(10000);
+  _timeout.setInterval(30000);
   _timeout.setSingleShot(true);
 
   // connect signals
@@ -421,6 +421,11 @@ SecureStream::_onKeepAlive() {
   resp.payload.window = htons(_inBuffer.window());
   if (! sendDatagram((const uint8_t*) &resp, 7)) {
     logWarning() << "SecureStream: Failed to send ACK.";
+  } else {
+    logDebug() << "Send (keep-live) ACK seq=" << _inBuffer.nextSequence()
+               << "; win=" << _inBuffer.window()
+               << " to " << peer().addr() << ":" << peer().port()
+               << " for connection " <<  id().toBase32() << ".";
   }
 }
 
@@ -433,6 +438,9 @@ SecureStream::_onCheckPacketTimeout() {
   msg.seq = htonl(seq);
   if (sendDatagram((const uint8_t *) &msg, len+5)) {
     _keepalive.start();
+    logDebug() << "Resend DATA seq=" << seq << ", len=" << len
+               << " to " << peer().addr() << ":" << peer().port()
+               << " for connection " << id().toBase32() << ".";
   } else {
     logWarning() << "SecureStream: Failed to resend data: seq=" << seq << ", len=" << len << ".";
   }
@@ -489,8 +497,11 @@ SecureStream::abort() {
     logDebug() << "SecureStream: Reset connection, send RST.";
     _state = CLOSED;
     Message msg(Message::RESET);
-    if(! sendDatagram((uint8_t *) &msg, 1)) {
+    if (! sendDatagram((uint8_t *) &msg, 1)) {
       logError() << "SecureConnection: Can not send RST packet.";
+    } else {
+      logDebug() << "Send reset to " << peer().addr() << ":" << peer().port()
+                 << " for connection " << id().toBase32() << ".";
     }
   }
 }
@@ -520,7 +531,7 @@ SecureStream::writeData(const char *data, qint64 len) {
   // and maximum payload length
   len = std::min(len, qint64(_outBuffer.free()));
   len = std::min(len, qint64(DHT_STREAM_MAX_DATA_SIZE));
-  if (0 == len) {
+  if (0 >= len) {
     return 0;
   }
 
@@ -531,7 +542,7 @@ SecureStream::writeData(const char *data, qint64 len) {
 
   // put in output buffer, updates sequence number
   if(0 == (len = _outBuffer.write((const uint8_t *)data, len))) {
-    logDebug() << "Cannot write to outBuffer. Full?";
+    logError() << "Cannot write to outBuffer. Full?";
     return 0;
   }
 
@@ -546,8 +557,12 @@ SecureStream::writeData(const char *data, qint64 len) {
   if( sendDatagram((const uint8_t *)&msg, len+5) ) {
     // reset keep-alive timer
     _keepalive.start();
+    logDebug() << "Send DATA seq=" << ntohl(msg.seq) << ", len=" << len
+               << " to " << peer().addr() << ":" << peer().port()
+               << " for connection " << id().toBase32() << ".";
     return len;
   }
+
 
   // on error
   logError() << "Can not send datagram!";
@@ -599,6 +614,9 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     if (len<5) { return; }
     // Get sequence number of data packet
     uint32_t seq = ntohl(msg->seq);
+    logDebug() << "Received DATA seq=" << seq << ", len=" << (len-5)
+               << " from " << peer().addr() << ":" << peer().port()
+               << " for connection " << id().toBase32() << ".";
     // update input buffer, returns the number of bytes ACKed
     uint32_t rxlen = _inBuffer.putPacket(seq, (const uint8_t *)msg->payload.data, len-5);
     // One may also send an ACK if the received sequence number is outside the reception window.
@@ -611,6 +629,10 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       resp.payload.window = htons(_inBuffer.window());
       // Send ACK & reset keep-alive timer
       if (sendDatagram((const uint8_t*) &resp, 7)) {
+        logDebug() << "Send ACK seq=" << _inBuffer.nextSequence()
+                   << ", win=" << _inBuffer.window()
+                   << " to " << peer().addr() << ":" << peer().port()
+                   << " for connection " << id().toBase32() << ".";
         _keepalive.start();
       } else {
         logError() << "Failed to send ACK seq=" << _inBuffer.nextSequence() << ", win=" << _inBuffer.window();
@@ -619,6 +641,9 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
       if (OPEN == _state) {
         this->readyReadEvent();
       }
+    } else {
+      logDebug() << "Cannot add data packet len=" << (len-5)
+                 << " to inBuffer: win=" << _inBuffer.window() << ".";
     }
     // done
     return;
@@ -626,12 +651,15 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
 
   if (Message::ACK == msg->type) {
     // check message size
-    if (len!=7) {
+    if (7 != len) {
       logInfo() << "SecureStream: Malformed ACK received.";
       return;
     }
     // Get sequence number
     uint32_t seq = ntohl(msg->seq);
+    logDebug() << "Received ACK seq=" << seq << ", win=" << ntohs(msg->payload.window)
+               << " from " << peer().addr() << ":" << peer().port()
+               << " for connection " << id().toBase32() << ".";
     // ACK data in output buffer
     if (uint32_t send = _outBuffer.ack(seq, ntohs(msg->payload.window))) {
       // If some data in the output buffer has been ACKed
@@ -653,14 +681,18 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
     }
     // If nothing has been ACKed and ACK seq == first byte of output buffer
     // -> resend requested packet.
-    if (_outBuffer.firstSequence() == ntohl(msg->seq)) {
+    if (_outBuffer.bytesToWrite() && (_outBuffer.firstSequence() == ntohl(msg->seq)) ){
       // -> resent requested message
       Message resp(Message::DATA);
       uint16_t len=DHT_STREAM_MAX_DATA_SIZE; uint32_t seq=0;
-      _outBuffer.resend(resp.payload.data, len, seq);
+      len = _outBuffer.resend(resp.payload.data, len, seq);
       resp.seq = htonl(seq);
       if (sendDatagram((const uint8_t *) &resp, len+5)) {
         _keepalive.start();
+        logDebug() << "Resend Data seq=" << seq
+                   << " (next seq="<<_outBuffer.nextSequence() << "), len=" << len
+                   << " to " << peer().addr() << ":" << peer().port()
+                   << " for connection " << id().toBase32() << ".";
       }
     }
     // done.
@@ -678,7 +710,7 @@ SecureStream::handleDatagram(const uint8_t *data, size_t len) {
   }
 
   // Unknown packet type
-  logError() << "Unknown datagram received: type=" << msg->type << ".";
+  logWarning() << "Unknown datagram received: type=" << msg->type << ".";
 }
 
 void

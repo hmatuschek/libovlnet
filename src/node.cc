@@ -456,6 +456,7 @@ Node::Node(const QString &idFile,
     _connections(), _requestTimer(), _nodeTimer(), _rendezvousTimer(), _announceTimer(),
     _statisticsTimer()
 {
+  qsrand(QDateTime::currentDateTime().currentMSecsSinceEpoch());
   logInfo() << "Start node #" << _self.id() << " @ " << addr << ":" << port;
 
   // try to bind socket to address and port
@@ -513,6 +514,7 @@ Node::Node(const Identity &id,
     _connections(), _requestTimer(), _nodeTimer(), _rendezvousTimer(), _announceTimer(),
     _statisticsTimer()
 {
+  qsrand(QDateTime::currentDateTime().currentMSecsSinceEpoch());
   logInfo() << "Start node #" << id.id() << " @ " << addr << ":" << port;
 
   // try to bind socket to address and port
@@ -1009,7 +1011,7 @@ Node::_onReadyRead() {
       _socket.readDatagram(0, 0, &addr, &port);
       logInfo() << "Invalid UDP packet received from " << addr << ":" << port;
     } else {
-      // Update statistics
+      // Update RX statistics
       _bytesReceived += _socket.pendingDatagramSize();
       // Read message
       struct Message msg; QHostAddress addr; uint16_t port;
@@ -1321,7 +1323,8 @@ Node::_processStartConnectionResponse(
 {
   // Verify session key
   if (! req->socket()->verify(msg.payload.start_connection.pubkey, size-OVL_COOKIE_SIZE-3)) {
-    logError() << "Verification of peer session key failed.";
+    logError() << "Verification of peer session key failed for connection id="
+               << req->socket()->id().toBase32() << ".";
     req->socket()->failed();
     return;
   }
@@ -1329,14 +1332,16 @@ Node::_processStartConnectionResponse(
   // verify fingerprints
   if (!(req->socket()->peerId() == req->peedId())) {
     logError() << "Peer fingerprint mismatch: " << req->socket()->peerId()
-               << " != " << req->peedId();
+               << " != " << req->peedId() << " for connection id="
+               << req->socket()->id().toBase32() << ".";
     req->socket()->failed();
     return;
   }
 
   // success -> start connection
   if (! req->socket()->start(req->cookie(), PeerItem(addr, port))) {
-    logError() << "Can not initialize symmetric chipher.";
+    logError() << "Can not initialize symmetric chipher for connection id="
+               << req->socket()->id().toBase32() << ".";
     req->socket()->failed();
     return;
   }
@@ -1752,8 +1757,8 @@ Node::_onCheckAnnouncements() {
 
 void
 Node::_onUpdateStatistics() {
-  _inRate = (double(_bytesReceived - _lastBytesReceived)/_statisticsTimer.interval())/1000;
+  _inRate = (double(_bytesReceived - _lastBytesReceived)/_statisticsTimer.interval())*1000;
   _lastBytesReceived = _bytesReceived;
-  _outRate = (double(_bytesSend - _lastBytesSend)/_statisticsTimer.interval())/1000;
+  _outRate = (double(_bytesSend - _lastBytesSend)/_statisticsTimer.interval())*1000;
   _lastBytesSend = _bytesSend;
 }
