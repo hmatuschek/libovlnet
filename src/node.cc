@@ -841,8 +841,16 @@ void
 Node::_processSearchRequest(
     const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
+  // Check network ID
+  Identifier remoteNetId(msg.payload.search.network);
+  if (!_networks.contains(remoteNetId)) {
+    logDebug() << "Cannot process search request: Unknown network " << remoteNetId;
+    return;
+  }
+
+  // Get best matches for the requested network
   QList<NodeItem> best;
-  _buckets.getNearest(Identifier(msg.payload.search.id), best);
+  _networks[remoteNetId]->getNearest(Identifier(msg.payload.search.id), best);
 
   struct Message resp;
   // Assemble response

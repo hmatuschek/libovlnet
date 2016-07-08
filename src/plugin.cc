@@ -137,7 +137,8 @@ PluginLoader::isValid(const QString &path) {
   if (! meta.isValid())
     return false;
 
-  logDebug() << "Found plugin " << meta.name() << " @ " << path << ".";
+  logDebug() << "Found plugin " << meta.name() << ", v" << meta.version()
+             << " @ " << path << ".";
   _availablePlugins.insert(meta.name(), meta);
 
   return true;
