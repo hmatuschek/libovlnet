@@ -21,7 +21,7 @@
  * It is ensured that a complete bucket can be transferred within one UDP message. */
 #define OVL_K std::min(8, OVL_MAX_TRIPLES)
 
-#define OVL_PING_REQU_SIZE            (OVL_COOKIE_SIZE+2*OVL_HASH_SIZE+1)
+#define OVL_PING_REQU_SIZE            (OVL_COOKIE_SIZE+3*OVL_HASH_SIZE+1)
 #define OVL_PING_RESP_SIZE            OVL_PING_REQU_SIZE
 #define OVL_SEARCH_MIN_REQU_SIZE      (OVL_COOKIE_SIZE+2*OVL_HASH_SIZE+1)
 #define OVL_SEARCH_MIN_RESP_SIZE      (OVL_COOKIE_SIZE+1)
