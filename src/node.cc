@@ -571,7 +571,7 @@ Node::sendPing(const QHostAddress &addr, uint16_t port, const Identifier &netid)
   memcpy(msg.payload.ping.network, netid.constData(), OVL_HASH_SIZE);
   msg.payload.ping.type = Message::PING;
   // send it
-  if(0 > _socket.writeDatagram((char *) &msg, OVL_COOKIE_SIZE+OVL_HASH_SIZE+1, addr, port)) {
+  if(0 > _socket.writeDatagram((char *) &msg, OVL_PING_REQU_SIZE, addr, port)) {
     logError() << "Failed to send ping to " << addr << ":" << port;
   }
 }
@@ -588,7 +588,7 @@ Node::sendPing(const Identifier &id, const QHostAddress &addr, uint16_t port, co
   memcpy(msg.payload.ping.network, netid.constData(), OVL_HASH_SIZE);
   msg.payload.ping.type = Message::PING;
   // send it
-  if(0 > _socket.writeDatagram((char *) &msg, OVL_COOKIE_SIZE+OVL_HASH_SIZE+1, addr, port)) {
+  if(0 > _socket.writeDatagram((char *) &msg, OVL_PING_REQU_SIZE, addr, port)) {
     logError() << "Failed to send ping to " << addr << ":" << port;
   }
 }
