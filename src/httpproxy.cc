@@ -61,7 +61,7 @@ LocalHttpProxyResponse::LocalHttpProxyResponse(Node &dht, const HostName &id, Ht
     connect(&_dht, SIGNAL(nodeFound(NodeItem)), this, SLOT(_onNodeFound(NodeItem)));
     connect(&_dht, SIGNAL(nodeNotFound(Identifier,QList<NodeItem>)),
             this, SLOT(_onNodeNotFound(Identifier,QList<NodeItem>)));
-    _dht.findNode(_destination.ovlId());
+    _dht.search(new FindNodeQuery(_destination.ovlId()));
   } else {
     // Otherwise assume "normal" domain name.
     QTcpSocket *socket = new QTcpSocket(this); _stream = socket;

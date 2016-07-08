@@ -382,6 +382,11 @@ Bucket::contains(const Identifier &id) const {
   return _triples.contains(id);
 }
 
+bool
+Bucket::isValid(const Identifier &id) const {
+  return _triples[id].lastSeen().isValid();
+}
+
 NodeItem
 Bucket::getNode(const Identifier &id) const {
   if (_triples.contains(id)) {
@@ -498,6 +503,11 @@ Buckets::Buckets(const Identifier &self)
   _buckets.reserve(8*OVL_HASH_SIZE);
 }
 
+const Identifier &
+Buckets::id() const {
+  return _self;
+}
+
 bool
 Buckets::empty() const {
   return 0 == _buckets.size();
@@ -526,6 +536,17 @@ Buckets::contains(const Identifier &id) const {
   QList<Bucket>::const_iterator bucket = _buckets.begin();
   for (; bucket != _buckets.end(); bucket++) {
     if (bucket->contains(id)) { return true; }
+  }
+  return false;
+}
+
+bool
+Buckets::isValid(const Identifier &id) const {
+  QList<Bucket>::const_iterator bucket = _buckets.begin();
+  for (; bucket != _buckets.end(); bucket++) {
+    if (bucket->contains(id)) {
+      return bucket->isValid(id);
+    }
   }
   return false;
 }

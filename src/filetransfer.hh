@@ -32,7 +32,7 @@ public:
    * @param filename Filename of the file to be transferred (do not need to exists).
    * @param filesize Size of the file.
    * @param parent Specifies the optional QObject parent. */
-  explicit FileUpload(Node &node, const QString &filename, size_t filesize, QObject *parent = 0);
+  explicit FileUpload(Network &net, const QString &filename, size_t filesize, QObject *parent = 0);
   /** Destructor. */
   virtual ~FileUpload();
 

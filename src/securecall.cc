@@ -2,8 +2,8 @@
 #include "node.hh"
 #include <netinet/in.h>
 
-SecureCall::SecureCall(bool incomming, Node &dht)
-  : QObject(0), SecureSocket(dht),
+SecureCall::SecureCall(bool incomming, Network &net)
+  : QObject(0), SecureSocket(net),
     _incomming(incomming), _encoder(0), _decoder(0), _paStream(0)
 {
   // Init encoder

@@ -9,6 +9,7 @@
 
 #include "buckets.hh"
 #include "dht_config.hh"
+#include "network.hh"
 
 #include <openssl/evp.h>
 
@@ -87,7 +88,7 @@ class SecureSocket
 {
 public:
   /** Constructor. */
-  SecureSocket(Node &node);
+  SecureSocket(Network &net);
   /** Destructor. */
   virtual ~SecureSocket();
 
@@ -168,7 +169,7 @@ protected:
 
 protected:
   /** A weak reference to the DHT instance. */
-  Node &_node;
+  Network &_network;
 
 private:
   /** The ECDH key pair of this node for the session. */
@@ -200,7 +201,7 @@ private:
  * secure connections (@c SecureSocket).
  *
  * On an incomming connection, first @c newSocket gets called. This method should create the
- * matching @c SecureSocket instance for the given service. Then the @c DHT instance will initiate
+ * matching @c SecureSocket instance for the given service. Then the @c Node instance will initiate
  * a secure connection. In that step, the identity of the peer will be verified. Once the connection
  * is initiated, @c allowConnection will be called. If it returns @c true, the connection is
  * considered as established and @c connectionStarted gets called passing the ownership of the
@@ -250,11 +251,13 @@ public:
  * a secure connection. On success, @c connectionStarted will be called and @c connectionFailed
  * on error. Again, both methods transfer the ownership of the socket.
  * @ingroup core */
-class AbstractService
+class AbstractService: public QObject
 {
+  Q_OBJECT
+
 protected:
   /** Hidden constructor. */
-  AbstractService();
+  explicit AbstractService(QObject *parent=0);
 
 public:
   /** Destructor. */

@@ -7,8 +7,8 @@
 /* ******************************************************************************************** *
  * Implementation of SOCKSInStream
  * ******************************************************************************************** */
-LocalSocksStream::LocalSocksStream(Node &dht, QTcpSocket *instream, QObject *parent)
-  : SecureStream(dht, parent), _inStream(instream)
+LocalSocksStream::LocalSocksStream(Network &net, QTcpSocket *instream, QObject *parent)
+  : SecureStream(net, parent), _inStream(instream)
 {
   // Take ownership of TCP socket.
   _inStream->setParent(this);
@@ -132,8 +132,8 @@ LocalSocksStream::_remoteClosed() {
 /* ********************************************************************************************* *
  * Implementation of LocalSocksService
  * ********************************************************************************************* */
-LocalSocksService::LocalSocksService(Node &dht, const NodeItem &remote, uint16_t port, QObject *parent)
-  : QObject(parent), _dht(dht), _remote(remote), _server(), _connectionCount(0)
+LocalSocksService::LocalSocksService(Network &net, const NodeItem &remote, uint16_t port, QObject *parent)
+  : QObject(parent), _network(net), _remote(remote), _server(), _connectionCount(0)
 {
   logDebug() << "Start SOCKS proxy service at localhost:" << port;
   // Bind socket to local port
@@ -162,11 +162,11 @@ LocalSocksService::_onNewConnection() {
   while (_server.hasPendingConnections()) {
     // Get for each incomming connection -> create a separate stream to the remote
     QTcpSocket *socket = _server.nextPendingConnection();
-    LocalSocksStream *conn = new LocalSocksStream(_dht, socket);
+    LocalSocksStream *conn = new LocalSocksStream(_network, socket);
     connect(conn, SIGNAL(destroyed()), this, SLOT(_onConnectionClosed()));
     _connectionCount++;
     emit connectionCountChanged(_connectionCount);
-    _dht.startConnection("::socks5", _remote, conn);
+    _network.root().startConnection(_network.prefix()+"::socks5", _remote, conn);
   }
 }
 
@@ -182,8 +182,8 @@ LocalSocksService::_onConnectionClosed() {
 /* ******************************************************************************************** *
  * Implementation of SOCKSOutStream
  * ******************************************************************************************** */
-SocksOutStream::SocksOutStream(Node &dht, QObject *parent)
-  : SecureStream(dht, parent), _state(RX_VERSION), _outStream(0),
+SocksOutStream::SocksOutStream(Network &net, QObject *parent)
+  : SecureStream(net, parent), _state(RX_VERSION), _outStream(0),
     _nAuthMeth(0), _authMeth(), _addr(), _nHostName(0), _hostName(), _port(0)
 {
   // pass...

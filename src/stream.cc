@@ -304,7 +304,7 @@ StreamOutBuffer::ack(uint32_t seq, uint16_t window) {
   // Find the ACKed byte
   uint32_t drop = 0;
   if (_in_between(seq, _firstSequence, _nextSequence)) {
-    // howmany bytes dropped
+    // how many bytes to drop
     drop = seq-_firstSequence;
     // update round-trip time
     _update_rt(age());
@@ -366,8 +366,8 @@ StreamOutBuffer::_in_between(uint32_t x, uint32_t a, uint32_t b) const {
 /* ******************************************************************************************** *
  * Implementation of SecureStream
  * ******************************************************************************************** */
-SecureStream::SecureStream(Node &dht, QObject *parent)
-  : QIODevice(parent), SecureSocket(dht), _inBuffer(), _outBuffer(2000),
+SecureStream::SecureStream(Network &net, QObject *parent)
+  : QIODevice(parent), SecureSocket(net), _inBuffer(), _outBuffer(2000),
     _state(INITIALIZED), _keepalive(), _packetTimer(), _timeout()
 {
   // Setup keep-alive timer, gets started by open();
@@ -431,7 +431,9 @@ SecureStream::_onKeepAlive() {
 
 void
 SecureStream::_onCheckPacketTimeout() {
-  if ((! _outBuffer.bytesToWrite()) || (! _outBuffer.timeout())) { return; }
+  // Check for timeout
+  if ((! _outBuffer.bytesToWrite()) || (! _outBuffer.timeout()))
+    return;
   // Resent some data
   Message msg(Message::DATA); uint32_t seq=0;
   uint32_t len = _outBuffer.resend(msg.payload.data, DHT_STREAM_MAX_DATA_SIZE, seq);
@@ -487,7 +489,7 @@ SecureStream::abort() {
   _timeout.stop();
 
   // Make sure the stream does not get notified anymore.
-  _node.socketClosed(id());
+  _network.root().socketClosed(id());
 
   // close QIODevice
   QIODevice::close();

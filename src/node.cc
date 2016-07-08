@@ -28,11 +28,7 @@ struct __attribute__((packed)) Message
     /** A ping request or response. */
     PING = 0,
     /** A find node request message. */
-    FIND_NODE,
-    /** A find value request message. */
-    FIND_VALUE,
-    /** An announce indication. */
-    ANNOUNCE,
+    SEARCH,
     /** A "connect" request or response message. */
     CONNECT,
     /** A rendezvous request or notification message. */
@@ -47,28 +43,27 @@ struct __attribute__((packed)) Message
     /** A ping message (request & response) consists of a type identifier
      * and the ID of the sender. */
     struct __attribute__((packed)){
-      uint8_t type;               ///< Type flag == @c MSG_PING.
-      char    id[OVL_HASH_SIZE];  ///< Identifier of the sender
+      uint8_t type;                   ///< Type flag == @c MSG_PING.
+      char    id[OVL_HASH_SIZE];      ///< Identifier of the sender.
+      char    network[OVL_HASH_SIZE]; ///< Identifier of the network.
     } ping;
 
     /** A find node request. */
     struct __attribute__((packed)) {
-      /** Type flag == @c MSG_FIND_NODE | @c MSG_FIND_VALUE | @c MSG_ANNOUNCE. */
+      /** Type flag == @c SEARCH. */
       uint8_t type;
       /** The identifier of the node to find. */
       char    id[OVL_HASH_SIZE];
+      /** The identifier of the network to search. */
+      char    network[OVL_HASH_SIZE];
       /** This dummy payload is needed to avoid the risk to exploid this request for a relay DoS
        * attack. It ensures that the request has at least the same size as the response. The size
        * of this field implicitly defines the maximal number of triples returned by the remote node. */
-      char    dummy[OVL_MAX_TRIPLES*OVL_TRIPLE_SIZE-2*OVL_HASH_SIZE];
+      char    dummy[OVL_MAX_TRIPLES*OVL_TRIPLE_SIZE-2*OVL_HASH_SIZE-1];
     } search;
 
-    /** A response to "find value", "find node" or "announce". */
+    /** A response to "search". */
     struct __attribute__((packed)) {
-      /** If a FIND_VALUE response, this flag indicates success. Then, the triples contain the
-       * nodes associated with the requested value. Otherwise the triples contain the nodes to
-       * query next. */
-      uint8_t   success;
       /** Node tiples (ID, address, port). */
       DHTTriple triples[OVL_MAX_TRIPLES];
     } result;
@@ -120,11 +115,7 @@ public:
   /** Request type. */
   typedef enum {
     PING,              ///< A ping request.
-    FIND_NODE,         ///< A find node request.
-    FIND_NEIGHBOURS,   ///< A find neighbours request.
-    ANNOUNCEMENT,      ///< An announcement request.
-    FIND_VALUE,        ///< A find value request.
-    RENDEZVOUS_SEARCH, ///< A Rendezvous search request.
+    SEARCH,            ///< A find node request.
     START_CONNECTION   ///< A Start connection request.
   } Type;
 
@@ -160,15 +151,20 @@ class PingRequest: public Request
 {
 public:
   /** Anonymous ping request. */
-  PingRequest();
+  PingRequest(const Identifier &netid);
   /** Named ping request. */
-  PingRequest(const Identifier &id);
+  PingRequest(const Identifier &id, const Identifier &netid);
+
   /** Returns the identifier of the node if this is a named ping request. */
   inline const Identifier &id() const { return _id; }
+  /** Returns the network id for the ping request. */
+  inline const Identifier &netid() const { return _prefix; }
 
 protected:
   /** Identifier of the node if this is a named ping request. */
   Identifier _id;
+  /** Identifier of the prefix/subnet for the ping. */
+  Identifier _prefix;
 };
 
 
@@ -176,71 +172,15 @@ protected:
  * @ingroup internal */
 class SearchRequest: public Request
 {
-protected:
-  /** Hidden constructor. */
-  SearchRequest(Request::Type type, SearchQuery *query);
-
 public:
+  /** Hidden constructor. */
+  SearchRequest(SearchQuery *query);
   /** Returns the query instance associated with the request. */
   inline SearchQuery *query() const { return _query; }
 
 protected:
   /** The search query associated with the request. */
   SearchQuery *_query;
-};
-
-
-/** A find node request item.
- * @ingroup internal */
-class FindNodeRequest: public SearchRequest
-{
-public:
-  /** Constructor.
-   * @param query Specifies the query object associated with this request. */
-  FindNodeRequest(SearchQuery *query);
-};
-
-
-/** A find neighbours request item.
- * @ingroup internal */
-class FindNeighboursRequest: public SearchRequest
-{
-public:
-  /** Constructor.
-   * @param query Specifies the query object associated with this request. */
-  FindNeighboursRequest(SearchQuery *query);
-};
-
-/** A find value request item.
- * @ingroup internal */
-class FindValueRequest: public SearchRequest
-{
-public:
-  /** Constructor.
-   * @param query Specifies the query object associated with this request. */
-  FindValueRequest(ValueSearchQuery *query);
-};
-
-/** An announce request item.
- * @ingroup internal */
-class AnnounceRequest: public SearchRequest
-{
-public:
-  /** Constructor.
-   * @param query Specifies the query object associated with this request. */
-  AnnounceRequest(SearchQuery *query);
-};
-
-/** A Rendezvous search request.
- * Works like a @c FindNeighboursRequest but sends a rendezvous request to every node that appears
- * to know the target node.
- * @ingroup internal */
-class RendezvousSearchRequest: public SearchRequest
-{
-public:
-  /** Constructor.
-   * @param query Specifies the query object associated with this request. */
-  RendezvousSearchRequest(SearchQuery *query);
 };
 
 
@@ -272,114 +212,23 @@ protected:
 };
 
 
-
-/* ******************************************************************************************** *
- * Implementation of SearchQuery etc.
- * ******************************************************************************************** */
-SearchQuery::SearchQuery(const Identifier &id)
-  : _id(id), _best(), _queried()
-{
-  // Pass...
-}
-
-SearchQuery::~SearchQuery() {
-  // pass...
-}
-
-void
-SearchQuery::ignore(const Identifier &id) {
-  _queried.insert(id);
-}
-
-const Identifier &
-SearchQuery::id() const {
-  return _id;
-}
-
-void
-SearchQuery::update(const NodeItem &node) {
-  // Skip nodes already queried or in the best list -> done
-  if (_queried.contains(node.id())) { return; }
-  // Perform an "insort" into best list
-  Distance d = _id-node.id();
-  QList<NodeItem>::iterator item = _best.begin();
-  while ((item != _best.end()) && (d>=(_id-item->id()))) {
-    // if the node is in list -> quit
-    if (item->id() == node.id()) { return; }
-    // continue
-    item++;
-  }
-  _best.insert(item, node);
-  while (_best.size() > OVL_K) { _best.pop_back(); }
-}
-
-bool
-SearchQuery::next(NodeItem &node) {
-  QList<NodeItem>::iterator item = _best.begin();
-  for (; item != _best.end(); item++) {
-    if (! _queried.contains(item->id())) {
-      _queried.insert(item->id());
-      node = *item;
-      return true;
-    }
-  }
-  return false;
-}
-
-QList<NodeItem> &
-SearchQuery::best() {
-  return _best;
-}
-
-const QList<NodeItem> &
-SearchQuery::best() const {
-  return _best;
-}
-
-const NodeItem &
-SearchQuery::first() const {
-  return _best.first();
-}
-
-void
-SearchQuery::failed() {
-  delete this;
-}
-
-void
-SearchQuery::succeeded() {
-  delete this;
-}
-
-
 /* ******************************************************************************************** *
  * Implementation of ValueSearchQuery
  * ******************************************************************************************** */
-ValueSearchQuery::ValueSearchQuery(const Identifier &id)
-  : SearchQuery(id), _peers()
+RendezvousSearchQuery::RendezvousSearchQuery(Node &node, const Identifier &id)
+  : NeighbourhoodQuery(id), _node(node)
 {
   // pass...
 }
 
-ValueSearchQuery::~ValueSearchQuery() {
-  // pass...
+bool
+RendezvousSearchQuery::next(NodeItem &node) {
+  if (NeighbourhoodQuery::next(node)) {
+    _node.sendRendezvous(_id, node);
+    return true;
+  }
+  return false;
 }
-
-void
-ValueSearchQuery::addPeer(const PeerItem &peer) {
-  _peers.push_back(peer);
-}
-
-const QList<PeerItem> &
-ValueSearchQuery::peers() const {
-  return _peers;
-}
-
-QList<PeerItem> &
-ValueSearchQuery::peers() {
-  return _peers;
-}
-
 
 /* ******************************************************************************************** *
  * Implementation of Request etc.
@@ -390,50 +239,20 @@ Request::Request(Type type)
   // pass...
 }
 
-PingRequest::PingRequest()
-  : Request(PING), _id()
+PingRequest::PingRequest(const Identifier &netid)
+  : Request(PING), _id(), _prefix(netid)
 {
   // pass...
 }
 
-PingRequest::PingRequest(const Identifier &id)
-  : Request(PING), _id(id)
+PingRequest::PingRequest(const Identifier &id, const Identifier &netid)
+  : Request(PING), _id(id), _prefix(netid)
 {
   // pass...
 }
 
-SearchRequest::SearchRequest(Request::Type type, SearchQuery *query)
-  : Request(type), _query(query)
-{
-  // pass...
-}
-
-FindNodeRequest::FindNodeRequest(SearchQuery *query)
-  : SearchRequest(FIND_NODE, query)
-{
-  // pass...
-}
-
-FindNeighboursRequest::FindNeighboursRequest(SearchQuery *query)
-  : SearchRequest(FIND_NEIGHBOURS, query)
-{
-  // pass...
-}
-
-FindValueRequest::FindValueRequest(ValueSearchQuery *query)
-  : SearchRequest(FIND_VALUE, query)
-{
-  // pass...
-}
-
-AnnounceRequest::AnnounceRequest(SearchQuery *query)
-  : SearchRequest(ANNOUNCEMENT, query)
-{
-  // pass...
-}
-
-RendezvousSearchRequest::RendezvousSearchRequest(SearchQuery *query)
-  : SearchRequest(RENDEZVOUS_SEARCH, query)
+SearchRequest::SearchRequest(SearchQuery *query)
+  : Request(SEARCH), _query(query)
 {
   // pass...
 }
@@ -446,77 +265,22 @@ StartConnectionRequest::StartConnectionRequest(const Identifier &service, const 
 
 
 /* ******************************************************************************************** *
- * Implementation of DHT
+ * Implementation of Node
  * ******************************************************************************************** */
-Node::Node(const QString &idFile,
-           const QHostAddress &addr, quint16 port, QObject *parent)
-  : QObject(parent), _self(idFile), _socket(), _started(false),
-    _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
-    _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),
-    _connections(), _requestTimer(), _nodeTimer(), _rendezvousTimer(), _announceTimer(),
-    _statisticsTimer()
-{
-  qsrand(QDateTime::currentDateTime().currentMSecsSinceEpoch());
-  logInfo() << "Start node #" << _self.id() << " @ " << addr << ":" << port;
-
-  // try to bind socket to address and port
-  if (! _socket.bind(addr, port)) {
-    logError() << "Cannot bind to " << addr << ":" << port;
-    return;
-  }
-
-  // Connect to error slot
-  connect(&_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)),
-          this,SLOT(_onSocketError(QAbstractSocket::SocketState)));
-
-  // check request timeouts every 500ms
-  _requestTimer.setInterval(500);
-  _requestTimer.setSingleShot(false);
-
-  // Update statistics every 5 seconds
-  _statisticsTimer.setInterval(1000*5);
-  _statisticsTimer.setSingleShot(false);
-
-  // Ping rendezvous nodes every 10s
-  _rendezvousTimer.setInterval(1000*10);
-  _rendezvousTimer.setSingleShot(false);
-
-  // check for dead nodes every minute
-  _nodeTimer.setInterval(1000*60);
-  _nodeTimer.setSingleShot(false);
-
-  // Check for dead announcements and check for update my announcement items every 3min
-  _announceTimer.setInterval(1000*3);
-  _announceTimer.setSingleShot(false);
-
-  connect(&_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
-  connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
-  connect(&_requestTimer, SIGNAL(timeout()), this, SLOT(_onCheckRequestTimeout()));
-  connect(&_nodeTimer, SIGNAL(timeout()), this, SLOT(_onCheckNodeTimeout()));
-  connect(&_rendezvousTimer, SIGNAL(timeout()), this, SLOT(_onPingRendezvousNodes()));
-  connect(&_announceTimer, SIGNAL(timeout()), this, SLOT(_onCheckAnnouncements()));
-  connect(&_statisticsTimer, SIGNAL(timeout()), this, SLOT(_onUpdateStatistics()));
-
-  _requestTimer.start();
-  _nodeTimer.start();
-  _rendezvousTimer.start();
-  _announceTimer.start();
-  _statisticsTimer.start();
-
-  _started = true;
-}
-
 Node::Node(const Identity &id,
            const QHostAddress &addr, quint16 port, QObject *parent)
-  : QObject(parent), _self(id), _socket(), _started(false),
+  : Network(id.id(), parent), _self(id), _socket(), _started(false),
+    _prefix(""), _networks(),
     _bytesReceived(0), _lastBytesReceived(0), _inRate(0),
-    _bytesSend(0), _lastBytesSend(0), _outRate(0), _buckets(_self.id()),
-    _connections(), _requestTimer(), _nodeTimer(), _rendezvousTimer(), _announceTimer(),
-    _statisticsTimer()
+    _bytesSend(0), _lastBytesSend(0), _outRate(0),
+    _connections(), _requestTimer(), _rendezvousTimer(), _statisticsTimer()
 {
   qsrand(QDateTime::currentDateTime().currentMSecsSinceEpoch());
   logInfo() << "Start node #" << id.id() << " @ " << addr << ":" << port;
 
+  // register myself as a network
+  _networks.insert(this->netid(), this);
+
   // try to bind socket to address and port
   if (! _socket.bind(addr, port)) {
     logError() << "Cannot bind to " << addr << ":" << port;
@@ -539,26 +303,15 @@ Node::Node(const Identity &id,
   _rendezvousTimer.setInterval(1000*10);
   _rendezvousTimer.setSingleShot(false);
 
-  // check for dead nodes every minute
-  _nodeTimer.setInterval(1000*60);
-  _nodeTimer.setSingleShot(false);
-
   // Check for dead announcements and check for update my announcement items every 3min
-  _announceTimer.setInterval(1000*3);
-  _announceTimer.setSingleShot(false);
-
   connect(&_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
   connect(&_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
   connect(&_requestTimer, SIGNAL(timeout()), this, SLOT(_onCheckRequestTimeout()));
-  connect(&_nodeTimer, SIGNAL(timeout()), this, SLOT(_onCheckNodeTimeout()));
   connect(&_rendezvousTimer, SIGNAL(timeout()), this, SLOT(_onPingRendezvousNodes()));
-  connect(&_announceTimer, SIGNAL(timeout()), this, SLOT(_onCheckAnnouncements()));
   connect(&_statisticsTimer, SIGNAL(timeout()), this, SLOT(_onUpdateStatistics()));
 
   _requestTimer.start();
-  _nodeTimer.start();
   _rendezvousTimer.start();
-  _announceTimer.start();
   _statisticsTimer.start();
 
   _started = true;
@@ -566,6 +319,31 @@ Node::Node(const Identity &id,
 
 Node::~Node() {
   // pass...
+}
+
+bool
+Node::hasNetwork(const QString &prefix) const {
+  char hash[OVL_HASH_SIZE];
+  QByteArray prefName = prefix.toUtf8();
+  OVLHash((const uint8_t *)prefName.constData(), prefName.size(), (uint8_t *)hash);
+  return _networks.contains(Identifier(hash));
+}
+
+bool
+Node::registerNetwork(Network *subnet) {
+  if (_networks.contains(subnet->netid()))
+    return false;
+  subnet->setParent(this);
+  _networks.insert(subnet->netid(), subnet);
+  return true;
+}
+
+Network *
+Node::network(const QString &prefix) {
+  char hash[OVL_HASH_SIZE];
+  QByteArray prefName = prefix.toUtf8();
+  OVLHash((const uint8_t *)prefName.constData(), prefName.size(), (uint8_t *)hash);
+  return _networks[Identifier(hash)];
 }
 
 void
@@ -583,114 +361,38 @@ Node::ping(const PeerItem &peer) {
 
 void
 Node::ping(const QHostAddress &addr, uint16_t port) {
-  // Create ping request
-  PingRequest *req = new PingRequest();
-  _pendingRequests.insert(req->cookie(), req);
-  // Assemble message
-  Message msg;
-  memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  memcpy(msg.payload.ping.id, _self.id().data(), OVL_HASH_SIZE);
-  msg.payload.ping.type = Message::PING;
-  // send it
-  if(0 > _socket.writeDatagram((char *) &msg, OVL_COOKIE_SIZE+OVL_HASH_SIZE+1, addr, port)) {
-    logError() << "Failed to send ping to " << addr << ":" << port;
-  }
+  sendPing(addr, port, netid());
 }
 
 void
 Node::ping(const Identifier &id, const QHostAddress &addr, uint16_t port) {
-  // Create named ping request
-  PingRequest *req = new PingRequest(id);
-  _pendingRequests.insert(req->cookie(), req);
-  // Assemble message
-  Message msg;
-  memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  memcpy(msg.payload.ping.id, _self.id().data(), OVL_HASH_SIZE);
-  msg.payload.ping.type = Message::PING;
-  // send it
-  if(0 > _socket.writeDatagram((char *) &msg, OVL_COOKIE_SIZE+OVL_HASH_SIZE+1, addr, port)) {
-    logError() << "Failed to send ping to " << addr << ":" << port;
-  }
+  sendPing(id, addr, port, netid());
 }
 
 void
 Node::ping(const NodeItem &node) {
-  ping(node.id(), node.addr(), node.port());
+  sendPing(node.id(), node.addr(), node.port(), netid());
 }
 
 void
-Node::findNode(const Identifier &id) {
-  findNode(new SearchQuery(id));
-}
-
-void
-Node::findNode(SearchQuery *query) {
-  // Create a query instance
-  //SearchQuery *query = new SearchQuery(id);
+Node::search(SearchQuery *query) {
   query->ignore(_self.id());
   // Collect DHT_K nearest nodes
   _buckets.getNearest(query->id(), query->best());
   // Send request to the first element in the list
   NodeItem next;
   if (! query->next(next)) {
-    logInfo() << "Can not find node" << query->id() << ". Buckets empty.";
-    query->failed();
+    logInfo() << "Can not search for " << query->id() << ". Buckets empty.";
+    query->searchFailed();
   } else {
-    sendFindNode(next, query);
+    sendSearch(next, query);
   }
-}
-
-void
-Node::findValue(const Identifier &id) {
-  findValue(new ValueSearchQuery(id));
-}
-
-void
-Node::findValue(ValueSearchQuery *query) {
-  query->ignore(_self.id());
-  // Collect DHT_K nearest nodes
-  _buckets.getNearest(query->id(), query->best());
-  // Send request to the first element in the list
-  NodeItem next;
-  if (! query->next(next)) {
-    logInfo() << "Can not find value " << query->id() << ". Buckets empty.";
-    // Signal failiour
-    emit valueNotFound(query->id(), query->best());
-    query->failed();
-  } else {
-    sendFindValue(next, query);
-  }
-}
-
-void
-Node::announce(const Identifier &id) {
-  // Create a query instance
-  SearchQuery *query = new SearchQuery(id);
-  query->ignore(_self.id());
-  // Collect DHT_K nearest nodes
-  _buckets.getNearest(id, query->best());
-  // Send request to the first element in the list
-  NodeItem next;
-  if (! query->next(next)) {
-    logInfo() << "Can not announce " << id << ". Buckets empty.";
-    // Emmit signal if failiour is not a pending announcement
-    query->failed();
-  } else {
-    // Update item
-    _annouceItems.insert(id, QDateTime::currentDateTime());
-    sendAnnouncement(next, query);
-  }
-}
-
-void
-Node::remAnnouncement(const Identifier &id) {
-  _annouceItems.remove(id);
 }
 
 void
 Node::rendezvous(const Identifier &id) {
   // Create a query instance
-  SearchQuery *query = new SearchQuery(id);
+  SearchQuery *query = new RendezvousSearchQuery(*this, id);
   query->ignore(_self.id());
   // Collect DHT_K nearest nodes
   _buckets.getNearest(id, query->best());
@@ -698,48 +400,18 @@ Node::rendezvous(const Identifier &id) {
   NodeItem next;
   if (! query->next(next)) {
     logInfo() << "Can not find node" << id << ". Buckets empty.";
-    // Emmit signal if failiour is not a pending announcement
-    emit rendezvousFailed(id);
-    query->failed();
+    query->searchCompleted();
   } else {
-    sendRendezvousSearch(next, query);
-  }
-}
-
-void
-Node::findNeighbours(const Identifier &id, const QList<NodeItem> &start) {
-  findNeighbours(new SearchQuery(id), start);
-}
-
-void
-Node::findNeighbours(SearchQuery *query, const QList<NodeItem> &start) {
-  query->ignore(_self.id());
-  // Collect DHT_K nearest nodes
-  _buckets.getNearest(query->id(), query->best());
-  // Update with start items
-  QList<NodeItem>::const_iterator item = start.begin();
-  for (; item != start.end(); item++) { query->update(*item); }
-  // Send request to the first element in the list
-  NodeItem next;
-  if (! query->next(next)) {
-    logInfo() << "Can not find node" << query->id() << ". Buckets empty.";
-    emit neighboursFound(query->id(), query->best());
-    query->failed();
-  } else {
-    sendFindNeighbours(next, query);
+    sendSearch(next, query);
   }
 }
 
 bool
-Node::hasService(const Identifier &service) const {
-  return _services.contains(service);
-}
-
-bool
-Node::hasService(const char *service) const {
+Node::hasService(const QString &service) const {
   unsigned char hash[OVL_HASH_SIZE];
-  OVLHash((const unsigned char *)service, strlen(service), hash);
-  return hasService(Identifier((const char *)hash));
+  QByteArray service_name = service.toUtf8();
+  OVLHash((const unsigned char *)service_name.data(), service_name.size(), hash);
+  return _services.contains(Identifier((char *)hash));
 }
 
 bool
@@ -748,7 +420,8 @@ Node::registerService(const QString &service, AbstractService *handler) {
   QByteArray sName = service.toUtf8();
   OVLHash((const uint8_t *)sName.constData(), sName.size(), hash);
   Identifier id((const char *) hash);
-  if (_services.contains(id)) { return false; }
+  if (_services.contains(id))
+    return false;
   _services.insert(id, handler);
   return true;
 }
@@ -817,6 +490,16 @@ Node::id() const {
   return _self.id();
 }
 
+Node &
+Node::root() {
+  return *this;
+}
+
+const QString &
+Node::prefix() const {
+  return _prefix;
+}
+
 bool
 Node::started() const {
   // Check if socket is bound
@@ -877,93 +560,53 @@ Node::enableRendezvousPing(bool enable) {
  * Implementation of internal used methods.
  */
 void
-Node::sendFindNode(const NodeItem &to, SearchQuery *query) {
-  /*logDebug() << "Send FindNode request to " << to.id()
-             << " @" << to.addr() << ":" << to.port(); */
-  // Construct request item
-  FindNodeRequest *req = new FindNodeRequest(query);
-  // Queue request
+Node::sendPing(const QHostAddress &addr, uint16_t port, const Identifier &netid) {
+  // Create named ping request
+  PingRequest *req = new PingRequest(netid);
   _pendingRequests.insert(req->cookie(), req);
-  // Assemble & send message
+  // Assemble message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.search.type = Message::FIND_NODE;
-  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
-  int size = OVL_COOKIE_SIZE+1+OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
-  if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
-    logError() << "Failed to send FindNode request to " << to.id()
-               << " @" << to.addr() << ":" << to.port();
+  memcpy(msg.payload.ping.id, _self.id().data(), OVL_HASH_SIZE);
+  msg.payload.ping.type = Message::PING;
+  // send it
+  if(0 > _socket.writeDatagram((char *) &msg, OVL_COOKIE_SIZE+OVL_HASH_SIZE+1, addr, port)) {
+    logError() << "Failed to send ping to " << addr << ":" << port;
   }
 }
 
 void
-Node::sendFindNeighbours(const NodeItem &to, SearchQuery *query) {
-  // Construct request item
-  FindNeighboursRequest *req = new FindNeighboursRequest(query);
-  // Queue request
+Node::sendPing(const Identifier &id, const QHostAddress &addr, uint16_t port, const Identifier &netid) {
+  // Create named ping request
+  PingRequest *req = new PingRequest(id, netid);
   _pendingRequests.insert(req->cookie(), req);
-  // Assemble & send message
+  // Assemble message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.search.type = Message::FIND_NODE;
-  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
-  int size = OVL_COOKIE_SIZE+1+OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
-  if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
-    logError() << "Failed to send FindNode request to " << to.id()
-               << " @" << to.addr() << ":" << to.port();
+  memcpy(msg.payload.ping.id, _self.id().constData(), OVL_HASH_SIZE);
+  memcpy(msg.payload.ping.network, netid.constData(), OVL_HASH_SIZE);
+  msg.payload.ping.type = Message::PING;
+  // send it
+  if(0 > _socket.writeDatagram((char *) &msg, OVL_COOKIE_SIZE+OVL_HASH_SIZE+1, addr, port)) {
+    logError() << "Failed to send ping to " << addr << ":" << port;
   }
 }
 
 void
-Node::sendAnnouncement(const NodeItem &to, SearchQuery *query) {
+Node::sendSearch(const NodeItem &to, SearchQuery *query) {
   // Construct request item
-  AnnounceRequest *req = new AnnounceRequest(query);
+  SearchRequest *req = new SearchRequest(query);
   // Queue request
   _pendingRequests.insert(req->cookie(), req);
   // Assemble & send message
   Message msg;
   memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.search.type = Message::ANNOUNCE;
-  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
+  msg.payload.search.type = Message::SEARCH;
+  memcpy(msg.payload.search.id, query->id().constData(), OVL_HASH_SIZE);
+  memcpy(msg.payload.search.network, query->netid().constData(), OVL_HASH_SIZE);
   int size = OVL_COOKIE_SIZE+1+OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
   if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
-    logError() << "Failed to send Announce request to " << to.id()
-               << " @" << to.addr() << ":" << to.port();
-  }
-}
-
-void
-Node::sendFindValue(const NodeItem &to, ValueSearchQuery *query) {
-  // Construct request item
-  FindValueRequest *req = new FindValueRequest(query);
-  // Queue request
-  _pendingRequests.insert(req->cookie(), req);
-  // Assemble & send message
-  Message msg;
-  memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.search.type = Message::FIND_VALUE;
-  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
-  int size = OVL_COOKIE_SIZE+1+OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
-  if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
-    logError() << "Failed to send FindValue request to " << to.id()
-               << " @" << to.addr() << ":" << to.port();
-  }
-}
-
-void
-Node::sendRendezvousSearch(const NodeItem &to, SearchQuery *query) {
-  // Construct request item
-  RendezvousSearchRequest *req = new RendezvousSearchRequest(query);
-  // Queue request
-  _pendingRequests.insert(req->cookie(), req);
-  // Assemble & send message
-  Message msg;
-  memcpy(msg.cookie, req->cookie().data(), OVL_COOKIE_SIZE);
-  msg.payload.search.type = Message::FIND_NODE;
-  memcpy(msg.payload.search.id, query->id().data(), OVL_HASH_SIZE);
-  int size = OVL_COOKIE_SIZE+1+OVL_HASH_SIZE+OVL_K*OVL_TRIPLE_SIZE;
-  if (size != _socket.writeDatagram((char *)&msg, size, to.addr(), to.port())) {
-    logError() << "Failed to send Rendezvous request to " << to.id()
+    logError() << "Failed to send Search request to " << to.id()
                << " @" << to.addr() << ":" << to.port();
   }
 }
@@ -1030,12 +673,8 @@ Node::_onReadyRead() {
         _pendingRequests.remove(cookie);
         if (Request::PING == item->type()) {
           _processPingResponse(msg, size, static_cast<PingRequest *>(item), addr, port);
-        } else if (Request::FIND_NODE == item->type()) {
-          _processFindNodeResponse(msg, size, static_cast<FindNodeRequest *>(item), addr, port);
-        } else if (Request::FIND_NEIGHBOURS == item->type()) {
-          _processFindNeighboursResponse(msg, size, static_cast<FindNeighboursRequest *>(item), addr, port);
-        } else if (Request::RENDEZVOUS_SEARCH == item->type()) {
-          _processRendezvousSearchResponse(msg, size, static_cast<RendezvousSearchRequest *>(item), addr, port);
+        } else if (Request::SEARCH == item->type()) {
+          _processSearchResponse(msg, size, static_cast<SearchRequest *>(item), addr, port);
         } else if (Request::START_CONNECTION == item->type()) {
           _processStartConnectionResponse(msg, size, static_cast<StartConnectionRequest *>(item), addr, port);
         }else {
@@ -1046,8 +685,8 @@ Node::_onReadyRead() {
         // Message is likely a request
         if ((size == OVL_PING_REQU_SIZE) && (Message::PING == msg.payload.ping.type)){
           _processPingRequest(msg, size, addr, port);
-        } else if ((size >= OVL_SEARCH_MIN_REQU_SIZE) && (Message::FIND_NODE == msg.payload.search.type)) {
-          _processFindNodeRequest(msg, size, addr, port);
+        } else if ((size >= OVL_SEARCH_MIN_REQU_SIZE) && (Message::SEARCH == msg.payload.search.type)) {
+          _processSearchRequest(msg, size, addr, port);
         } else if ((size > OVL_CONNECT_MIN_REQU_SIZE) && (Message::CONNECT == msg.payload.start_connection.type)) {
           _processStartConnectionRequest(msg, size, addr, port);
         } else if ((size == OVL_RENDEZVOUS_REQU_SIZE) && (Message::RENDEZVOUS == msg.payload.rendezvous.type)) {
@@ -1072,28 +711,25 @@ Node::_onSocketError(QAbstractSocket::SocketState error) {
 }
 
 void
-Node::_processPingResponse(
-    const struct Message &msg, size_t size, PingRequest *req, const QHostAddress &addr, uint16_t port)
+Node::_processPingResponse(const struct Message &msg, size_t size, PingRequest *req,
+                           const QHostAddress &addr, uint16_t port)
 {
-  // signal success
-  emit nodeReachable(NodeItem(Identifier(msg.payload.ping.id), addr, port));
-  // If the buckets are empty -> we are likely bootstrapping
-  bool bootstrapping = _buckets.empty();
-  // Given that this is a ping response -> add the node to the corresponding
-  // bucket if space is left
-  if (_buckets.add(Identifier(msg.payload.ping.id), addr, port)) {
-    emit nodeAppeard(NodeItem(Identifier(msg.payload.ping.id), addr, port));
-  }
-  if (bootstrapping) {
-    emit connected();
-    logDebug() << "Still boot strapping: Search for myself.";
-    findNode(_self.id());
-  }
+  // check if network identifier of response matches request network
+  Identifier remoteNetId(msg.payload.ping.network);
+  if (remoteNetId != req->netid())
+    return;
+  // Irrespective of the network, handle node reachable event
+  this->nodeReachableEvent(NodeItem(Identifier(msg.payload.ping.id), addr, port));
+  // Then, check if network is known
+  if (! _networks.contains(remoteNetId))
+    return;
+  // if so -> notify network
+  _networks[remoteNetId]->nodeReachableEvent(NodeItem(Identifier(msg.payload.ping.id), addr, port));
 }
 
 void
-Node::_processFindNodeResponse(
-    const struct Message &msg, size_t size, FindNodeRequest *req, const QHostAddress &addr, uint16_t port)
+Node::_processSearchResponse(
+    const struct Message &msg, size_t size, SearchRequest *req, const QHostAddress &addr, uint16_t port)
 {
   // payload length must be a multiple of triple length
   if ( 0 == ((size-OVL_SEARCH_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
@@ -1105,216 +741,34 @@ Node::_processFindNodeResponse(
                     ntohs(msg.payload.result.triples[i].port));
       // Add discovered node to buckets
       _buckets.addCandidate(id, item.addr(), item.port());
+      // add candidate for the specific network
+      if (_networks.contains(req->query()->netid()))
+        _networks[req->query()->netid()]->addCandidate(item);
       // Update node list of query
       req->query()->update(item);
     }
 
-    // If the node was found -> signal success
-    if (req->query()->best().size() && (req->query()->id() == req->query()->first().id())) {
-      // Signal node found
-      emit nodeFound(req->query()->first());
-      // signel query succeeded
-      req->query()->succeeded();
-      // done
+    // If the search has been completed -> done
+    if (req->query()->isSearchComplete()) {
+      req->query()->searchCompleted();
       return;
     }
   } else {
-    logInfo() << "Received a malformed FIND_NODE response from "
+    logInfo() << "Received a malformed Search response from "
               << addr << ":" << port;
   }
   // Get next node to query
   NodeItem next;
   // get next node to query, if there is no next node -> search failed
   if (! req->query()->next(next)) {
-    // If the node search is a pending announcement
-    logInfo() << "Node " << req->query()->id() << " not found.";
-    // if it was a regular node search -> signal error
-    emit nodeNotFound(req->query()->id(), req->query()->best());
     // delete query
-    req->query()->failed();
+    req->query()->searchCompleted();
     // done.
     return;
   }
 
   // Send next request
-  sendFindNode(next, req->query());
-}
-
-void
-Node::_processFindValueResponse(
-    const struct Message &msg, size_t size, FindValueRequest *req, const QHostAddress &addr, uint16_t port)
-{
-  // payload length must be a multiple of triple length
-  if ( 0 == ((size-OVL_SEARCH_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
-    // unpack and update query
-    size_t Ntriple = (size-OVL_SEARCH_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
-    if (msg.payload.result.success) {
-      QList<NodeItem> nodes;
-      // On value found -> unpack result and signal success
-      for (size_t i=0; i<Ntriple; i++) {
-        Identifier id(msg.payload.result.triples[i].id);
-        QHostAddress addr((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip));
-        uint16_t port = ntohs(msg.payload.result.triples[i].port);
-        static_cast<ValueSearchQuery *>(req->query())->addPeer(PeerItem(addr, port));
-        nodes.push_back(NodeItem(id, addr, port));
-      }
-      // Signal node found
-      emit valueFound(req->query()->id(), nodes);
-      // delete query
-      req->query()->succeeded();
-      // done
-      return;
-    } else {
-      // If value not found update next nodes and continue search
-      for (size_t i=0; i<Ntriple; i++) {
-        Identifier id(msg.payload.result.triples[i].id);
-        NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip)),
-                      ntohs(msg.payload.result.triples[i].port));
-        // Add discovered node to buckets
-        _buckets.addCandidate(id, item.addr(), item.port());
-        // Update node list of query
-        req->query()->update(item);
-      }
-    }
-  } else {
-    logInfo() << "Received a malformed FIND_VALUE response from "
-              << addr << ":" << port;
-  }
-  // Get next node to query
-  NodeItem next;
-  // get next node to query, if there is no next node -> search failed
-  if (! req->query()->next(next)) {
-    // If the node search is a pending announcement
-    logInfo() << "Value " << req->query()->id() << " not found.";
-    // if it was a regular node search -> signal error
-    emit valueNotFound(req->query()->id(), req->query()->best());
-    // delete query
-    req->query()->failed();
-    // done.
-    return;
-  }
-
-  // Send next request
-  sendFindValue(next, reinterpret_cast<ValueSearchQuery *>(req->query()));
-}
-
-void
-Node::_processAnnounceResponse(
-    const struct Message &msg, size_t size, AnnounceRequest *req, const QHostAddress &addr, uint16_t port)
-{
-  // payload length must be a multiple of triple length
-  if ( 0 == ((size-OVL_SEARCH_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
-    // unpack and update query
-    size_t Ntriple = (size-OVL_SEARCH_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
-    for (size_t i=0; i<Ntriple; i++) {
-      Identifier id(msg.payload.result.triples[i].id);
-      NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)*(msg.payload.result.triples[i].ip)),
-                    ntohs(msg.payload.result.triples[i].port));
-      // Add discovered node to buckets
-      _buckets.addCandidate(id, item.addr(), item.port());
-      // Update node list of query
-      req->query()->update(item);
-    }
-  } else {
-    logInfo() << "Received a malformed ANNOUNCE response from "
-              << addr << ":" << port;
-  }
-  // Get next node to query
-  NodeItem next;
-  // get next node to query, if there is no next node -> search done
-  if (! req->query()->next(next)) {
-    // If the node search is a pending announcement
-    logInfo() << "Announcement of " << req->query()->id() << " completed.";
-    // delete query
-    req->query()->succeeded();
-    // done.
-    return;
-  }
-
-  // Send next request
-  sendAnnouncement(next, req->query());
-}
-
-void
-Node::_processFindNeighboursResponse(const Message &msg, size_t size, FindNeighboursRequest *req,
-                                    const QHostAddress &addr, uint16_t port)
-{
-  // payload length must be a multiple of triple length
-  if ( 0 != ((size-OVL_SEARCH_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
-    logInfo() << "Received a malformed FIND_NODE response from "
-              << addr << ":" << port;
-  } else {
-    // unpack and update query
-    size_t Ntriple = (size-OVL_SEARCH_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
-    // proceed with returned nodes
-    for (size_t i=0; i<Ntriple; i++) {
-      Identifier id(msg.payload.result.triples[i].id);
-      NodeItem item(id, QHostAddress((const Q_IPV6ADDR &)* (msg.payload.result.triples[i].ip)),
-                    ntohs(msg.payload.result.triples[i].port));
-      // Add discovered node to buckets
-      _buckets.addCandidate(id, item.addr(), item.port());
-      // Update node list of query
-      req->query()->update(item);
-    }
-  }
-
-  NodeItem next;
-  // get next node to query, if there is no next node -> search failed
-  if (! req->query()->next(next)) {
-    // signal error
-    emit neighboursFound(req->query()->id(), req->query()->best());
-    // delete query
-    req->query()->succeeded();
-    // done.
-    return;
-  }
-  // Send next request
-  sendFindNeighbours(next, req->query());
-}
-
-void
-Node::_processRendezvousSearchResponse(const Message &msg, size_t size, RendezvousSearchRequest *req,
-                                      const QHostAddress &addr, uint16_t port)
-{
-  // payload length must be a multiple of triple length
-  if ( 0 != ((size-OVL_SEARCH_MIN_RESP_SIZE)%OVL_TRIPLE_SIZE) ) {
-    logInfo() << "Received a malformed FIND_NODE response from "
-              << addr << ":" << port;
-  } else {
-    // unpack and update query
-    size_t Ntriple = (size-OVL_SEARCH_MIN_RESP_SIZE)/OVL_TRIPLE_SIZE;
-    // proceed with returned nodes
-    for (size_t i=0; i<Ntriple; i++) {
-      Identifier id(msg.payload.result.triples[i].id);
-      QHostAddress nodeaddr((const Q_IPV6ADDR &)* (msg.payload.result.triples[i].ip));
-      uint16_t     nodeport(ntohs(msg.payload.result.triples[i].port));
-      // Add discovered node to buckets
-      _buckets.addCandidate(id, nodeaddr, nodeport);
-      // Update node list of query
-      req->query()->update(NodeItem(id, nodeaddr, nodeport));
-      // If the peer knows the target -> send him a rendezvous message
-      if (req->query()->id() == id) {
-        sendRendezvous(req->query()->id(), PeerItem(addr, port));
-      }
-    }
-  }
-
-  NodeItem next;
-  // get next node to query, if there is no next node -> search failed
-  if (! req->query()->next(next)) {
-    // If at least someone I asked knows the item -> success
-    if (req->query()->best().size() && (req->query()->first().id() == req->query()->id())) {
-      emit rendezvousInitiated(req->query()->first());
-    }
-    // signal error
-    emit rendezvousFailed(req->query()->id());
-    // delete query
-    req->query()->failed();
-    // done.
-    return;
-  }
-  // Send next request
-  sendRendezvousSearch(next, req->query());
+  sendSearch(next, req->query());
 }
 
 void
@@ -1355,24 +809,35 @@ Node::_processPingRequest(
     const Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
   //logDebug() << "Received Ping request from " << addr << ":" << port;
+  Identifier remoteNetId(msg.payload.ping.network);
+  if (! _networks.contains(remoteNetId)) {
+    logDebug() << "Received Ping request from " << Identifier(msg.payload.ping.id)
+               << "@" << addr << ":" << port
+               << " for unknown network " << remoteNetId << ".";
+    // Anyway, add as a candidate to the root network
+    _buckets.addCandidate(Identifier(msg.payload.ping.id), addr, port);
+    return;
+  }
+
   // simply assemble a pong response including my own ID
   Message resp;
   memcpy(resp.cookie, msg.cookie, OVL_COOKIE_SIZE);
-  memcpy(resp.payload.ping.id, _self.id().data(), OVL_HASH_SIZE);
+  memcpy(resp.payload.ping.id, _self.id().constData(), OVL_HASH_SIZE);
+  memcpy(resp.payload.ping.network, remoteNetId.constData(), OVL_HASH_SIZE);
   resp.payload.ping.type = Message::PING;
   // send
   //logDebug() << "Send Ping response to " << addr << ":" << port;
   if(0 > _socket.writeDatagram((char *) &resp, OVL_PING_RESP_SIZE, addr, port)) {
     logError() << "Failed to send Ping response to " << addr << ":" << port;
   }
-  // Add node to candidate nodes for the bucket table if not known already
-  if (! _buckets.contains(Identifier(msg.payload.ping.id))) {
-    _buckets.addCandidate(Identifier(msg.payload.ping.id), addr, port);
-  }
+
+  // Add node to candidate nodes for the specific network
+  _networks[remoteNetId]->addCandidate(NodeItem(Identifier(msg.payload.ping.id), addr, port));
+
 }
 
 void
-Node::_processFindNodeRequest(
+Node::_processSearchRequest(
     const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
 {
   QList<NodeItem> best;
@@ -1381,7 +846,6 @@ Node::_processFindNodeRequest(
   struct Message resp;
   // Assemble response
   memcpy(resp.cookie, msg.cookie, OVL_COOKIE_SIZE);
-  resp.payload.result.success = 0;
   // Determine the number of nodes to reply
   int maxN = int(size-OVL_SEARCH_MIN_REQU_SIZE)/OVL_TRIPLE_SIZE;
   int N = std::min(best.size(), maxN);
@@ -1397,95 +861,6 @@ Node::_processFindNodeRequest(
   // Compute size and send reponse
   size_t resp_size = (OVL_SEARCH_MIN_RESP_SIZE + N*OVL_TRIPLE_SIZE);
   _socket.writeDatagram((char *) &resp, resp_size, addr, port);
-}
-
-void
-Node::_processFindValueRequest(
-    const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
-{
-  struct Message resp;
-  // Assemble response
-  memcpy(resp.cookie, msg.cookie, OVL_COOKIE_SIZE);
-  Identifier queryId(msg.payload.search.id);
-  int maxN = int(size-OVL_SEARCH_MIN_REQU_SIZE)/OVL_TRIPLE_SIZE;
-  QList<NodeItem> res;
-
-  if (_hashTable.contains(queryId)) {
-    // On success (I hold a list of responsible nodes)
-    resp.payload.result.success = 1;
-    // Determine the number of nodes to reply
-    int N = std::min(std::min(OVL_K, _hashTable[queryId].size()), maxN);
-    QSet<AnnouncementItem>::iterator node= _hashTable[queryId].begin();
-    for (int i=0; i<N; i++, node++) {
-      res.append(NodeItem(Identifier(), *node));
-    }
-  } else {
-    resp.payload.result.success = 0;
-    QList<NodeItem> best;
-    _buckets.getNearest(Identifier(msg.payload.search.id), best);
-    // Determine the number of nodes to reply
-    int N = std::min(std::min(OVL_K, best.size()), maxN);
-    QList<NodeItem>::iterator item = best.begin();
-    for (int i = 0; (i<N); item++, i++) {
-      res.append(*item);
-    }
-  }
-
-  // Add items
-  QList<NodeItem>::iterator item = res.begin();
-  for (int i = 0; item!=res.end(); item++, i++) {
-    memcpy(resp.payload.result.triples[i].id, item->id().data(), OVL_HASH_SIZE);
-    memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
-    resp.payload.result.triples[i].port = htons(item->port());
-  }
-
-  // Compute size and send reponse
-  size_t resp_size = (OVL_SEARCH_MIN_RESP_SIZE + res.size()*OVL_TRIPLE_SIZE);
-  _socket.writeDatagram((char *) &resp, resp_size, addr, port);
-}
-
-void
-Node::_processAnnounceRequest(
-    const struct Message &msg, size_t size, const QHostAddress &addr, uint16_t port)
-{
-  // Assemble response
-  struct Message resp;
-  memcpy(resp.cookie, msg.cookie, OVL_COOKIE_SIZE);
-  resp.payload.result.success = 0;
-
-  Identifier queryId(msg.payload.search.id);
-  int maxN = int(size-OVL_SEARCH_MIN_REQU_SIZE)/OVL_TRIPLE_SIZE;
-
-  // Determine the number of nodes to reply
-  QList<NodeItem> best;
-  _buckets.getNearest(queryId, best);
-  int N = std::min(maxN, best.size());
-
-  QList<NodeItem>::iterator item = best.begin();
-  for (int i = 0; i<N; item++, i++) {
-    memcpy(resp.payload.result.triples[i].id, item->id().data(), OVL_HASH_SIZE);
-    memcpy(resp.payload.result.triples[i].ip, item->addr().toIPv6Address().c, 16);
-    resp.payload.result.triples[i].port = htons(item->port());
-  }
-
-  // Compute size and send reponse
-  size_t resp_size = (OVL_SEARCH_MIN_RESP_SIZE + N*OVL_TRIPLE_SIZE);
-  _socket.writeDatagram((char *) &resp, resp_size, addr, port);
-
-  // If I am responsible for that value -> add to
-  Distance my_d = _self.id()-queryId;
-  for (item=best.begin(); item!=best.end(); item++) {
-    // If I am closer to the announced data than one of the K nearest nodes I know,
-    // -- that is the value is in my neightbourhood -- I take it.
-    if (my_d < (item->id()-queryId)) {
-      if (! _hashTable.contains(queryId)) {
-        _hashTable.insert(queryId, QSet<AnnouncementItem>());
-      }
-      // insert or replace annoucement
-      _hashTable[queryId].insert(AnnouncementItem(addr, port));
-      return;
-    }
-  }
 }
 
 void
@@ -1546,6 +921,7 @@ Node::_processStartConnectionRequest(const Message &msg, size_t size, const QHos
 void
 Node::_processRendezvousRequest(Message &msg, size_t size, const QHostAddress &addr, uint16_t port) {
   if (_self.id() == Identifier(msg.payload.rendezvous.id)) {
+    logDebug() << "Received rendezvous request -> ping back.";
     // If the rendezvous request addressed me -> response with a ping
     ping(msg.payload.rendezvous.ip, ntohs(msg.payload.rendezvous.port));
   } else if (_buckets.contains(Identifier(msg.payload.rendezvous.id))) {
@@ -1553,6 +929,7 @@ Node::_processRendezvousRequest(Message &msg, size_t size, const QHostAddress &a
     NodeItem node = _buckets.getNode(Identifier(msg.payload.rendezvous.id));
     memcpy(msg.payload.rendezvous.ip, addr.toIPv6Address().c, 16);
     msg.payload.rendezvous.port = htons(port);
+    logDebug() << "Forward rendezvous to " << node.id() << ".";
     if (OVL_RENDEZVOUS_REQU_SIZE != _socket.writeDatagram(
           (char *)&msg, OVL_RENDEZVOUS_REQU_SIZE, node.addr(), node.port())) {
       logError() << "DHT: Cannot forward rendezvous request to " << node.id()
@@ -1587,95 +964,19 @@ Node::_onCheckRequestTimeout() {
         _buckets.pingLost(ping->id());
       }
       delete ping;
-    } else if (Request::FIND_NODE == (*req)->type()) {
-      logDebug() << "FindNode request timeout...";
-      SearchQuery *query = static_cast<FindNodeRequest *>(*req)->query();
+    } else if (Request::SEARCH == (*req)->type()) {
+      logDebug() << "Search request timeout...";
+      SearchQuery *query = static_cast<SearchRequest *>(*req)->query();
       // Get next node to query
       NodeItem next;
       // get next node to query, if there is no next node -> search failed
       if (! query->next(next)) {
-        // if it was a regular node search -> signal error
-        emit nodeNotFound(query->id(), query->best());
-        query->failed();
+        query->searchCompleted();
         // delete request and query
         delete *req;
       } else {
         // Continue search
-        sendFindNode(next, query); delete *req;
-      }
-    } else if (Request::FIND_VALUE == (*req)->type()) {
-      logDebug() << "FindValue request timeout...";
-      ValueSearchQuery *query = static_cast<ValueSearchQuery *>(
-            static_cast<FindValueRequest *>(*req)->query());
-      // Get next node to query
-      NodeItem next;
-      // get next node to query, if there is no next node -> search failed
-      if (! query->next(next)) {
-        // if it was a regular node search -> signal error
-        emit valueNotFound(query->id(), query->best());
-        query->failed();
-        // delete request
-        delete *req;
-      } else {
-        // Continue search
-        sendFindValue(next, query);
-        delete *req;
-      }
-    } else if (Request::ANNOUNCEMENT == (*req)->type()) {
-      logDebug() << "Announcement request timeout...";
-      SearchQuery *query = static_cast<AnnounceRequest *>(*req)->query();
-      // Get next node to query
-      NodeItem next;
-      // get next node to query, if there is no next node -> search failed
-      if (! query->next(next)) {
-        // Silently ignore...
-        query->succeeded();
-        // delete request
-        delete *req;
-      } else {
-        // Continue search
-        sendAnnouncement(next, query);
-        delete *req;
-      }
-    } else if (Request::FIND_NEIGHBOURS == (*req)->type()) {
-      logDebug() << "FindNeighbours request timeout...";
-      SearchQuery *query = static_cast<FindNeighboursRequest *>(*req)->query();
-      // Get next node to query
-      NodeItem next;
-      // get next node to query, if there is no next node -> done
-      if (! query->next(next)) {
-        // signal end of search
-        emit neighboursFound(query->id(), query->best());
-        query->succeeded();
-        // delete request & query
-        delete *req;
-      } else {
-        // Send next request
-        sendFindNeighbours(next, query);
-        delete *req;
-      }
-    } else if (Request::RENDEZVOUS_SEARCH == (*req)->type()) {
-      logDebug() << "RendezvousSearch request timeout...";
-      SearchQuery *query = static_cast<RendezvousSearchRequest *>(*req)->query();
-      // Get next node to query
-      NodeItem next;
-      // get next node to query, if there is no next node -> done
-      if (! query->next(next)) {
-        // If node was found -> rendezvous initiated
-        if (query->best().size() && (query->first().id() == query->id())) {
-          emit rendezvousInitiated(query->first());
-          query->succeeded();
-        } else {
-          // if not -> failed.
-          emit rendezvousFailed(query->id());
-          query->failed();
-        }
-        // delete request
-        delete *req;
-      } else {
-        // Send next request
-        sendRendezvousSearch(next, query);
-        delete *req;
+        sendSearch(next, query); delete *req;
       }
     } else if (Request::START_CONNECTION == (*req)->type()) {
       logDebug() << "StartConnection request timeout...";
@@ -1688,70 +989,12 @@ Node::_onCheckRequestTimeout() {
 }
 
 void
-Node::_onCheckNodeTimeout() {
-  // Collect nodes older than 15min from the buckets
-  QList<NodeItem> oldNodes;
-  _buckets.getOlderThan(15*60, oldNodes);
-  // send a ping to all of them
-  QList<NodeItem>::iterator node = oldNodes.begin();
-  for (; node != oldNodes.end(); node++) {
-    ping(node->addr(), node->port());
-  }
-
-  // Get disappeared nodes
-  oldNodes.clear(); _buckets.getOlderThan(20*60, oldNodes);
-  for (node = oldNodes.begin(); node != oldNodes.end(); node++) {
-    emit nodeLost(node->id());
-  }
-  // are buckets non-empty (this node is connected to the network)
-  bool connected = (0 != _buckets.numNodes());
-  // Remove dead nodes from the buckets
-  _buckets.removeOlderThan(20*60);
-  // check if the last node was removed
-  if (connected && (0 == _buckets.numNodes())) {
-    // If the last node was removed -> signal connection loss
-    emit disconnected();
-  }
-
-  // Update neighbourhood
-  if (_buckets.numNodes()) {
-    // search for myself, this will certainly fail but results in a list
-    // of the closest nodes, which will be added to the buckets as candidates
-    findNeighbours(_self.id());
-  }
-}
-
-void
 Node::_onPingRendezvousNodes() {
   QList<NodeItem> nodes;
   _buckets.getNearest(id(), nodes);
   QList<NodeItem>::iterator node = nodes.begin();
   for (; node != nodes.end(); node++) {
     ping(*node);
-  }
-}
-
-void
-Node::_onCheckAnnouncements() {
-  // Remove all announcement older than an hour:
-  QHash<Identifier, QSet<AnnouncementItem> >::iterator item = _hashTable.begin();
-  for (; item != _hashTable.end(); item++) {
-    QSet<AnnouncementItem>::iterator peer = item->begin();
-    while(peer != item->end()) {
-      if (peer->olderThan(60*60)) {
-        peer = item->erase(peer);
-      } else {
-        peer++;
-      }
-    }
-  }
-
-  // Reannounce all item older than 25min
-  QHash<Identifier, QDateTime>::iterator aitem = _annouceItems.begin();
-  for (; aitem != _annouceItems.end(); aitem++) {
-    if (aitem->secsTo(QDateTime::currentDateTime())>=25*60) {
-      announce(aitem.key());
-    }
   }
 }
 

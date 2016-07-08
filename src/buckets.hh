@@ -12,7 +12,6 @@
 
 #include <inttypes.h>
 
-
 // Forward declaration
 class Identifier;
 
@@ -241,6 +240,8 @@ public:
   void nodes(QList<NodeItem> &lst) const;
   /** Returns @c true if the bucket contains the given identifier. */
   bool contains(const Identifier &id) const;
+  /** Returns true if the node has a valid timestamp. */
+  bool isValid(const Identifier &id) const;
   /** Returns the given node. */
   NodeItem getNode(const Identifier &id) const;
   /** Adds or updates an node. */
@@ -280,10 +281,14 @@ public:
   /** Constructor. */
   Buckets(const Identifier &self);
 
+  /** Returns the node id. */
+  const Identifier &id() const;
   /** Returns @c true if the bucket list is empty. */
   bool empty() const;
   /** Returns true if the buckets contain the given node. */
   bool contains(const Identifier &id) const;
+  /** Returns true if the node has a valid timestamp. */
+  bool isValid(const Identifier &id) const;
   /** Gets the specified node. */
   NodeItem getNode(const Identifier &id) const;
   /** Returns the number of nodes in the buckets. */

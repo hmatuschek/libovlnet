@@ -15,7 +15,7 @@
 #include <openssl/ec.h>
 #include <openssl/pem.h>
 #include <openssl/ripemd.h>
-
+#include <openssl/rand.h>
 
 
 /* ******************************************************************************************** *
@@ -25,7 +25,7 @@ Identity::Identity(EVP_PKEY *key)
   : _keyPair(key)
 {
   unsigned char *keydata = 0; int keylen = 0;
-  unsigned char fingerprint[20];
+  unsigned char fingerprint[OVL_HASH_SIZE];
 
   // Get get public key in DER format (binary)
   if ( 0 >= (keylen = i2d_PUBKEY(_keyPair, &keydata)) )
@@ -33,6 +33,8 @@ Identity::Identity(EVP_PKEY *key)
 
   // Compute RIPEMD160
   OVLHash(keydata, keylen, fingerprint);
+
+  /// @bug free keydata.
 
   // Done
   _fingerprint = Identifier((char *)fingerprint);
@@ -94,26 +96,11 @@ error:
 }
 
 Identity::Identity(const Identity &other)
-  : _keyPair(0), _fingerprint(other._fingerprint)
+  : _keyPair(other._keyPair), _fingerprint(other._fingerprint)
 {
-  // Store in EVP
-  if (0 == (_keyPair = EVP_PKEY_new()))
-    goto error;
-
   if (other._keyPair) {
-    if (0 >= EVP_PKEY_copy_parameters(_keyPair, other._keyPair))
-      goto error;
+    CRYPTO_add(&_keyPair->references, 1, CRYPTO_LOCK_EVP_PKEY);
   }
-
-error:
-  ERR_load_crypto_strings();
-  unsigned long e = 0;
-  while ( 0 != (e = ERR_get_error()) ) {
-    logError() << "OpenSSL: " << ERR_error_string(e, 0);
-  }
-  if (_keyPair)
-    EVP_PKEY_free(_keyPair);
-  _keyPair=0;
 }
 
 Identity::Identity(const QString &path)
@@ -396,8 +383,8 @@ Identity::fromPublicKey(const uint8_t *key, size_t len) {
 /* ******************************************************************************************** *
  * Implementation of SecureSocket
  * ******************************************************************************************** */
-SecureSocket::SecureSocket(Node &node)
-  : _node(node), _sessionKeyPair(0), _peerPubKey(0), _streamId(Identifier::create())
+SecureSocket::SecureSocket(Network &net)
+  : _network(net), _sessionKeyPair(0), _peerPubKey(0), _streamId(Identifier::create())
 {
   // pass...
 }
@@ -405,7 +392,7 @@ SecureSocket::SecureSocket(Node &node)
 SecureSocket::~SecureSocket() {
   if (_sessionKeyPair) { EVP_PKEY_free(_sessionKeyPair); }
   if (_peerPubKey) { EVP_PKEY_free(_peerPubKey); }
-  _node.socketClosed(_streamId);
+  _network.root().socketClosed(_streamId);
 }
 
 int
@@ -416,7 +403,7 @@ SecureSocket::prepare(uint8_t *msg, size_t len) {
   size_t stored=0;
 
   // Store public key and its length into output buffer
-  if (0 > (keyLen = _node.identity().publicKey(msg+2, len-2)) )
+  if (0 > (keyLen = _network.root().identity().publicKey(msg+2, len-2)) )
     goto error;
   *((uint16_t *)msg) = qToBigEndian(qint16(keyLen));
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
@@ -448,7 +435,7 @@ SecureSocket::prepare(uint8_t *msg, size_t len) {
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
 
   // Sign session key
-  if (0 > (keyLen = _node.identity().sign(keyPtr, keyLen, msg+2, len-2)))
+  if (0 > (keyLen = _network.root().identity().sign(keyPtr, keyLen, msg+2, len-2)))
     goto error;
   *((uint16_t *)msg) = qToBigEndian(qint16(keyLen));
   stored += keyLen+2; msg += keyLen+2; len -= keyLen+2;
@@ -561,7 +548,7 @@ SecureSocket::start(const Identifier &streamId, const PeerItem &peer) {
   if(0 >= EVP_PKEY_derive(ctx, skey, &skeyLen))
     goto error;
 
-  // Derive shared key and iv
+  // Derive shared key and iv using SHA-256
   SHA256(skey, skeyLen, tmp);
   memcpy(_sharedKey, tmp, 16);
   memcpy(_sharedIV, tmp+16, 16);
@@ -571,7 +558,9 @@ SecureSocket::start(const Identifier &streamId, const PeerItem &peer) {
   OPENSSL_free(skey);
 
   // Set seq to random value
-  _outSeq = dht_rand64();
+  if (! RAND_bytes((unsigned char *) &_outSeq, sizeof(_outSeq)))
+    goto error;
+
   // Store peer
   _peer = peer;
   // Store stream id and socket
@@ -744,7 +733,7 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
   txlen += enclen;
 
   // Send datagram
-  if (! _node.sendData(_streamId, msg, txlen, _peer)) {
+  if (! _network.root().sendData(_streamId, msg, txlen, _peer)) {
     return false;
   }
 
@@ -756,7 +745,7 @@ SecureSocket::sendDatagram(const uint8_t *data, size_t len) {
 bool
 SecureSocket::sendNull() {
   // send only stream id
-  return _node.sendData(_streamId, 0, 0, _peer);
+  return _network.root().sendData(_streamId, 0, 0, _peer);
 }
 
 
@@ -776,7 +765,8 @@ ServiceHandler::~ServiceHandler() {
 /* ******************************************************************************************** *
  * Implementation of AbstractService
  * ******************************************************************************************** */
-AbstractService::AbstractService()
+AbstractService::AbstractService(QObject *parent)
+  : QObject(parent)
 {
   // pass...
 }

@@ -207,7 +207,7 @@ public:
   /** Constructor.
    * @param dht A weak reference to the DHT instance.
    * @param parent The optional QObject parent. */
-  SecureStream(Node &dht, QObject *parent=0);
+  SecureStream(Network &net, QObject *parent=0);
   /** Destructor. */
   virtual ~SecureStream();
 

@@ -18,89 +18,6 @@ inline QString httpMethodName(HttpMethod m) {
 }
 
 /* ********************************************************************************************* *
- * Implementation of HostName
- * ********************************************************************************************* */
-HostName::HostName(const QString &name, uint16_t defaultPort)
-  : _name(name), _port(defaultPort)
-{
-  // Split at ':'
-  if (_name.contains(':')) {
-    int idx = _name.indexOf(':');
-    _port = _name.mid(idx+1).toUInt();
-    _name = _name.left(idx);
-  }
-}
-
-HostName::HostName(const HostName &other)
-  : _name(other._name), _port(other._port)
-{
-  // pass...
-}
-
-HostName &
-HostName::operator =(const HostName &other) {
-  _name = other._name;
-  _port = other._port;
-  return *this;
-}
-
-const QString &
-HostName::name() const {
-  return _name;
-}
-
-uint16_t
-HostName::port() const {
-  return _port;
-}
-
-bool
-HostName::isOvlNode() const {
-  return _name.endsWith(".ovl");
-}
-
-Identifier
-HostName::ovlId() const {
-  return Identifier::fromBase32(_name.left(_name.size()-4));
-}
-
-
-/* ********************************************************************************************* *
- * Implementation of URI
- * ********************************************************************************************* */
-URI::URI()
-  : _proto(), _host(""), _path(), _query()
-{
-
-}
-
-URI::URI(const QString &uri)
-  : _proto(), _host(""), _path(), _query()
-{
-  QUrl url(uri);
-  _proto = url.scheme();
-  _host  = HostName(url.host(), url.port());
-  _path  = url.path();
-  _query = url.query();
-}
-
-URI::URI(const URI &other)
-  : _proto(other._proto), _host(other._host), _path(other._path), _query(other._query)
-{
-  // pass...
-}
-
-URI &
-URI::operator =(const URI &other) {
-  _proto = other._proto;
-  _host = other._host;
-  _path = other._path;
-  _query = other._query;
-  return *this;
-}
-
-
-/* ********************************************************************************************* *
  * Implementation of HTTPRequest
  * ********************************************************************************************* */
 HttpRequest::HttpRequest(QIODevice *socket, const NodeItem &remote)
@@ -245,6 +162,7 @@ HttpResponse::sendHeaders() {
   switch (_code) {
     case HTTP_RESP_INCOMPLETE: return;
     case HTTP_OK: _headerBuffer.append("200 OK\r\n"); break;
+    case HTTP_SEE_OTHER: _headerBuffer.append("303 See Other\r\n"); break;
     case HTTP_BAD_REQUEST: _headerBuffer.append("400 BAD REQUEST\r\n"); break;
     case HTTP_FORBIDDEN: _headerBuffer.append("403 FORBIDDEN\r\n"); break;
     case HTTP_NOT_FOUND: _headerBuffer.append("404 NOT FOUND\r\n"); break;
@@ -339,9 +257,9 @@ HttpStringResponse::_bytesWritten(qint64 bytes) {
 /* ********************************************************************************************* *
  * Implementation of HttpJsonResponse
  * ********************************************************************************************* */
-HttpJsonResponse::HttpJsonResponse(const QJsonDocument &document, HttpRequest *request)
+HttpJsonResponse::HttpJsonResponse(const QJsonDocument &document, HttpRequest *request, HttpResponseCode respcode)
   : HttpStringResponse(
-      request->version(), HTTP_OK, document.toJson(), request->socket(), "application/json")
+      request->version(), respcode, document.toJson(), request->socket(), "application/json")
 {
   // pass
 }
@@ -645,21 +563,59 @@ LocalHttpServer::_onNewConnection() {
 
 
 /* ********************************************************************************************* *
+ * Implementation of HttpDispatcher
+ * ********************************************************************************************* */
+HttpDispatcher::HttpDispatcher()
+  : HttpRequestHandler(), _handler()
+{
+  // pass...
+}
+
+HttpDispatcher::~HttpDispatcher() {
+  QList<HttpRequestHandler *>::iterator item = _handler.begin();
+  for (; item != _handler.end(); item++)
+    delete *item;
+  _handler.clear();
+}
+
+void
+HttpDispatcher::addHandler(HttpRequestHandler *handler) {
+  _handler.push_back(handler);
+}
+
+bool
+HttpDispatcher::acceptReqest(HttpRequest *request) {
+  return true;
+}
+
+HttpResponse *
+HttpDispatcher::processRequest(HttpRequest *request) {
+  QList<HttpRequestHandler *>::iterator item = _handler.begin();
+  for (; item != _handler.end(); item++) {
+    if ((*item)->acceptReqest(request))
+      return (*item)->processRequest(request);
+  }
+  return new HttpStringResponse(
+        request->version(), HTTP_NOT_FOUND, "Not found.", request->socket());
+}
+
+
+/* ********************************************************************************************* *
  * Implementation of HttpService
  * ********************************************************************************************* */
-HttpService::HttpService(Node &dht, HttpRequestHandler *handler, QObject *parent)
-  : QObject(parent), _dht(dht), _handler(handler)
+HttpService::HttpService(Network &net, HttpRequestHandler *handler, QObject *parent)
+  : AbstractService(parent), _network(net), _handler(handler)
 {
   // pass...
 }
 
 HttpService::~HttpService() {
-  // pass...
+  delete _handler;
 }
 
 SecureSocket *
 HttpService::newSocket() {
-  return new SecureStream(_dht, this);
+  return new SecureStream(_network, this);
 }
 
 void

@@ -5,6 +5,7 @@
 #define SECURECHAT_H
 
 #include "crypto.hh"
+#include "network.hh"
 
 #include <QObject>
 #include <QTimer>
@@ -20,7 +21,7 @@ class SecureChat : public QObject, public SecureSocket
 public:
   /** Construtor.
    * @param dht Specifies the @c DHT instance. */
-  SecureChat(Node &dht);
+  SecureChat(Network &net);
   /** Destructor, closes the connection. */
   virtual ~SecureChat();
 

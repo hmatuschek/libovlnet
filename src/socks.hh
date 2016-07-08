@@ -26,7 +26,7 @@ public:
    * @param instream The local incomming TCP-SOCKS connection. The ownership of the socket is taken
    *        by the instance.
    * @param parent The optional QObject parent. */
-  LocalSocksStream(Node &dht, QTcpSocket *instream, QObject *parent=0);
+  LocalSocksStream(Network &net, QTcpSocket *instream, QObject *parent=0);
   /** Destructor, closes the TCP and @c SecureStream connections. */
   virtual ~LocalSocksStream();
 
@@ -77,7 +77,7 @@ public:
    * @param remote The remote node to use as a proxy.
    * @param port Specifies the local TCP port to listen for incomming connections.
    * @param parent The optional QObject parent. */
-  explicit LocalSocksService(Node &dht, const NodeItem &remote, uint16_t port=1080, QObject *parent = 0);
+  explicit LocalSocksService(Network &net, const NodeItem &remote, uint16_t port=1080, QObject *parent = 0);
 
   /** Destructor. */
   virtual ~LocalSocksService();
@@ -100,7 +100,7 @@ protected slots:
 
 protected:
   /** A weak reference to the DHT node. */
-  Node &_dht;
+  Network &_network;
   /** The remote node acting as a proxy. */
   NodeItem _remote;
   /** The local TCP server waiting for incomming connections. */
@@ -141,7 +141,7 @@ public:
   /** Constructor.
    * @param dht A weak reference to the local DHT node instance.
    * @param parent The optional QObject parent. */
-  SocksOutStream(Node &dht, QObject *parent=0);
+  SocksOutStream(Network &net, QObject *parent=0);
   /** Destructor, also cloeses the connections. */
   virtual ~SocksOutStream();
 

@@ -1,8 +1,8 @@
 #include "securechat.hh"
 #include "node.hh"
 
-SecureChat::SecureChat(Node &dht)
-  : QObject(0), SecureSocket(dht),
+SecureChat::SecureChat(Network &node)
+  : QObject(0), SecureSocket(node),
     _keepAlive(), _timeout()
 {
   // Setup keep-alive timer

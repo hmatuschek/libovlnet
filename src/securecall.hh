@@ -34,7 +34,7 @@ public:
   /** Constructor.
    * @param incomming Indicates whether the call was initiated by the peer or this node.
    * @param dht A weak reference to the @c DHT instance. */
-  explicit SecureCall(bool incomming, Node &dht);
+  explicit SecureCall(bool incomming, Network &net);
   /** Destructor. */
   virtual ~SecureCall();
 

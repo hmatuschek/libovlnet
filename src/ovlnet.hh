@@ -118,6 +118,7 @@
 
 #include "dht_config.hh"
 #include "node.hh"
+#include "subnetwork.hh"
 #include "crypto.hh"
 #include "stream.hh"
 

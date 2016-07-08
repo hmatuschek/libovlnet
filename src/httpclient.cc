@@ -1,13 +1,14 @@
 #include "httpclient.hh"
+#include <QJsonDocument>
 
 
 /* ********************************************************************************************* *
- * Implementation of NetworkConnection
+ * Implementation of HttpClientConnection
  * ********************************************************************************************* */
-HttpClientConnection::HttpClientConnection(Node &node, const NodeItem &remote, const QString &service, QObject *parent)
-  : SecureStream(node, parent), _state(CONNECTING), _service(service)
+HttpClientConnection::HttpClientConnection(Network &net, const NodeItem &remote, const QString &service, QObject *parent)
+  : SecureStream(net, parent), _state(CONNECTING), _service(service), _remote(remote)
 {
-  _node.startConnection(_service, remote, this);
+  _network.root().startConnection(_network.prefix()+"::"+_service, remote, this);
 }
 
 bool
@@ -42,6 +43,11 @@ HttpClientConnection::get(const QString &path) {
   // No body : close instream immediately
   resp->close();
   return resp;
+}
+
+const NodeItem &
+HttpClientConnection::remote() const {
+  return _remote;
 }
 
 void
@@ -192,4 +198,135 @@ qint64
 HttpClientResponse::writeData(const char *data, qint64 len) {
   if (SEND_BODY != _state) { return -1; }
   return _connection->write(data, len);
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of JsonQuery
+ * ********************************************************************************************* */
+JsonQuery::JsonQuery(const QString &service, const QString &path, Network &net, const Identifier &remote)
+  : QObject(0), _service(service), _query(path), _network(net), _remoteId(remote),
+    _method(HTTP_GET), _data()
+{
+  FindNodeQuery *query = new FindNodeQuery(remote);
+  connect(query, SIGNAL(found(NodeItem)), this, SLOT(nodeFound(NodeItem)));
+  connect(query, SIGNAL(failed(Identifier,QList<NodeItem>)), this, SLOT(error()));
+  _network.search(query);
+}
+
+JsonQuery::JsonQuery(const QString &service, const QString &path, Network &net, const NodeItem &remote)
+  : QObject(0), _service(service), _query(path), _network(net), _remoteId(remote.id()),
+    _method(HTTP_GET), _data()
+{
+  nodeFound(remote);
+}
+
+JsonQuery::JsonQuery(const QString &service, const QString &path, const QJsonDocument &data, Network &net, const Identifier &remote)
+  : QObject(0), _service(service), _query(path), _network(net), _remoteId(remote),
+    _method(HTTP_POST), _data(data)
+{
+  FindNodeQuery *query = new FindNodeQuery(remote);
+  connect(query, SIGNAL(found(NodeItem)), this, SLOT(nodeFound(NodeItem)));
+  connect(query, SIGNAL(failed(Identifier,QList<NodeItem>)), this, SLOT(error()));
+  _network.search(query);
+}
+
+JsonQuery::JsonQuery(const QString &service, const QString &path, const QJsonDocument &data, Network &net, const NodeItem &remote)
+  : QObject(0), _service(service), _query(path), _network(net), _remoteId(remote.id()),
+    _method(HTTP_POST), _data(data)
+{
+  nodeFound(remote);
+}
+
+void
+JsonQuery::nodeFound(const NodeItem &node) {
+  /*logDebug() << "Try to connect station '" << node.id().toBase32()
+             << "' for '" << _query << "'."; */
+  _connection = new HttpClientConnection(_network, node, _service, this);
+  connect(_connection, SIGNAL(established()), this, SLOT(connectionEstablished()));
+  connect(_connection, SIGNAL(error()), this, SLOT(error()));
+}
+
+void
+JsonQuery::connectionEstablished() {
+  /*logDebug() << "Try to query '" << _query
+             << "' from station '" << _connection->peerId() << "'."; */
+  _response = _connection->get(_query);
+  if (_response) {
+    connect(_response, SIGNAL(finished()), this, SLOT(responseReceived()));
+    connect(_response, SIGNAL(error()), this, SLOT(error()));
+  } else {
+    error();
+  }
+}
+
+bool
+JsonQuery::accept() {
+  if (HTTP_OK != _response->responseCode()) {
+    logError() << "Cannot query '" << _query << "': Node returned " << _response->responseCode();
+    return false;
+  }
+  if (! _response->hasResponseHeader("Content-Length")) {
+    logError() << "Node response has no length!";
+    return false;
+  }
+  if (! _response->hasResponseHeader("Content-Type")) {
+    logError() << "Node response has no content type!";
+    return false;
+  }
+  if ("application/json" != _response->responseHeader("Content-Type")) {
+    logError() << "Response content type '" << _response->responseHeader("Content-Type")
+               << " is not 'application/json'!";
+    return false;
+  }
+  return true;
+}
+
+void
+JsonQuery::responseReceived() {
+  if (! this->accept()) {
+    logDebug() << "Response rejected.";
+    error(); return;
+  }
+  _responseLength = _response->responseHeader("Content-Length").toUInt();
+  connect(_response, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+}
+
+void
+JsonQuery::error() {
+  logError() << "Failed to access " << _query << " at " << _remoteId.toBase32() << ".";
+  emit failed();
+  deleteLater();
+}
+
+void
+JsonQuery::_onReadyRead() {
+  if (_responseLength) {
+    // Read as much as possible
+    QByteArray tmp = _response->read(_responseLength);
+    // add to response buffer
+    _buffer.append(tmp);
+    // update response length
+    _responseLength -= tmp.size();
+  }
+  if (0 == _responseLength) {
+    // If finished
+    QJsonParseError jerror;
+    // parse JSON
+    QJsonDocument doc = QJsonDocument::fromJson(_buffer, &jerror);
+    if (QJsonParseError::NoError != jerror.error) {
+      // On error
+      logInfo() << "Station returned invalid JSON document as result: "
+                << jerror.errorString() << ".";
+      error(); return;
+    }
+    // signal success
+    this->finished(doc);
+  }
+}
+
+void
+JsonQuery::finished(const QJsonDocument &doc) {
+  emit success(_connection->remote(), doc);
+  this->deleteLater();
 }
