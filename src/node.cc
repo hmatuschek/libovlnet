@@ -275,10 +275,12 @@ Node::Node(const Identity &id,
     _bytesSend(0), _lastBytesSend(0), _outRate(0),
     _connections(), _requestTimer(), _rendezvousTimer(), _statisticsTimer()
 {
+  // seed RNG
   qsrand(QDateTime::currentDateTime().currentMSecsSinceEpoch());
+
   logInfo() << "Start node #" << id.id() << " @ " << addr << ":" << port;
 
-  // register myself as a network
+  // register myself as a network (root network)
   _networks.insert(this->netid(), this);
 
   // try to bind socket to address and port
@@ -299,7 +301,7 @@ Node::Node(const Identity &id,
   _statisticsTimer.setInterval(1000*5);
   _statisticsTimer.setSingleShot(false);
 
-  // Ping rendezvous nodes every 10s
+  // Ping rendezvous nodes every 60s
   _rendezvousTimer.setInterval(1000*10);
   _rendezvousTimer.setSingleShot(false);
 
@@ -311,7 +313,6 @@ Node::Node(const Identity &id,
   connect(&_statisticsTimer, SIGNAL(timeout()), this, SLOT(_onUpdateStatistics()));
 
   _requestTimer.start();
-  _rendezvousTimer.start();
   _statisticsTimer.start();
 
   _started = true;
