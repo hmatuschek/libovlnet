@@ -198,12 +198,6 @@ public:
       if (! _lastSeen.isValid()) { return true; }
       return (_lastSeen.addSecs(seconds) < QDateTime::currentDateTime());
     }
-    /** Returns the number of lost pings to this node. */
-    inline size_t lostPings() const {
-      return _lostPings;
-    }
-    /** Increments the ping-lost counter. */
-    inline void pingLost() { _lostPings++; }
 
   protected:
     /** The prefix -- index of the leading bit of the difference between this identifier and the
@@ -213,8 +207,6 @@ public:
     PeerItem     _peer;
     /** The time, the item was last seen. */
     QDateTime    _lastSeen;
-    /** The number of times, a ping request was not answered. */
-    size_t       _lostPings;
   };
 
 public:
@@ -250,8 +242,6 @@ public:
   void addCandidate(const Identifier &id, const QHostAddress &addr, uint16_t port);
   /** The prefix of the bucket. */
   size_t prefix() const;
-  /** Increments the ping-loss counter of the node. */
-  void pingLost(const Identifier &id);
 
   /** Splits the bucket at its prefix. Means all item with a higher prefix (smaller distance)
    * than the prefix of this bucket are moved to the new one. */
@@ -307,8 +297,6 @@ public:
   void getOlderThan(size_t seconds, QList<NodeItem> &nodes) const;
   /** Removes all nodes that are "older" than the specified age (in seconds). */
   void removeOlderThan(size_t seconds);
-  /** Increment the ping-loss counter. */
-  void pingLost(const Identifier &id);
 
 protected:
   /** Returns the bucket index, an item should be searched for. */

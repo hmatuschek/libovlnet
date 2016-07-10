@@ -1,6 +1,9 @@
 #include "network.hh"
 #include "node.hh"
 
+#define NET_NODE_REFRESH_INTERVAL (15*60)
+#define NET_NODE_TIMEOUT          (20*60)
+
 
 /* ******************************************************************************************** *
  * Implementation of SearchQuery
@@ -215,22 +218,26 @@ void
 Network::checkNodes() {
   // Collect nodes older than 15min from the buckets
   QList<NodeItem> oldNodes;
-  _buckets.getOlderThan(15*60, oldNodes);
+  _buckets.getOlderThan(NET_NODE_REFRESH_INTERVAL, oldNodes);
   // send a ping to all of them
   QList<NodeItem>::iterator node = oldNodes.begin();
   for (; node != oldNodes.end(); node++) {
+    logDebug() << "Node " << node->id() << " needs update -> ping.";
     this->ping(*node);
   }
 
   // Get disappeared nodes
-  oldNodes.clear(); _buckets.getOlderThan(20*60, oldNodes);
+  oldNodes.clear(); _buckets.getOlderThan(NET_NODE_TIMEOUT, oldNodes);
   for (node = oldNodes.begin(); node != oldNodes.end(); node++) {
     emit nodeLost(node->id());
   }
+
   // are buckets non-empty (this node is connected to the network)
   bool connected = (0 != _buckets.numNodes());
+
   // Remove dead nodes from the buckets
-  _buckets.removeOlderThan(20*60);
+  _buckets.removeOlderThan(NET_NODE_TIMEOUT);
+
   // check if the last node was removed
   if (connected && (0 == _buckets.numNodes())) {
     // If the last node was removed -> signal connection loss

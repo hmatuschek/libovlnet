@@ -6,6 +6,9 @@
 #include <netinet/in.h>
 #include <inttypes.h>
 
+#define NODE_STATISTICS_INTERVAL      (1000*5)
+#define NODE_RENDEZVOUS_PING_INTERVAL (1000*60)
+#define NODE_REQUEST_CHECK_INTERVAL   (500)
 
 /** Represents a triple of ID, IP address and port as transferred via UDP.
  * @ingroup internal */
@@ -294,15 +297,15 @@ Node::Node(const Identity &id,
           this,SLOT(_onSocketError(QAbstractSocket::SocketState)));
 
   // check request timeouts every 500ms
-  _requestTimer.setInterval(500);
+  _requestTimer.setInterval(NODE_REQUEST_CHECK_INTERVAL);
   _requestTimer.setSingleShot(false);
 
   // Update statistics every 5 seconds
-  _statisticsTimer.setInterval(1000*5);
+  _statisticsTimer.setInterval(NODE_STATISTICS_INTERVAL);
   _statisticsTimer.setSingleShot(false);
 
   // Ping rendezvous nodes every 60s
-  _rendezvousTimer.setInterval(1000*10);
+  _rendezvousTimer.setInterval(NODE_RENDEZVOUS_PING_INTERVAL);
   _rendezvousTimer.setSingleShot(false);
 
   // Check for dead announcements and check for update my announcement items every 3min
@@ -417,6 +420,7 @@ Node::hasService(const QString &service) const {
 
 bool
 Node::registerService(const QString &service, AbstractService *handler) {
+  logInfo() << "Register service " << service << ".";
   unsigned char hash[OVL_HASH_SIZE];
   QByteArray sName = service.toUtf8();
   OVLHash((const uint8_t *)sName.constData(), sName.size(), hash);
@@ -562,6 +566,7 @@ Node::enableRendezvousPing(bool enable) {
  */
 void
 Node::sendPing(const QHostAddress &addr, uint16_t port, const Identifier &netid) {
+  //logDebug() << "Send ping to " << addr << ":" << port << " within net " << netid << ".";
   // Create named ping request
   PingRequest *req = new PingRequest(netid);
   _pendingRequests.insert(req->cookie(), req);
@@ -579,6 +584,7 @@ Node::sendPing(const QHostAddress &addr, uint16_t port, const Identifier &netid)
 
 void
 Node::sendPing(const Identifier &id, const QHostAddress &addr, uint16_t port, const Identifier &netid) {
+  //logDebug() << "Send ping to " << addr << ":" << port << " within net " << netid << ".";
   // Create named ping request
   PingRequest *req = new PingRequest(id, netid);
   _pendingRequests.insert(req->cookie(), req);
@@ -968,12 +974,7 @@ Node::_onCheckRequestTimeout() {
   for (; req != deadRequests.end(); req++) {
     if (Request::PING == (*req)->type()) {
       logDebug() << "Ping request timeout...";
-      PingRequest *ping = static_cast<PingRequest *>(*req);
-      // If the ping was send to a known node (known ID, and not to a peer)
-      if (ping->id().isValid()) {
-        _buckets.pingLost(ping->id());
-      }
-      delete ping;
+      delete static_cast<PingRequest *>(*req);
     } else if (Request::SEARCH == (*req)->type()) {
       logDebug() << "Search request timeout...";
       SearchQuery *query = static_cast<SearchRequest *>(*req)->query();
@@ -986,7 +987,8 @@ Node::_onCheckRequestTimeout() {
         delete *req;
       } else {
         // Continue search
-        sendSearch(next, query); delete *req;
+        sendSearch(next, query);
+        delete *req;
       }
     } else if (Request::START_CONNECTION == (*req)->type()) {
       logDebug() << "StartConnection request timeout...";
@@ -1004,6 +1006,7 @@ Node::_onPingRendezvousNodes() {
   _buckets.getNearest(id(), nodes);
   QList<NodeItem>::iterator node = nodes.begin();
   for (; node != nodes.end(); node++) {
+    //logDebug() << "Ping rendezvous node " << node->addr() << ":" << node->port() << ".";
     ping(*node);
   }
 }

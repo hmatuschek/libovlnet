@@ -291,20 +291,19 @@ AnnouncementItem::olderThan(size_t seconds) const {
  * Implementation of Bucket::Item
  * ******************************************************************************************** */
 Bucket::Item::Item()
-  : _prefix(0), _peer(QHostAddress(), 0), _lastSeen(), _lostPings(0)
+  : _prefix(0), _peer(QHostAddress(), 0), _lastSeen()
 {
   // pass...
 }
 
 Bucket::Item::Item(const QHostAddress &addr, uint16_t port, size_t prefix, const QDateTime &lastSeen)
-  : _prefix(prefix), _peer(addr, port), _lastSeen(lastSeen), _lostPings(0)
+  : _prefix(prefix), _peer(addr, port), _lastSeen(lastSeen)
 {
   // pass...
 }
 
 Bucket::Item::Item(const Item &other)
-  : _prefix(other._prefix), _peer(other._peer), _lastSeen(other._lastSeen),
-    _lostPings(other._lostPings)
+  : _prefix(other._prefix), _peer(other._peer), _lastSeen(other._lastSeen)
 {
   // pass...
 }
@@ -314,7 +313,6 @@ Bucket::Item::operator =(const Item &other) {
   _prefix    = other._prefix;
   _peer      = other._peer;
   _lastSeen  = other._lastSeen;
-  _lostPings = other._lostPings;
   return *this;
 }
 
@@ -406,6 +404,7 @@ Bucket::add(const Identifier &id, const QHostAddress &addr, uint16_t port) {
   bool isNew = !contains(id);
   if (contains(id) || (!full())) {
     _triples[id] = Item(addr, port, (id-_self).leadingBit(), QDateTime::currentDateTime());
+    //logDebug() << "Node " << addr << ":" << port << " entered buckets.";
     return isNew;
   }
   return false;
@@ -454,13 +453,6 @@ Bucket::getNearest(const Identifier &id, QList<NodeItem> &best) const {
     while ((node != best.end()) && (d>=(id-node->id()))) { node++; }
     best.insert(node, NodeItem(item.key(), item->addr(), item->port()));
     while (best.size() > OVL_K) { best.pop_back(); }
-  }
-}
-
-void
-Bucket::pingLost(const Identifier &id) {
-  if (_triples.contains(id)) {
-    _triples[id].pingLost();
   }
 }
 
@@ -656,14 +648,6 @@ Buckets::removeOlderThan(size_t seconds) {
   QList<Bucket>::iterator bucket = _buckets.begin();
   for (; bucket != _buckets.end(); bucket++) {
     bucket->removeOlderThan(seconds);
-  }
-}
-
-void
-Buckets::pingLost(const Identifier &id) {
-  QList<Bucket>::iterator bucket = _buckets.begin();
-  for (; bucket != _buckets.end(); bucket++) {
-    bucket->pingLost(id);
   }
 }
 
