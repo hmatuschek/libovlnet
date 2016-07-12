@@ -28,7 +28,7 @@ public:
 
 public:
   /** Constructor.
-   * @param dht Specifies the DHT instance.
+   * @param network Specifies the network.
    * @param filename Filename of the file to be transferred (do not need to exists).
    * @param filesize Size of the file.
    * @param parent Specifies the optional QObject parent. */

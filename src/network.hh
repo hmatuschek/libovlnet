@@ -18,7 +18,9 @@ class SearchQuery: public QObject
   Q_OBJECT
 
 public:
-  /** Constructor. */
+  /** Constructor.
+   * @param id Specifies the identifier to search for.
+   * @param prefix Specifies the network prefix to search in. */
   SearchQuery(const Identifier &id, const QString &prefix);
 
   /** Destructor. */
@@ -48,6 +50,7 @@ public:
   /** Returns the first element from the search queue. */
   const NodeItem &first() const;
 
+  /** Returns true, if the search is complete. */
   virtual bool isSearchComplete() const = 0;
 
   /** Gets called if there is no progress in search or if @c isSearchComplete returned @c true. */
@@ -62,8 +65,11 @@ public:
   virtual void searchFailed();
 
 signals:
+  /** Gets emitted if the search succeeded or failed. */
   void completed(const Identifier &id, const QList<NodeItem> &best);
+  /** Gets emitted if the search failed. */
   void failed(const Identifier &id, const QList<NodeItem> &best);
+  /** Gets emitted if the search succeeded. */
   void succeeded(const Identifier &id, const QList<NodeItem> &best);
 
 protected:
@@ -78,12 +84,17 @@ protected:
 };
 
 
+/** A specialized @c SearchQuery that resolves a node identifier. */
 class FindNodeQuery: public SearchQuery
 {
   Q_OBJECT
 
 public:
+  /** Constructs a node search query.
+   * @param id Specifies the node identifier.
+   * @param prefix Specifies the network prefix to search in. */
   FindNodeQuery(const Identifier &id, const QString prefix="");
+  /** Destructor. */
   virtual ~FindNodeQuery();
 
   bool isSearchComplete() const;
@@ -91,16 +102,24 @@ public:
   void searchSucceeded();
 
 signals:
+  /** Gets emitted if the node has been found. */
   void found(const NodeItem &node);
 };
 
 
+/** A @c SearchQuery specialization searching for the neighbourhood of a node or any other
+ * identifier. In contrast to the @c FindNodeQuery, this query continues until the neighbourhood
+ * of an identifier has be found. */
 class NeighbourhoodQuery: public SearchQuery
 {
   Q_OBJECT
 
 public:
+  /** Constructs a neighbourhood search query.
+   * @param id Specifies the identifier to search for.
+   * @param prefix Specifies the network prefix to search in. */
   NeighbourhoodQuery(const Identifier &id, const QString prefix="");
+  /** Destructor. */
   virtual ~NeighbourhoodQuery();
 
   bool isSearchComplete() const;
@@ -115,12 +134,17 @@ class Network : public QObject
   Q_OBJECT
 
 public:
+  /** Constructs a network.
+   * @param id Specifies the identifier of the node.
+   * @param parent Specifies the QObject parent. */
   explicit Network(const Identifier &id, QObject *parent = 0);
 
   /** Returns a weak reference to the root network node. */
   virtual Node &root() = 0;
 
+  /** Returns the network prefix (name). Returns an empty string for the roo network. */
   virtual const QString &prefix() const = 0;
+  /** Returns the network identifier. */
   virtual Identifier netid() const;
 
   /** Returns @c true if a handler is associated with the given service name. */
@@ -130,14 +154,19 @@ public:
    * service. The ownership of the handler is transferred to the DHT. */
   virtual bool registerService(const QString& service, AbstractService *handler)=0;
 
+  /** Sends a ping to the given node. */
   virtual void ping(const NodeItem &node) = 0;
+  /** Starts a search query (e.g., @c FindNodeQuery). */
   virtual void search(SearchQuery *query) = 0;
+  /** Returns the nearest neighbours within this network from the buckets. */
   void getNearest(const Identifier &id, QList<NodeItem> &nodes) const;
 
 public slots:
+  /** Adds a candidate node for the network. */
   void addCandidate(const NodeItem &node);
 
 protected:
+  /** Gets called once a node replied to a ping request within this network. */
   virtual void nodeReachableEvent(const NodeItem &node);
 
 signals:
@@ -153,10 +182,13 @@ signals:
   void nodeReachable(const NodeItem &node);
 
 protected slots:
+  /** Gets called periodically to check for any unreachable node in the buckets. */
   void checkNodes();
 
 protected:
+  /** The buckets of nodes for this network. */
   Buckets _buckets;
+  /** Bucket update timer. */
   QTimer _nodeTimer;
 
   friend class Node;

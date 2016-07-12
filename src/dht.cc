@@ -11,10 +11,10 @@ DHT::DHT(SubNetwork &subnet, QObject *parent)
   : QObject(parent), _subnet(subnet)
 {
   // register data search service
-  _subnet.root().registerService(subnet.prefix()+"::dht",
-                                 new HttpService(subnet.root(), new DHTSearchHandler(*this), this));
+  _subnet.registerService("dht", new HttpService(_subnet, new DHTSearchHandler(*this), this));
 
   // Whenever the neighbourhood of some ID has been determined
+  /// @bug nearestMembers is not a signal!
   connect(&_subnet, SIGNAL(nearestMembers(Identifier,QList<NodeItem>)),
           this, SLOT(membersFoundEvent(Identifier,QList<NodeItem>)));
 }
@@ -190,8 +190,8 @@ DHTSearchHandler::acceptReqest(HttpRequest *request) {
 
 HttpResponse *
 DHTSearchHandler::processRequest(HttpRequest *request) {
-  if ((HTTP_GET == request->method()) && (request->uri().path().startsWith("/find/"))) {
-    Identifier itemid = Identifier::fromBase32(request->uri().path().mid(6));
+  if ((HTTP_GET == request->method()) && (request->uri().path().startsWith("/"))) {
+    Identifier itemid = Identifier::fromBase32(request->uri().path().mid(1));
     if (! itemid.isValid()) {
       return new HttpStringResponse(request->version(), HTTP_BAD_REQUEST, "", request->socket());
     }
@@ -263,7 +263,7 @@ DHTSearchHandler::_processAnnouncement(const Identifier &item, HttpRequest *requ
  * Implementation of DHTSearchRequest
  * ********************************************************************************************** */
 DHTSearchRequest::DHTSearchRequest(DHT &dht, const NodeItem &remote, SearchQuery *query)
-  : JsonQuery(dht.subnet().prefix(), "/find/"+query->id().toBase32(), dht.subnet().root(), remote),
+  : JsonQuery("dht", "/"+query->id().toBase32(), dht.subnet(), remote),
     _dht(dht), _queryobj(query), _redirect(false)
 {
   // pass...
@@ -381,8 +381,8 @@ DHTAnnounceQuery::DHTAnnounceQuery(Network &net, const Identifier &id)
 void
 DHTAnnounceQuery::_onNeighboursFound(const Identifier &id, const QList<NodeItem> &nodes) {
   foreach (NodeItem node, nodes) {
-    JsonQuery *ann = new JsonQuery(
-          _network.prefix()+"::dht", "/"+_item.toBase32(), QJsonDocument(), _network.root(), node);
+    // Send a push request to the node.
+    JsonQuery *ann = new JsonQuery("dht", "/"+_item.toBase32(), QJsonDocument(), _network, node);
     _numQueries++;
     connect(ann, SIGNAL(success(NodeItem,QJsonDocument)), this, SLOT(_onNeighbourNotified()));
     connect(ann, SIGNAL(failed()), this, SLOT(_onError()));
