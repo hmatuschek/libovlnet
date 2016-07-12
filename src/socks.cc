@@ -166,7 +166,10 @@ LocalSocksService::_onNewConnection() {
     connect(conn, SIGNAL(destroyed()), this, SLOT(_onConnectionClosed()));
     _connectionCount++;
     emit connectionCountChanged(_connectionCount);
-    _network.startConnection("socks5", _remote, conn);
+    QString servicename = "socks5";
+    if (! _network.prefix().isEmpty())
+      servicename = _network.prefix() + "::" + servicename;
+    _network.root().startConnection(servicename, _remote, conn);
   }
 }
 
