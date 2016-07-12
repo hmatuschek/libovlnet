@@ -166,7 +166,7 @@ LocalSocksService::_onNewConnection() {
     connect(conn, SIGNAL(destroyed()), this, SLOT(_onConnectionClosed()));
     _connectionCount++;
     emit connectionCountChanged(_connectionCount);
-    _network.root().startConnection(_network.prefix()+"::socks5", _remote, conn);
+    _network.startConnection("socks5", _remote, conn);
   }
 }
 
