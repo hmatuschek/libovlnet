@@ -1006,7 +1006,7 @@ Node::_onPingRendezvousNodes() {
   _buckets.getNearest(id(), nodes);
   QList<NodeItem>::iterator node = nodes.begin();
   for (; node != nodes.end(); node++) {
-    //logDebug() << "Ping rendezvous node " << node->addr() << ":" << node->port() << ".";
+    logDebug() << "Ping rendezvous node " << node->addr() << ":" << node->port() << ".";
     ping(*node);
   }
 }
