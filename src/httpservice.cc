@@ -613,6 +613,11 @@ HttpService::~HttpService() {
   delete _handler;
 }
 
+HttpRequestHandler *
+HttpService::handler() const {
+  return _handler;
+}
+
 SecureSocket *
 HttpService::newSocket() {
   return new SecureStream(_network, this);

@@ -411,6 +411,9 @@ public:
   /** Destructor. */
   virtual ~HttpService();
 
+  /** Returns a weak reference to the handler instance. */
+  HttpRequestHandler *handler() const;
+
   /** Constructs a new stream socket. */
   SecureSocket *newSocket();
   /** Retruns @c true by default. */

@@ -177,7 +177,7 @@ StreamInBuffer::read(uint8_t *buffer, uint16_t len) {
 
 uint32_t
 StreamInBuffer::putPacket(uint32_t seq, const uint8_t *data, uint16_t len) {
-  // check if sequence matches expected sequence
+  /*// check if sequence matches expected sequence
   if (_nextSequence != seq) {
     return 0;
   }
@@ -186,10 +186,10 @@ StreamInBuffer::putPacket(uint32_t seq, const uint8_t *data, uint16_t len) {
   // Update sequence
   _nextSequence += len;
   _available += len;
-  return len;
+  return len;*/
 
   // check if seq fits into window [_nextSequence, _nextSequence-_available+window()), if not -> done
-  /*if (! _in_window(seq)) {
+  if (! _in_window(seq)) {
     logDebug() << "StreamInBuffer: Ignore packet seq=" << seq
                << ", len=" << len << ": Not in window: ["
                << _nextSequence << ", " << (_nextSequence+window()) << "].";
@@ -211,29 +211,23 @@ StreamInBuffer::putPacket(uint32_t seq, const uint8_t *data, uint16_t len) {
   if (0 == (len = _buffer.put(offset, data, len)) ) {
     return 0;
   }
-  // Store packet in queue
-  if (0 == _packets.size()) {
-    // if queue is empty -> append
-    _packets.append(QPair<uint32_t, uint32_t>(seq, len));
-  } else {
-    // Insort according to sequence number
-    uint32_t lastSeq = _nextSequence; int i=0;
-    while ((i<_packets.size()) && (!_in_between(seq, lastSeq, _packets[i].first))) {
-      lastSeq = _packets[i].first; i++;
-    }
-    _packets.insert(i, QPair<uint32_t, uint32_t>(seq, len));
+  // Insort according to sequence number
+  uint32_t lastSeq = _nextSequence; int i=0;
+  while ((i<_packets.size()) && (!_in_between(seq, lastSeq, _packets[i].first))) {
+    lastSeq = _packets[i].first; i++;
   }
+  _packets.insert(i, QPair<uint32_t, uint32_t>(seq, len));
+
   // Get number of bytes that got available by this packet
   uint32_t newbytes = 0;
   while ( _packets.size() && _in_packet(_nextSequence, _packets.first())) {
     uint32_t acked = ((_packets.first().first+_packets.first().second)-_nextSequence);
-    _nextSequence  = (_packets.first().first+_packets.first().second);
-    /// @bug Ohh, this can be wrong!
-    _available    += acked;
-    newbytes      += acked;
+    _nextSequence  += acked;
+    _available     += acked;
+    newbytes       += acked;
     _packets.pop_front();
   }
-  return newbytes;*/
+  return newbytes;
 }
 
 bool
@@ -244,7 +238,7 @@ StreamInBuffer::_in_between(uint32_t seq, uint32_t a, uint32_t b) {
 bool
 StreamInBuffer::_in_window(uint32_t seq) const {
   uint32_t a = _nextSequence;
-  uint32_t b = (_nextSequence-_available+window());
+  uint32_t b = (_nextSequence-_available+0xffff);
   return _in_between(seq, a, b);
 }
 

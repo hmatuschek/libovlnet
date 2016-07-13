@@ -193,7 +193,7 @@ class SecureStream: public QIODevice, public SecureSocket
 public:
   /** Possible states of the stream. */
   typedef enum {
-    INITIALIZED,  ///< Stream is initialized, data may be received but and stored in the buffer,
+    INITIALIZED,  ///< Stream is initialized, data may be received and stored in the buffer,
                   ///  but no event is emitted.
     OPEN,         ///< Stream is open and data can be send or received. IO events are emitted.
     CLOSING,      ///< No data is received anymore but remaining data will be send. The state will
@@ -205,7 +205,7 @@ public:
 
 public:
   /** Constructor.
-   * @param dht A weak reference to the DHT instance.
+   * @param net A weak reference to the DHT instance.
    * @param parent The optional QObject parent. */
   SecureStream(Network &net, QObject *parent=0);
   /** Destructor. */
