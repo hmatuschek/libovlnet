@@ -27,7 +27,7 @@ SecureCall::SecureCall(bool incomming, Network &net)
   PaError paerr = Pa_OpenDefaultStream(&_paStream, 1, 1, paInt16, 48000, OVL_CALL_NUM_FRAMES,
                                        SecureCall::_handleFrames, this);
   if (paNoError != paerr) {
-    logError() << "Can not configure PortAudio source: (" << paError << ") "
+    logError() << "Can not configure PortAudio source: (" << paerr << ") "
                << ((const char *)Pa_GetErrorText(paerr));
     return;
   }
